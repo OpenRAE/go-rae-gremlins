@@ -18,7 +18,7 @@ Exit: The open upstream issues and PRs are in the fork. Nobody merges a copied i
 
 ## 2. Ready for development
 
-Exit: The repository is fully onboarded to Ground Control.
+Exit: #64 fully onboards the repository to Ground Control, and the issues below are done.
 
 - #65 Audit the workflows for safety and align them with the maintainer's practices and Gremlins
 - #67 Enable the workflows of the fork and make the checks of #64 pass
@@ -28,7 +28,6 @@ Exit: The repository is fully onboarded to Ground Control.
 - #71 Decide how the fork takes upstream changes
 - #72 Document the build and release process of upstream Gremlins
 - #73 Set up the release process of the fork
-- #74 Onboard the repository to Ground Control
 
 ## 3. Understand
 
