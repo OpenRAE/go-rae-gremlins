@@ -18,7 +18,7 @@ Exit: The open upstream issues and PRs are in the fork. Nobody merges a copied i
 
 ## 2. Ready for development
 
-Exit: A trivial change goes from issue to PR, passes CI, and merges into `dev` under Ground Control.
+Exit: The repository is fully onboarded to Ground Control.
 
 - #65 Audit the workflows for safety and align them with the maintainer's practices and Gremlins
 - #67 Enable the workflows of the fork and make the checks of #64 pass
@@ -28,7 +28,7 @@ Exit: A trivial change goes from issue to PR, passes CI, and merges into `dev` u
 - #71 Decide how the fork takes upstream changes
 - #72 Document the build and release process of upstream Gremlins
 - #73 Set up the release process of the fork
-- #74 Make Ground Control work from issue to merge in this repository
+- #74 Onboard the repository to Ground Control
 
 ## 3. Understand
 
