@@ -1,7 +1,7 @@
 # Maintenance plan
 
-This plan makes go-rae-gremlins a well-maintained fork of Gremlins. Each phase is a GitHub milestone.
-A phase starts when the phase before it is complete.
+This plan makes go-rae-gremlins a well-maintained fork of Gremlins. All of its issues are in the
+Maintenance baseline milestone. The phases run in order. A phase starts when the phase before it is complete.
 
 Other repositories need correct results from this fork:
 
@@ -10,13 +10,13 @@ Other repositories need correct results from this fork:
 
 The defects in #1 are on the critical path of that work.
 
-## 00 Capture
+## 1. Capture
 
-Exit: The open upstream issues and PRs are in the fork. Nobody merges a copied item before 03 Triage.
+Exit: The open upstream issues and PRs are in the fork. Nobody merges a copied item before triage (#83).
 
 - #66 Copy the four upstream PRs that the pre-push guard blocked
 
-## 01 Ready for development
+## 2. Ready for development
 
 Exit: A trivial change goes from issue to PR, passes CI, and merges into `dev` under Ground Control.
 
@@ -30,7 +30,7 @@ Exit: A trivial change goes from issue to PR, passes CI, and merges into `dev` u
 - #73 Set up the release process of the fork
 - #74 Make Ground Control work from issue to merge in this repository
 
-## 02 Understand
+## 3. Understand
 
 Exit: Each review has a record, a baseline, and decisions. The reviews do not fix code.
 
@@ -43,16 +43,16 @@ Exit: Each review has a record, a baseline, and decisions. The reviews do not fi
 - #81 Review the security
 - #82 Review the documentation
 
-## 03 Triage
+## 4. Triage
 
 Exit: Each copied item and #1 has a decision: keep, rework, or close.
 
 - #83 Triage the copied upstream items and #1 against the review results
 
-## 04 Remediate and develop
+## 5. Remediate and develop
 
 Exit: The kept work and the remediations are done under the new gates, and a tagged release exists that the dependent repositories can pin.
 
 - #84 Cut a tagged release that the dependent repositories can pin
 
-The 03 Triage milestone adds the remediation and development issues to this milestone.
+Triage (#83) creates the remediation and development issues.
