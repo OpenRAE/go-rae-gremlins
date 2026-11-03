@@ -1,0 +1,3 @@
+# Historical Viper test-table key "tvsa.float64.key", not an API credential.
+# Ignore only this rule at this exact commit, file, and line; retain all other checks.
+57aeb87ed372eaedb95da16cd43961077327c6a0:configuration/configuration_test.go:generic-api-key:263

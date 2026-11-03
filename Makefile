@@ -39,6 +39,11 @@ requirements:
 lint:
 	${LINT} ./...
 
+.PHONY: policy
+policy:
+	pre-commit validate-config
+	pre-commit run --hook-stage pre-commit --all-files
+
 .PHONY: goimports
 goimports:
 	goimports --local 'github.com/go-gremlins/gremlins' -v -w .

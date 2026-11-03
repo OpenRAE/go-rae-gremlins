@@ -38,6 +38,9 @@ linters:
         linters:
           - cyclop
   settings:
+    goconst:
+      # Keep table-driven test inputs and expected command arguments readable.
+      ignore-tests: true
     revive:
       severity: warning
       confidence: 0.8

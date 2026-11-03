@@ -5,6 +5,12 @@ out
 
 CLAUDE.local.md
 
+# Local credentials and agent server configuration
+.env
+.env.*
+!.env.example
+.mcp.json
+
 ### Go template
 # Binaries for programs and plugins
 *.exe

@@ -31,6 +31,10 @@ code metrics, bear with us if we ask you to make changes before accepting your P
 
 ## Becoming a contributor
 
+This fork's optional maintainer tooling and repository checks are documented in
+[Maintainer setup](https://github.com/OpenRAE/go-rae-gremlins/blob/main/docs/MAINTAINER_SETUP.md).
+Ground Control is not required to contribute.
+
 Gremlins is fully developed on GitHub and the best way to contribute is by forking the repository and, once you complete
 your work, opening a _pull request_.
 

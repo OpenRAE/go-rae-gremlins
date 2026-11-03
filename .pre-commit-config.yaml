@@ -1,0 +1,25 @@
+minimum_pre_commit_version: '3.2.0'
+fail_fast: true
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b # v5.0.0
+    hooks:
+      - id: check-yaml
+        # MkDocs uses application-specific YAML tags; check syntax without loading them.
+        args: [--unsafe]
+      - id: check-json
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: c2afd56bbe7ab11564107d34efac4bfde3e3c78d # v8.24.0
+    hooks:
+      - id: gitleaks
+      - id: gitleaks
+        alias: gitleaks-history
+        name: Scan Git history for secrets
+        entry: gitleaks git --redact --no-banner --log-opts=--all
+        stages: [manual]
+        always_run: true
