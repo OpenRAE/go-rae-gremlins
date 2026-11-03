@@ -19,10 +19,11 @@ make build
 ```
 
 Select the package and test name that exercise your change. `make test`,
-`make cover`, and the Gremlins workflow run the full checks in CI. The existing
-coverage integrations remain in place. Codecov authenticates with GitHub's
-short-lived OIDC identity rather than a stored upload token; the test job has
-`id-token: write` for this purpose.
+`make cover`, and the Gremlins workflow run the full checks in CI. `make cover`
+generates `coverage.out` with race detection. The inherited Codecov upload is
+removed because this fork is not configured in Codecov; CI needs no OIDC token
+permission for coverage reporting. Re-enabling Codecov requires an explicit
+decision to configure the fork in that service.
 
 GitHub's default CodeQL setup is enabled for Go on this fork. It owns CodeQL
 analysis; a second advanced CodeQL workflow would conflict with that setup.

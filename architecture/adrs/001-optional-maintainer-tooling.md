@@ -44,6 +44,12 @@ Repository policy checks use the same hook configuration locally and in CI.
 Full Go tests, race detection, and mutation testing remain CI responsibilities;
 local implementation uses tests for the changed behavior.
 
+Generate Go coverage in the test matrix. Remove the inherited Codecov uploader
+and its configuration because Codecov has no repository configured for this
+fork. Do not grant CI an OIDC token permission for an unused integration.
+Any future Codecov setup requires an explicit decision to enable the service
+for the fork; test failures continue to fail CI independently of reporting.
+
 Ground Control is optional. Native Git and Go commands remain supported.
 Merging PRs and changes into `main` requires the user's approval.
 
