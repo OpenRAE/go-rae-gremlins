@@ -1,0 +1,51 @@
+schema_version: 1
+project: go-rae-gremlins
+github_repo: OpenRAE/go-rae-gremlins
+workflow:
+  base_branch: main
+  # Full commands describe CI gates; local work selects relevant package tests.
+  test_command: make test
+  completion_command: make all
+  lint_command: make lint
+  policy_command: make policy
+  precommit_command: pre-commit run --hook-stage pre-commit
+rules:
+  plan_rules: .gc/plan-rules.md
+docs:
+  adr_dir: architecture/adrs/
+  architecture_overview: architecture/adrs/001-optional-maintainer-tooling.md
+  coding_standards: AGENTS.md
+  workflow_reference: docs/MAINTAINER_SETUP.md
+example_paths:
+  source: internal/engine/engine.go
+  test: internal/engine/engine_test.go
+cross_cutting_concerns:
+  description: |
+    Runtime: Go CLI; keep the upstream github.com/go-gremlins/gremlins module path.
+    Verification: targeted local Go tests with race detection; full tests and mutation testing in CI.
+    Security: local credentials and MCP settings are ignored; retain secret scanning and existing hooks.
+    Delivery: issues and pull requests belong to OpenRAE/go-rae-gremlins; user-owned merges into main.
+architecture:
+  vocabulary:
+    patterns:
+      - name: CLI commands
+        applies_to: Cobra command wiring and configuration of mutation runs
+        example_path: cmd/unleash.go
+      - name: Mutation engine
+        applies_to: AST traversal, mutation selection, and worker execution
+        example_path: internal/engine/engine.go
+    canonical_helpers:
+      - name: Repository commands
+        purpose: Existing Go build, lint, and CI test commands
+        path: Makefile
+      - name: Configuration
+        purpose: Existing Viper configuration cascade
+        path: internal/configuration/configuration.go
+    boundary_contract:
+      description: |
+        Keep application dependencies in the existing Go module.
+        Credentials and MCP settings stay local; approved review providers are configured by the user.
+        Ground Control is optional maintainer tooling; the user approves merges into main.
+    binding_adrs:
+      - id: ADR-001
+        one_liner: Optional local maintainer tooling reuses native Go commands and existing GitHub hosting.
