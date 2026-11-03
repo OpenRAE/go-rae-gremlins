@@ -22,6 +22,9 @@ Select the package and test name that exercise your change. `make test`,
 `make cover`, and the Gremlins workflow run the full checks in CI. The existing
 coverage integrations remain unchanged.
 
+GitHub's default CodeQL setup is enabled for Go on this fork. It owns CodeQL
+analysis; a second advanced CodeQL workflow would conflict with that setup.
+
 Pre-commit downloads the public hook sources pinned in
 `.pre-commit-config.yaml` and runs them locally. Commit checks validate file
 syntax, merge markers, and private keys; Gitleaks scans the staged diff with
