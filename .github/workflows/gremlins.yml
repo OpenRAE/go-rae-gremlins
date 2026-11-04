@@ -5,17 +5,55 @@ on:
     branches: [ 'main' ]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   gremlins:
+    name: Mutation testing
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-      - name: Run Gremlins
-        uses: go-gremlins/gremlins-action@v1
+      - name: Build this fork
+        run: go build -o "$RUNNER_TEMP/gremlins" ./cmd/gremlins
+      - name: Mutate changed lines
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
+        run: '"$RUNNER_TEMP/gremlins" unleash --diff "$BASE_COMMIT"'
+      - name: Mutate the full repository
+        if: github.event_name == 'push'
+        run: '"$RUNNER_TEMP/gremlins" unleash'
+
+  regression-proof:
+    name: Regression proof
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
         with:
-          version: latest
-          args: --silent
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Check regression proof helper
+        run: python -m unittest discover -s .github/scripts -p 'test_regression_proof.py'
+      - name: Prove new regression tests against base code
+        env:
+          BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
+        run: python .github/scripts/regression_proof.py "$BASE_COMMIT"

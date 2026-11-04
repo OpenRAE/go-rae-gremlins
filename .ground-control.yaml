@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 project: go-rae-gremlins
 github_repo: OpenRAE/go-rae-gremlins
 workflow:
@@ -26,6 +26,14 @@ cross_cutting_concerns:
     Security: local credentials and MCP settings are ignored; retain secret scanning and existing hooks.
     Delivery: issues and pull requests belong to OpenRAE/go-rae-gremlins; user-owned merges into main.
 architecture:
+  modules:
+    - path: .
+      implementations:
+        - internal/diff/diff.go
+        - internal/report/report.go
+        - .github/workflows/gremlins.yml
+      adrs:
+        - architecture/adrs/001-optional-maintainer-tooling.md
   vocabulary:
     patterns:
       - name: CLI commands
