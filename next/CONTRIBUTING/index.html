@@ -1301,6 +1301,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pull-request-test-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pull request test gates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#commit-messages" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1502,6 +1513,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pull-request-test-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pull request test gates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#commit-messages" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1626,6 +1648,41 @@ history.</p>
 <p>Before a release, the code base will be frozen and no <em>pull request</em> will be accepted until the release is done, with
 the only exception of bug fixes. If you send a <em>pull request</em> during a code freeze, you will have to wait a little more
 before seeing it merged.</p>
+<h3 id="pull-request-test-gates">Pull request test gates<a class="headerlink" href="#pull-request-test-gates" title="Permanent link">&para;</a></h3>
+<p>The Gremlins workflow builds this fork and mutation tests the added Go lines
+relative to the pull request's merge base. The existing <code>.gremlins.yaml</code>
+thresholds apply. Lines outside the diff are skipped; a change without mutation
+candidates passes without applying thresholds to an empty selection. Pushes to
+<code>main</code> still run mutation testing across the repository.</p>
+<p>Classify every new Go test by name: <code>TestRegression...</code> for a fix,
+or <code>TestFeature...</code> for new behavior. CI rejects unclassified new tests, so
+omitting a regression prefix cannot silently bypass the proof check. Existing
+test names need no changes. A new named subtest inherits its parent's
+classification. Put a new regression under a <code>TestRegression...</code> parent;
+new subtests under an unclassified historical test fail CI too.</p>
+<p>Name each new Go regression test <code>TestRegression</code> followed by its behavior,
+for example <code>TestRegressionDiffSeparatedAdditions</code>. Give each regression a
+distinct test or <code>t.Run</code> name; unnamed table rows cannot prove separate
+regressions. CI runs the head and base suites to discover test and subtest names,
+then proves each new regression leaf separately with race detection and caching
+disabled. A failing sibling cannot establish proof for a passing case.
+Each case must pass on the PR head and fail an assertion against the merge base
+with the PR's test files, <code>testdata</code> fixtures, and Go dependency files overlaid.
+A case that passes on base, fails to compile, panics, times out, skips, or does
+not run fails the proof check. An existing regression name is not treated as a
+new case; give each new regression its own name. <code>TestFeature...</code> cases run
+through the normal test suite and do not need to prove a regression.</p>
+<p>Keep regression files and helpers compatible with base production signatures.
+New APIs used by other tests in the same package can prevent the base tests
+from compiling; separate those changes when necessary. The base production
+files are never replaced by PR production files. Test-file and fixture symlinks
+are rejected rather than copied. A PR without new regression names reports
+that no proof cases are required.</p>
+<p>CI invokes <code>python .github/scripts/regression_proof.py "$BASE_COMMIT"</code> with
+Python 3.12, the Go version in <code>go.mod</code>, and full Git history. Test files and
+fixtures must be tracked by Git. The helper creates and removes a temporary
+base snapshot; it leaves the working tree and Git index intact. Keep local
+verification targeted: the full-suite discovery runs belong in CI.</p>
 <h3 id="commit-messages">Commit messages<a class="headerlink" href="#commit-messages" title="Permanent link">&para;</a></h3>
 <p>Commit messages follow a convention. Here is an example:</p>
 <div class="highlight"><pre><span></span><code>area: do a specific thing
