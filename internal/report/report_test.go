@@ -42,6 +42,27 @@ import (
 
 var fakePosition = newPosition("aFolder/aFile.go", 3, 12)
 
+func TestRegressionSkippedMutantsDoNotFailThresholds(t *testing.T) {
+	viper.Set(configuration.UnleashThresholdEfficacyKey, 80)
+	viper.Set(configuration.UnleashThresholdMCoverageKey, 90)
+	t.Cleanup(viper.Reset)
+	log.Init(&bytes.Buffer{}, &bytes.Buffer{})
+	t.Cleanup(log.Reset)
+
+	data := report.Results{Mutants: []mutator.Mutator{
+		stubMutant{status: mutator.Skipped, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+	}}
+	if err := report.Do(data); err != nil {
+		t.Fatalf("no mutations selected, threshold must not fail: %v", err)
+	}
+	data.Mutants = append(data.Mutants, stubMutant{
+		status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition,
+	})
+	if err := report.Do(data); err == nil {
+		t.Fatal("uncovered selected mutants must still fail thresholds")
+	}
+}
+
 func TestReport(t *testing.T) {
 	const (
 		testingLine  = "Mutation testing completed in 2 minutes 22 seconds\n"
