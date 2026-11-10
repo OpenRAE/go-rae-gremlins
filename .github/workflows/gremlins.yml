@@ -26,14 +26,30 @@ jobs:
           go-version-file: 'go.mod'
       - name: Build this fork
         run: go build -o "$RUNNER_TEMP/gremlins" ./cmd/gremlins
-      - name: Mutate changed lines
+      - name: Start the per-user systemd manager
+        # loginctl enable-linger starts the per-user manager for the runner user.
+        # It needs no sudo; polkit authorizes a user for their own account.
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          loginctl enable-linger "$(id -un)"
+          for _ in $(seq 1 30); do
+            if systemctl --user show-environment >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+      - name: Mutate changed lines inside a memory budget
         if: github.event_name == 'pull_request'
         env:
           BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
-        run: '"$RUNNER_TEMP/gremlins" unleash --diff "$BASE_COMMIT"'
-      - name: Mutate the full repository
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          scripts/run-bounded.sh --budget 10G -- "$RUNNER_TEMP/gremlins" unleash --diff "$BASE_COMMIT"
+      - name: Mutate the full repository inside a memory budget
         if: github.event_name == 'push'
-        run: '"$RUNNER_TEMP/gremlins" unleash'
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          scripts/run-bounded.sh --budget 10G -- "$RUNNER_TEMP/gremlins" unleash
 
   regression-proof:
     name: Regression proof

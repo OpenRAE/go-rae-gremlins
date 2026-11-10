@@ -1,96 +1,14 @@
 {
   "version": 1,
-  "issue": 146,
-  "summary": "Reconcile main into the dev promotion: preserve float threshold conversion, empty mutation selections, precise diff ranges, development tooling, and main mutation and regression gates. Classify promoted acceptance tests and preserve regression identities across the fork module-path migration; keep the base production code unchanged during proofs. Validate generic configuration conversions explicitly and remove duplicate empty-diff coverage; repair promoted test lint findings. Remove obsolete lint allowances using the shrink-only lint command after Linux, Darwin and Windows analysis.",
-  "changes": [
-    {
-      "package": "cmd"
-    },
-    {
-      "package": "cmd/gremlins"
-    },
-    {
-      "package": "cmd/internal/flags"
-    },
-    {
-      "package": "internal/configuration"
-    },
-    {
-      "package": "internal/coverage"
-    },
-    {
-      "package": "internal/diff"
-    },
-    {
-      "package": "internal/engine"
-    },
-    {
-      "package": "internal/engine/workdir"
-    },
-    {
-      "package": "internal/engine/workerpool"
-    },
-    {
-      "package": "internal/exclusion"
-    },
-    {
-      "package": "internal/execution"
-    },
-    {
-      "package": "internal/gomodule"
-    },
-    {
-      "package": "internal/log"
-    },
-    {
-      "package": "internal/mutator"
-    },
-    {
-      "package": "internal/report"
-    },
-    {
-      "package": "internal/report/internal"
-    },
-    {
-      "package": "tools/architecture"
-    },
-    {
-      "package": "tools/lintcontext"
-    }
-  ],
-  "contracts": [
-    "cli",
-    "configuration",
-    "schema",
-    "report",
-    "exit_codes",
-    "cli_persistent",
-    "cli_binding"
-  ],
-  "trust_boundaries": "Synchronization uses existing GitHub CI, local test runners and existing secret scanners. No runtime CLI, report, configuration or exit-code contract changes.",
+  "issue": 127,
+  "summary": "Bound one complete Gremlins invocation with a Linux cgroup-v2 memory controller through a per-user systemd transient service (MemoryMax, MemorySwapMax=0, OOMPolicy=kill, KillMode=control-group). A new supervisor script scripts/run-bounded.sh verifies a finite memory limit and a zero swap limit, rejects a budget not smaller than host memory, runs the invocation inside the unit as the unprivileged user (no sudo, no root), reports the OOM result as exit 137 with partial output dropped, and passes other inner exit codes through. The Makefile adds a memcheck target and .github/workflows/ci.yml adds a required memory job that proves enforcement with a small controlled allocator inside an enforced outer slice. The mutation workflow .github/workflows/gremlins.yml runs through the bounded entry point. No Go package, dependency, CLI flag, configuration key, JSON report field, exit code, architecture rule, or baseline changes. See docs/adr/0006-bounded-memory-for-mutation-runs.md, docs/development/memory-budget.md, and docs/development/memory-budget-preflight.md.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The bounded unit is a runtime OS boundary; the per-user systemd manager enforces MemoryMax and MemorySwapMax=0 before coverage, downloads, compilers, mutants, and descendants start. The supervisor script stays outside the unit, reports the runner OOM result after group termination, and owns cleanup. The script uses only the per-user manager, so the command runs as the unprivileged user; it rejects a root caller (decided from the shell's readonly effective user id), never uses sudo, and never runs the command as root. It builds the command environment from scratch with env -i, then forwards the caller's allowlist, the GREMLINS_* configuration, and the non-secret Go settings, so the manager environment is not inherited and a bounded run matches a direct command; it skips a value that carries URL credentials and never forwards tokens, the manager bus address, or the whole environment. It verifies a finite memory limit and a zero swap limit, rejects a budget not smaller than host memory, and never runs the workload unbounded. The application CLI, configuration schema, report, and exit codes do not change. The trust_changes entries below restate the model's existing development-check and delivery-finalization boundaries; this change adds no new model trust boundary, Go package, or dependency. The modeled policy changes are the Makefile build target and the ci.yml memory job.",
   "conflicts": [],
   "policies": [
-    "model",
-    "baseline",
-    "ci",
     "build",
-    "plan",
-    "guidance",
-    "contributing",
-    "hooks",
-    "lint",
-    "workflow",
-    "design_step",
-    "lint_baseline",
-    "lint_gate",
-    "lint_version",
-    "sonar",
-    "lint_coverage",
-    "coverage_admission",
-    "delivery_finalization",
-    "fork_finalization",
-    "finalizer_manifest",
-    "finalizer_lock"
+    "ci"
   ],
   "trust_changes": {
     "development_checks": {
@@ -111,14 +29,5 @@
       "network": true,
       "execute_source": false
     }
-  },
-  "contract_changes": {
-    "cli": "compatible",
-    "configuration": "compatible",
-    "schema": "compatible",
-    "report": "compatible",
-    "exit_codes": "compatible",
-    "cli_persistent": "compatible",
-    "cli_binding": "compatible"
   }
 }

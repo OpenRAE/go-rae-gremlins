@@ -133,6 +133,32 @@ jobs:
           export LINT_BASE="$COMPARISON"
           make policy
 
+  # Proves the cgroup-v2 memory budget stops a runaway allocator. The job fails
+  # when the runner lacks an effective memory controller; it never runs unbounded.
+  memory:
+    name: Memory budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start the per-user systemd manager
+        # loginctl enable-linger starts the per-user manager for the runner user.
+        # It needs no sudo; polkit authorizes a user for their own account.
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          loginctl enable-linger "$(id -un)"
+          for _ in $(seq 1 30); do
+            if systemctl --user show-environment >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+      - name: Prove the memory budget enforcement
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          make memcheck
+
   # Validates coverage reports and scanner settings in a secret-free job.
   # The token-bearing scan runs separately. Secrets are not available to
   # pull requests from other repositories, so those skip the Sonar jobs.
@@ -207,15 +233,16 @@ jobs:
   gate:
     name: PR Gate
     if: always()
-    needs: [architecture, lint, test, policy, sonar]
+    needs: [architecture, lint, test, policy, memory, sonar]
     runs-on: ubuntu-latest
     steps:
-      - name: Require architecture, lint, tests, policy, and SonarCloud
+      - name: Require architecture, lint, tests, policy, memory, and SonarCloud
         env:
           ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
           LINT_RESULT: ${{ needs.lint.result }}
           TEST_RESULT: ${{ needs.test.result }}
           POLICY_RESULT: ${{ needs.policy.result }}
+          MEMORY_RESULT: ${{ needs.memory.result }}
           SONAR_RESULT: ${{ needs.sonar.result }}
           FOREIGN_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
@@ -223,6 +250,7 @@ jobs:
           test "$LINT_RESULT" = success
           test "$TEST_RESULT" = success
           test "$POLICY_RESULT" = success
+          test "$MEMORY_RESULT" = success
           if [ "$FOREIGN_PR" = true ]; then
             test "$SONAR_RESULT" = skipped
           else
