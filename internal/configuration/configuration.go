@@ -335,16 +335,20 @@ func checkStringSlice(v any) error {
 	case string, []string:
 		return nil
 	case []any:
-		for i, e := range t {
-			if !isScalar(e) {
-				return fmt.Errorf("item #%d %v (%T) is not a string", i, e, e)
-			}
-		}
-
-		return nil
+		return checkItems(t)
 	default:
 		return fmt.Errorf("%v (%T) is not a list of strings", v, v)
 	}
+}
+
+func checkItems(items []any) error {
+	for i, e := range items {
+		if !isScalar(e) {
+			return fmt.Errorf("item #%d %v (%T) is not a string", i, e, e)
+		}
+	}
+
+	return nil
 }
 
 // isScalar reports whether Viper can read v as a string.

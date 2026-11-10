@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Gremlins Authors
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package configuration
 
 import (
@@ -89,20 +105,14 @@ func TestFeatureGetConvertsEnvironmentValues(t *testing.T) {
 
 func TestFeatureGetPrecedence(t *testing.T) {
 	testCases := []struct {
-		env          map[string]string
-		flags        []string
-		wantExcludes []string
-		name         string
-		wantWorkers  int
-		wantEfficacy float64
-		wantDryRun   bool
+		env   map[string]string
+		name  string
+		flags []string
+		want  typedValues
 	}{
 		{
-			name:         "file",
-			wantDryRun:   false,
-			wantWorkers:  2,
-			wantEfficacy: 50,
-			wantExcludes: []string{"file-a", "file-b"},
+			name: "file",
+			want: typedValues{DryRun: false, Workers: 2, Efficacy: 50, Excludes: []string{"file-a", "file-b"}},
 		},
 		{
 			name: "environment overrides file",
@@ -112,10 +122,7 @@ func TestFeatureGetPrecedence(t *testing.T) {
 				envEfficacy: "90",
 				envExcludes: "env-a env-b",
 			},
-			wantDryRun:   true,
-			wantWorkers:  4,
-			wantEfficacy: 90,
-			wantExcludes: []string{"env-a", "env-b"},
+			want: typedValues{DryRun: true, Workers: 4, Efficacy: 90, Excludes: []string{"env-a", "env-b"}},
 		},
 		{
 			name: "flag overrides environment",
@@ -125,11 +132,8 @@ func TestFeatureGetPrecedence(t *testing.T) {
 				envEfficacy: "90",
 				envExcludes: "env-a env-b",
 			},
-			flags:        []string{"--dry-run=false", "--workers=8", "--threshold-efficacy=75.5", "--exclude-files=flag-a"},
-			wantDryRun:   false,
-			wantWorkers:  8,
-			wantEfficacy: 75.5,
-			wantExcludes: []string{"flag-a"},
+			flags: []string{"--dry-run=false", "--workers=8", "--threshold-efficacy=75.5", "--exclude-files=flag-a"},
+			want:  typedValues{DryRun: false, Workers: 8, Efficacy: 75.5, Excludes: []string{"flag-a"}},
 		},
 	}
 
@@ -141,22 +145,30 @@ func TestFeatureGetPrecedence(t *testing.T) {
 			}
 			bindFlags(t, tc.flags)
 
-			if got := Get[bool](UnleashDryRunKey); got != tc.wantDryRun {
-				t.Errorf("Get[bool](%q) = %v, want %v", UnleashDryRunKey, got, tc.wantDryRun)
-			}
-			if got := Get[int](UnleashWorkersKey); got != tc.wantWorkers {
-				t.Errorf("Get[int](%q) = %d, want %d", UnleashWorkersKey, got, tc.wantWorkers)
-			}
-			if got := Get[float64](UnleashThresholdEfficacyKey); got != tc.wantEfficacy {
-				t.Errorf("Get[float64](%q) = %v, want %v", UnleashThresholdEfficacyKey, got, tc.wantEfficacy)
-			}
-			if diff := cmp.Diff(tc.wantExcludes, Get[[]string](UnleashExcludeFiles)); diff != "" {
-				t.Errorf("Get[[]string](%q) mismatch (-want +got):\n%s", UnleashExcludeFiles, diff)
+			if diff := cmp.Diff(tc.want, readTypedValues()); diff != "" {
+				t.Errorf("typed values mismatch (-want +got):\n%s", diff)
 			}
 			if err := Validate(); err != nil {
 				t.Errorf("Validate() error = %v, want nil", err)
 			}
 		})
+	}
+}
+
+// typedValues holds the typed values that the precedence tests read.
+type typedValues struct {
+	Excludes []string
+	Efficacy float64
+	Workers  int
+	DryRun   bool
+}
+
+func readTypedValues() typedValues {
+	return typedValues{
+		Excludes: Get[[]string](UnleashExcludeFiles),
+		Efficacy: Get[float64](UnleashThresholdEfficacyKey),
+		Workers:  Get[int](UnleashWorkersKey),
+		DryRun:   Get[bool](UnleashDryRunKey),
 	}
 }
 
