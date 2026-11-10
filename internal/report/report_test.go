@@ -688,6 +688,9 @@ func TestRegressionThresholdFlags(t *testing.T) {
 					data := report.Results{Mutants: []mutator.Mutator{
 						stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 						stubMutant{status: mutator.Lived, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.Lived, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 					}}

@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"bytes"
 	"go/token"
 	"reflect"
 	"testing"
