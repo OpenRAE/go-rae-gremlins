@@ -68,10 +68,11 @@ check() {
 }
 
 pass_or_fail() {
-	if [[ "$1" = ok ]]; then
-		note "PASS: $2"
+	local outcome="$1" label="$2"
+	if [[ "$outcome" = ok ]]; then
+		note "PASS: $label"
 	else
-		note "FAIL: $2"
+		note "FAIL: $label"
 		fail=1
 	fi
 }

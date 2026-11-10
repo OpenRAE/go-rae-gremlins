@@ -95,13 +95,14 @@ done
 # valid_size accepts a positive systemd size, for example 512M, 8G, or a byte
 # count. It rejects zero, infinity, and malformed values before any code runs.
 valid_size() {
-	case "$1" in
+	local size="$1"
+	case "$size" in
 	0 | 0[KMGT] | infinity | max | "")
 		return 1
 		;;
 	*) ;;
 	esac
-	[[ "$1" =~ ^[1-9][0-9]*[KMGT]?$ ]]
+	[[ "$size" =~ ^[1-9][0-9]*[KMGT]?$ ]]
 }
 
 valid_size "$budget" || fail "invalid --budget '$budget'; use a positive size such as 512M or 8G"
