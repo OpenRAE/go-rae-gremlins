@@ -56,20 +56,20 @@ slice=""
 output_file=""
 cmd=()
 
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--budget)
-		[ $# -ge 2 ] || usage
+		[[ $# -ge 2 ]] || usage
 		budget="$2"
 		shift 2
 		;;
 	--slice)
-		[ $# -ge 2 ] || usage
+		[[ $# -ge 2 ]] || usage
 		slice="$2"
 		shift 2
 		;;
 	--output-file)
-		[ $# -ge 2 ] || usage
+		[[ $# -ge 2 ]] || usage
 		output_file="$2"
 		shift 2
 		;;
@@ -84,13 +84,13 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-[ -n "$budget" ] || usage
-[ ${#cmd[@]} -ge 1 ] || usage
+[[ -n "$budget" ]] || usage
+[[ ${#cmd[@]} -ge 1 ]] || usage
 
 # This runner must never execute the workload as root. The per-user manager does
 # not drop privilege, so reject an effective root caller before anything else.
 # Use Bash's readonly EUID, not an external program, so PATH cannot influence it.
-[ "$EUID" -ne 0 ] || fail "run-bounded must not run as root; run it as an unprivileged user"
+[[ "$EUID" -ne 0 ]] || fail "run-bounded must not run as root; run it as an unprivileged user"
 
 # valid_size accepts a positive systemd size, for example 512M, 8G, or a byte
 # count. It rejects zero, infinity, and malformed values before any code runs.
@@ -99,6 +99,7 @@ valid_size() {
 	0 | 0[KMGT] | infinity | max | "")
 		return 1
 		;;
+	*) ;;
 	esac
 	[[ "$1" =~ ^[1-9][0-9]*[KMGT]?$ ]]
 }
@@ -118,11 +119,11 @@ case "$budget" in
 *T) host_limit=$((host_total_bytes / (1024 * 1024 * 1024 * 1024))) ;;
 *) host_limit=$host_total_bytes ;;
 esac
-if [ "${#budget_number}" -gt 18 ] || [ "$budget_number" -ge "$host_limit" ]; then
+if [[ "${#budget_number}" -gt 18 ]] || [[ "$budget_number" -ge "$host_limit" ]]; then
 	fail "--budget '$budget' is not smaller than host memory; choose a budget below total RAM"
 fi
 
-if [ -n "$slice" ] && ! [[ "$slice" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*\.slice$ ]]; then
+if [[ -n "$slice" ]] && ! [[ "$slice" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]*\.slice$ ]]; then
 	fail "invalid --slice '$slice'; use a systemd slice name such as gremlins.slice"
 fi
 
@@ -130,7 +131,7 @@ command -v systemd-run >/dev/null 2>&1 || fail "systemd-run not found; a Linux s
 command -v systemctl >/dev/null 2>&1 || fail "systemctl not found; a Linux systemd manager is required"
 
 # The unified cgroup-v2 hierarchy is required for MemoryMax and MemorySwapMax.
-[ -f /sys/fs/cgroup/cgroup.controllers ] || fail "the unified cgroup-v2 hierarchy is required"
+[[ -f /sys/fs/cgroup/cgroup.controllers ]] || fail "the unified cgroup-v2 hierarchy is required"
 
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$EUID}"
 
@@ -146,7 +147,7 @@ user_available || fail "the per-user systemd manager is not available; enable it
 scope_flag=(--user)
 
 slice_arg=()
-[ -n "$slice" ] && slice_arg=("--slice=$slice")
+[[ -n "$slice" ]] && slice_arg=("--slice=$slice")
 
 # verify_controller proves the memory controller is effective before the workload
 # runs. It starts a short unit with the budget and reads the live memory.max and
@@ -166,7 +167,7 @@ verify_controller() {
 	swap="${observed##*;}"
 	# The memory limit must be a finite byte count and swap must be denied.
 	[[ "$max" =~ ^[0-9]+$ ]] || return 1
-	[ "$swap" = "0" ]
+	[[ "$swap" = "0" ]]
 }
 
 verify_controller || fail "the memory controller did not apply a finite limit and a zero swap limit; enforcement is not available"
@@ -193,7 +194,7 @@ stop_unit() {
 
 # shellcheck disable=SC2329
 on_signal() {
-	[ -n "$sr_pid" ] && kill "$sr_pid" >/dev/null 2>&1 || true
+	[[ -n "$sr_pid" ]] && kill "$sr_pid" >/dev/null 2>&1 || true
 	stop_unit
 	remove_work_root
 	exit 143
@@ -220,7 +221,7 @@ workload=("$env_bin" -i)
 # Forward the explicit allowlist and every GREMLINS_* configuration variable, so
 # a bounded run honors the same settings as a direct Gremlins command.
 for name in "${forward_allowlist[@]}" ${!GREMLINS_@}; do
-	[ -n "${!name+x}" ] || continue
+	[[ -n "${!name+x}" ]] || continue
 	# Reject any URL userinfo, with or without a password, so a token or a
 	# credential never becomes a process argument on the systemd-run command line.
 	if printf '%s' "${!name}" | grep -qE '://[^/@[:space:]]+@'; then
@@ -267,9 +268,9 @@ trap - INT TERM
 result="$(systemctl "${scope_flag[@]}" show -p Result --value "$unit" 2>/dev/null || true)"
 systemctl "${scope_flag[@]}" reset-failed "$unit" >/dev/null 2>&1 || true
 
-if [ "$result" = "oom-kill" ]; then
+if [[ "$result" = "oom-kill" ]]; then
 	printf 'run-bounded: out of memory; the %s budget was reached and the run was ended\n' "$budget" >&2
-	if [ -n "$output_file" ] && [ -e "$output_file" ]; then
+	if [[ -n "$output_file" ]] && [[ -e "$output_file" ]]; then
 		rm -f -- "$output_file"
 		printf 'run-bounded: deleted the partial output file %s\n' "$output_file" >&2
 	fi

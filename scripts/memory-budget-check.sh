@@ -59,7 +59,7 @@ check() {
 	shift 2
 	local rc=0
 	timeout 90 "$@" >/dev/null 2>&1 || rc=$?
-	if [ "$rc" = "$want" ]; then
+	if [[ "$rc" = "$want" ]]; then
 		note "PASS: $label (exit $rc)"
 	else
 		note "FAIL: $label (exit $rc, want $want)"
@@ -68,7 +68,7 @@ check() {
 }
 
 pass_or_fail() {
-	if [ "$1" = ok ]; then
+	if [[ "$1" = ok ]]; then
 		note "PASS: $2"
 	else
 		note "FAIL: $2"
@@ -108,8 +108,9 @@ establish_outer_bound() {
 		note "FAIL: the outer slice memory limit is not enforced (MemoryMax=$applied)"
 		exit 1
 		;;
+	*) ;;
 	esac
-	if [ "$applied_swap" != 0 ]; then
+	if [[ "$applied_swap" != 0 ]]; then
 		note "FAIL: the outer slice swap limit is not zero (MemorySwapMax=$applied_swap)"
 		exit 1
 	fi
@@ -151,7 +152,7 @@ cancel_case() {
 		fi
 		sleep 0.1
 	done
-	if [ "$started" != 1 ]; then
+	if [[ "$started" != 1 ]]; then
 		kill "$rbpid" >/dev/null 2>&1 || true
 		pass_or_fail bad "cancellation setup: the workload unit never started"
 		return
@@ -166,7 +167,7 @@ cancel_case() {
 		fi
 		sleep 0.1
 	done
-	if [ "$gone" = 1 ]; then
+	if [[ "$gone" = 1 ]]; then
 		pass_or_fail ok "a signal to the supervisor stops the workload unit"
 	else
 		pass_or_fail bad "a signal to the supervisor stops the workload unit"
@@ -212,7 +213,7 @@ main() {
 	# shellcheck disable=SC2086
 	check 137 "out-of-memory run deletes the partial output" \
 		"$RUN_BOUNDED" --budget "$OOM_BUDGET" "${sl[@]}" --output-file "$report" -- $alloc "$BIG_MIB" "$report"
-	if [ -e "$report" ]; then
+	if [[ -e "$report" ]]; then
 		pass_or_fail bad "the partial output file is deleted after the OOM"
 	else
 		pass_or_fail ok "the partial output file is deleted after the OOM"
@@ -246,7 +247,7 @@ main() {
 	printf 'kept\n' >"$control"
 	check 137 "a non-OOM exit 137 passes through" \
 		"$RUN_BOUNDED" --budget "$FIT_BUDGET" "${sl[@]}" --output-file "$control" -- /bin/sh -c 'exit 137'
-	if [ -e "$control" ]; then
+	if [[ -e "$control" ]]; then
 		pass_or_fail ok "a non-OOM exit 137 does not delete the output (OOM comes from Result)"
 	else
 		pass_or_fail bad "a non-OOM exit 137 does not delete the output (OOM comes from Result)"
@@ -258,7 +259,7 @@ main() {
 	# shellcheck disable=SC2016
 	dollar_out="$(timeout 90 "$RUN_BOUNDED" --budget "$FIT_BUDGET" "${sl[@]}" -- /usr/bin/printf '%s' '$HOME' 2>/dev/null || true)"
 	# shellcheck disable=SC2016
-	if [ "$dollar_out" = '$HOME' ]; then
+	if [[ "$dollar_out" = '$HOME' ]]; then
 		pass_or_fail ok "a dollar sign in an argument is treated as data"
 	else
 		pass_or_fail bad "a dollar sign in an argument is treated as data (got '$dollar_out')"
@@ -354,7 +355,7 @@ main() {
 	elif command -v fakeroot >/dev/null 2>&1; then
 		root_prefix=(fakeroot)
 	fi
-	if [ ${#root_prefix[@]} -eq 0 ]; then
+	if [[ ${#root_prefix[@]} -eq 0 ]]; then
 		pass_or_fail bad "no user namespace or fakeroot to establish a root context for the root-guard case"
 	else
 		check 1 "a root invocation is rejected" \
@@ -364,7 +365,7 @@ main() {
 	# Cancellation: a signal to the supervisor stops the workload unit.
 	cancel_case
 
-	if [ "$fail" != 0 ]; then
+	if [[ "$fail" != 0 ]]; then
 		note "RESULT: FAIL"
 		exit 1
 	fi
