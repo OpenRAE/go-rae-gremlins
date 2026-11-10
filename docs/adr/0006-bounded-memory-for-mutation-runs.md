@@ -45,7 +45,8 @@ The script never infers an OOM from a signal, exit 137, output text, or a time l
 
 A signal to the script stops the unit first, so the workload does not keep running.
 The script owns an isolated temporary root.
-It passes the root to the unit as `TMPDIR` and `GOTMPDIR`, and removes it after the run.
+It passes the root to the unit as `TMPDIR`, so the workload's temporary files, including the go command's, go under it, and removes it after the run.
+It does not set `GOTMPDIR`, because the go command derives it from `TMPDIR` and Gremlins sets a per-mutant value itself.
 So a group-wide OOM kill does not leave temporary files behind.
 The script builds the workload environment from scratch with `env -i`.
 It forwards the caller's non-secret allowlist, the `GREMLINS_*` configuration, and the non-secret Go settings, so a bounded run honors the same settings as a direct command.

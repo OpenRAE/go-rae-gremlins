@@ -229,8 +229,11 @@ for name in "${forward_allowlist[@]}" ${!GREMLINS_@}; do
 	fi
 	workload+=("$name=${!name}")
 done
-# Point the workload's temporary files at the supervisor-owned root.
-workload+=("TMPDIR=$work_root" "GOTMPDIR=$work_root")
+# Point the workload's temporary files at the supervisor-owned root. Set only
+# TMPDIR: the go command derives its own temporary directory from TMPDIR, and
+# Gremlins sets a per-mutant GOTMPDIR itself, so the supervisor must not clobber
+# GOTMPDIR or a Gremlins self-test that asserts it would fail.
+workload+=("TMPDIR=$work_root")
 workload+=("${cmd[@]}")
 
 # Escape every dollar sign so systemd treats the whole command line as data and

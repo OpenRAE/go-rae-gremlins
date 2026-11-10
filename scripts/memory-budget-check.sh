@@ -321,6 +321,18 @@ main() {
 		pass_or_fail bad "the caller's XDG_CONFIG_HOME survives into the unit"
 	fi
 
+	# Temp handling: the supervisor sets TMPDIR under its own root for cleanup but
+	# does not clobber GOTMPDIR, which the go command and Gremlins manage themselves.
+	local tmp_out
+	tmp_out="$(timeout 90 "$RUN_BOUNDED" --budget "$FIT_BUDGET" "${sl[@]}" -- /usr/bin/env 2>/dev/null || true)"
+	if printf '%s' "$tmp_out" | grep -q '^GOTMPDIR='; then
+		pass_or_fail bad "the supervisor does not clobber GOTMPDIR"
+	elif printf '%s' "$tmp_out" | grep -qE '^TMPDIR=.*run-bounded-'; then
+		pass_or_fail ok "the supervisor sets TMPDIR under its own root and leaves GOTMPDIR alone"
+	else
+		pass_or_fail bad "the supervisor did not set TMPDIR under its own root"
+	fi
+
 	# Budget validation: a zero, infinite, excessive, or overflow budget is rejected.
 	check 1 "zero budget is rejected" "$RUN_BOUNDED" --budget 0 -- /bin/true
 	check 1 "infinite budget is rejected" "$RUN_BOUNDED" --budget infinity -- /bin/true
