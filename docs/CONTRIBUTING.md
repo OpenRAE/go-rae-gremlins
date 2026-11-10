@@ -219,4 +219,3 @@ Python 3.12, the Go version in `go.mod`, and full Git history. Test files and
 fixtures must be tracked by Git. The helper creates and removes a temporary
 base snapshot; it leaves the working tree and Git index intact. Keep local
 verification targeted: the full-suite discovery runs belong in CI.
-

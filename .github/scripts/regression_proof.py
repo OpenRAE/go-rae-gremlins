@@ -29,12 +29,17 @@ def discover(root, revision):
     code, events, output = go_events(root, "-race", "./...")
     if code:
         raise ValueError(f"tests did not pass on {revision} during discovery:\n" + output[-6000:])
+    module = module_path(root)
     return {
-        (event["Package"], event["Test"])
+        ("." + event["Package"][len(module):], event["Test"])
         for event in events
         if event.get("Action") in {"run", "skip"}
         and "Package" in event and event.get("Test", "").startswith("Test")
     }
+
+
+def module_path(root):
+    return re.search(r"(?m)^module\s+(\S+)", (root / "go.mod").read_text())[1]
 
 
 def is_test_file(path):
@@ -42,6 +47,8 @@ def is_test_file(path):
 
 
 def overlay_tests(root, base):
+    head_module = module_path(root)
+    base_module = module_path(base) if (base / "go.mod").exists() else head_module
     # Remove old tests/fixtures so renames and deletions cannot leave stale code.
     for path in sorted(base.rglob("*"), reverse=True):
         if is_test_file(path.relative_to(base)) and (path.is_file() or path.is_symlink()):
@@ -59,6 +66,14 @@ def overlay_tests(root, base):
             raise ValueError("unsafe base overlay: " + name)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
+        # Keep base production imports intact across a module-path migration.
+        # Only the overlaid tests and module declaration need rebinding.
+        if head_module != base_module and target.suffix == ".go":
+            target.write_text(target.read_text().replace(head_module, base_module))
+    if head_module != base_module:
+        module_file = base / "go.mod"
+        module_file.write_text(module_file.read_text().replace(
+            "module " + head_module, "module " + base_module, 1))
 
 
 def observe(root, package, name):

@@ -188,7 +188,7 @@ func opLines(op gitdiff.LineOp, count int) []gitdiff.Line {
 	return result
 }
 
-func Test_newChanges_separateEditsInOneFragment(t *testing.T) {
+func TestFeature_newChanges_separateEditsInOneFragment(t *testing.T) {
 	var lines []gitdiff.Line
 	lines = append(lines, opLines(gitdiff.OpContext, 3)...)
 	lines = append(lines, opLines(gitdiff.OpDelete, 1)...)

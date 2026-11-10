@@ -226,7 +226,7 @@ func TestMutatorTestExecution(t *testing.T) {
 // invented exit code (issue #59): go test exits 1 for a build failure and
 // for an assertion failure alike, so only the compiler's own markers in the
 // output can tell them apart.
-func TestMutatorTestExecutionBuildFailureIsNotViable(t *testing.T) {
+func TestRegressionMutatorTestExecutionBuildFailureIsNotViable(t *testing.T) {
 	const probeModule = "probe"
 
 	viperSet(map[string]any{configuration.UnleashDryRunKey: false})
@@ -240,7 +240,7 @@ func TestMutatorTestExecutionBuildFailureIsNotViable(t *testing.T) {
 
 import "testing"
 
-func TestLabel(t *testing.T) {
+func TestFeatureLabel(t *testing.T) {
 	_ = Label(3)
 }
 `,
@@ -282,7 +282,7 @@ func TestLabel(t *testing.T) {
 // failure in running the test command (here, a missing executable) is never
 // folded into mutator.Lived: the mutant must not be reported as a kill the
 // suite survived when the suite never ran at all (issue #59).
-func TestMutatorRunErrorIsNotReportedAsLived(t *testing.T) {
+func TestRegressionMutatorRunErrorIsNotReportedAsLived(t *testing.T) {
 	viperSet(map[string]any{configuration.UnleashDryRunKey: false})
 	defer viperReset()
 

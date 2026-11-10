@@ -92,6 +92,25 @@ class RegressionProofTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("No new TestRegression", result.stdout)
 
+    def test_module_migration_preserves_existing_test_identity(self):
+        self.write("value_test.go", 'package proof\nimport "testing"\n'
+                   'func TestExistingValue(t *testing.T) {}\n')
+        self.git("add", ".")
+        self.git("-c", "user.name=Test", "-c", "user.email=test@example.test",
+                 "-c", "commit.gpgsign=false", "commit", "-qm", "existing test")
+        self.base = self.git("rev-parse", "HEAD").strip()
+        self.write("go.mod", "module example.test/renamed\n\ngo 1.25.0\n")
+        result = self.proof()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_module_migration_still_proves_regression(self):
+        self.write("go.mod", "module example.test/renamed\n\ngo 1.25.0\n")
+        self.regression('if Value() != 2 { t.Fatal("wrong value") }')
+        self.write("value.go", "package proof\nfunc Value() int { return 2 }\n")
+        result = self.proof()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("proved", result.stdout)
+
     def test_checks_each_test_separately(self):
         self.regression('if Value() != 2 { t.Fatal("wrong value") }')
         with (self.root / "value_test.go").open("a") as target:

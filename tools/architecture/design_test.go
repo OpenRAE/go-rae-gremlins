@@ -13,7 +13,7 @@ func localTrust() map[string]trustBoundary {
 	return map[string]trustBoundary{"checks": {Destinations: []string{localBoundary}}}
 }
 
-func TestDesignContractCompatibility(t *testing.T) {
+func TestFeatureDesignContractCompatibility(t *testing.T) {
 	for _, tc := range []struct {
 		name, kind string
 		bad        bool
@@ -41,7 +41,7 @@ func TestDesignContractCompatibility(t *testing.T) {
 	}
 }
 
-func TestDesignTrustCompatibility(t *testing.T) {
+func TestFeatureDesignTrustCompatibility(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		proposal trustBoundary
@@ -72,7 +72,7 @@ func TestDesignTrustCompatibility(t *testing.T) {
 	}
 }
 
-func TestDesignRequiresModeledAssertions(t *testing.T) {
+func TestFeatureDesignRequiresModeledAssertions(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		change func(*design)
@@ -100,7 +100,7 @@ func TestDesignRequiresModeledAssertions(t *testing.T) {
 	}
 }
 
-func TestInvalidProposalModels(t *testing.T) {
+func TestFeatureInvalidProposalModels(t *testing.T) {
 	for _, mutate := range []func(*model){
 		func(m *model) { delete(m.ContractChanges, cliContract) },
 		func(m *model) { m.ContractChanges[unknownName] = []string{compatibleChange} },
@@ -116,7 +116,7 @@ func TestInvalidProposalModels(t *testing.T) {
 	}
 }
 
-func TestDesignTestDependencyScope(t *testing.T) {
+func TestFeatureDesignTestDependencyScope(t *testing.T) {
 	for _, tc := range []struct {
 		name                 string
 		imports, testImports []string

@@ -46,7 +46,7 @@ func Root(n int) bool { return n > 0 }
 
 import "testing"
 
-func TestRoot(t *testing.T) {
+func TestFeatureRoot(t *testing.T) {
 	if !Root(1) || Root(0) {
 		t.Fatal("wrong result")
 	}
@@ -62,7 +62,7 @@ func main() { _ = positive(1) }
 
 import "testing"
 
-func TestPositive(t *testing.T) {
+func TestFeaturePositive(t *testing.T) {
 	if !positive(1) || positive(0) {
 		t.Fatal("wrong result")
 	}
@@ -76,7 +76,7 @@ func Positive(n int) bool { return n > 0 }
 
 import "testing"
 
-func TestPositive(t *testing.T) {
+func TestFeaturePositive(t *testing.T) {
 	if !Positive(1) || Positive(0) {
 		t.Fatal("wrong result")
 	}
@@ -84,7 +84,7 @@ func TestPositive(t *testing.T) {
 `,
 }
 
-func TestMutantRunsTestsOfItsDirectory(t *testing.T) {
+func TestRegressionMutantRunsTestsOfItsDirectory(t *testing.T) {
 	testCases := []struct {
 		wantPkgs   map[string]string
 		name       string

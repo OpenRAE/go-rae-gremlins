@@ -318,7 +318,7 @@ func TestAssessment(t *testing.T) {
 	}
 }
 
-func TestAssessmentEmptyResultsSkipsThreshold(t *testing.T) {
+func TestFeatureAssessmentEmptyResultsSkipsThreshold(t *testing.T) {
 	t.Run("no mutants bypasses the threshold assessment", func(t *testing.T) {
 		log.Init(&bytes.Buffer{}, &bytes.Buffer{})
 		defer log.Reset()
