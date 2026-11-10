@@ -19,6 +19,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -217,4 +220,61 @@ func TestUnleashRejectsInvalidConfiguration(t *testing.T) {
 	if !strings.Contains(err.Error(), configuration.UnleashWorkersKey) {
 		t.Errorf("runUnleash error = %q, want it to name %q", err, configuration.UnleashWorkersKey)
 	}
+}
+
+func TestUnleashRequiresGoModule(t *testing.T) {
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	dir := t.TempDir()
+
+	err := runUnleash(context.Background())(nil, []string{dir})
+	if err == nil || !strings.Contains(err.Error(), "not in a Go module") {
+		t.Errorf("runUnleash(%q) error = %v, want a not-in-a-Go-module error", dir, err)
+	}
+}
+
+func TestModulePath(t *testing.T) {
+	t.Run("argument", func(t *testing.T) {
+		got, err := modulePath([]string{"some/path"})
+		if err != nil || got != "some/path" {
+			t.Errorf("modulePath([some/path]) = %q, %v; want %q, nil", got, err, "some/path")
+		}
+	})
+
+	t.Run("current directory", func(t *testing.T) {
+		dir := t.TempDir()
+		t.Chdir(dir)
+		want, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("os.Getwd error = %v", err)
+		}
+
+		got, err := modulePath(nil)
+		if err != nil || got != want {
+			t.Errorf("modulePath(nil) = %q, %v; want %q, nil", got, err, want)
+		}
+	})
+
+	t.Run("current directory removed", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows does not allow removal of the current directory")
+		}
+		dir := filepath.Join(t.TempDir(), "removed")
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			t.Fatalf("os.Mkdir(%q) error = %v", dir, err)
+		}
+		t.Chdir(dir)
+		t.Setenv("PWD", "")
+		if err := os.Remove(dir); err != nil {
+			t.Fatalf("os.Remove(%q) error = %v", dir, err)
+		}
+
+		got, err := modulePath(nil)
+		if err == nil {
+			t.Errorf("modulePath(nil) = %q, nil; want an error", got)
+		}
+	})
 }
