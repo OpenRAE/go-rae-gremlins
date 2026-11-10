@@ -28,12 +28,6 @@
     {
       "linter": "errcheck",
       "file": "internal/configuration/configuration.go",
-      "fingerprint": "65eb52db1f989ae60972a353592b392b2584cc47537d71f009d2e31c729013d6",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration.go",
       "fingerprint": "e0fd4e3d939ed2e4472aba29114e1b2a47e18c842fd472798b6219bc2f633ca5",
       "count": 1
     },
@@ -359,12 +353,6 @@
       "linter": "noctx",
       "file": "tools/architecture/git.go",
       "fingerprint": "0ff040d58d52fdafc7a18fdbf5ee6da2918ed486fd40511afe75b1f66e42d0bf",
-      "count": 1
-    },
-    {
-      "linter": "noctx",
-      "file": "tools/architecture/git_test.go",
-      "fingerprint": "ee6848b5dddac2b3bee19e2df4bdf0331982ad565b3cf3f81c1f3bb0829bb0df",
       "count": 1
     },
     {
@@ -717,18 +705,6 @@
     },
     {
       "linter": "revive",
-      "file": "tools/architecture/git_test.go",
-      "fingerprint": "122765acf9b91465943f42a4f323e015d5c8f7ebb752910d65985b814993768f",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "tools/architecture/git_test.go",
-      "fingerprint": "364177610043505fcf4e504187be1324b788a89a1582bcd327216ed4091485c2",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "tools/architecture/input.go",
       "fingerprint": "b3441b99b5b2f899d86dbbda9426a9754502bfeee5122179629b2fe4ed52a223",
       "count": 1
@@ -737,12 +713,6 @@
       "linter": "revive",
       "file": "tools/architecture/input.go",
       "fingerprint": "d6175483dd47cf50f4ba161e0d975584263aaff5b42d7e97ac22c8c197334a15",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "2dcb5b392e72668c8fe213fca89ca73da7b4982aa40add4e813fb742143ca6bc",
       "count": 1
     },
     {
@@ -779,60 +749,6 @@
       "linter": "revive",
       "file": "tools/architecture/scan.go",
       "fingerprint": "447003f2a4a2e614f0513896c1935ca1e6db7e8de276cbcf682fc3f75e92a211",
-      "count": 1
-    },
-    {
-      "linter": "thelper",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "1fbac2ad37da4f9e9bee88a3526a2c6122020f617312bc124c5c6aebe28e6be7",
-      "count": 1
-    },
-    {
-      "linter": "thelper",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "4e5b2bd736b37b2da2174b34bc11ddb9b8545922edf87ceecf7d8c10d48e1fd1",
-      "count": 1
-    },
-    {
-      "linter": "thelper",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "93be0370861f7107082ef1d5008530b489427bb05d162fd50cdfde8f7aabaf3d",
-      "count": 1
-    },
-    {
-      "linter": "thelper",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "a30dc2d92b56fe815ebc87f79ae0e93dc77bd971eacd643516e11624464aae50",
-      "count": 1
-    },
-    {
-      "linter": "thelper",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "a35a05bba9d742ae22b4ac28acb82a17eb55890204abf32f6abc60470b346e1d",
-      "count": 1
-    },
-    {
-      "linter": "thelper",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "a72ac851ddcc621b577d3db201bb642a8dde85ba68dc8db62421a3c5e0d5f864",
-      "count": 1
-    },
-    {
-      "linter": "thelper",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "be7a570ab14efc3df1f53b8be6c7864f87438f5e8d224b09d551c829df6b5660",
-      "count": 1
-    },
-    {
-      "linter": "thelper",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "ead3ccbfb21d06dde7a26e2838a164b26609d4ecd821356b4cec08b84506ac0d",
-      "count": 1
-    },
-    {
-      "linter": "thelper",
-      "file": "tools/architecture/main_test.go",
-      "fingerprint": "ef801c7d9e67712c3e2b2d14d9e02f5fd1eb12d9afe56506287cbea74d0df3d6",
       "count": 1
     },
     {
