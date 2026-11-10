@@ -259,8 +259,8 @@ func TestModulePath(t *testing.T) {
 	})
 
 	t.Run("current directory removed", func(t *testing.T) {
-		if runtime.GOOS == "windows" {
-			t.Skip("Windows does not allow removal of the current directory")
+		if runtime.GOOS != "linux" {
+			t.Skip("only Linux os.Getwd fails after removal of the current directory")
 		}
 		dir := filepath.Join(t.TempDir(), "removed")
 		if err := os.Mkdir(dir, 0o700); err != nil {
