@@ -51,10 +51,6 @@ lint-cover:
 	python3 -m coverage run -m unittest discover -s scripts -p test_lint.py
 	python3 -m coverage xml -o python-coverage.xml
 
-.PHONY: policy
-policy:
-	pre-commit run --all-files
-
 .PHONY: hooks
 hooks:
 	bash scripts/install-hooks.sh

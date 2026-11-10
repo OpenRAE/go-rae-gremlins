@@ -178,3 +178,45 @@ notes, and `CHANGELOG.md`; GoReleaser adds the binaries, source archive, and che
 The fork does not inherit upstream's release freeze or maintenance-release branches. Release and synchronization
 PRs opened with `GITHUB_TOKEN` do not trigger the normal PR checks; maintainer review remains necessary. Do not edit
 release versions or `CHANGELOG.md` manually, or publish to upstream Docker, Homebrew, or documentation channels.
+
+### Pull request test gates
+
+The Gremlins workflow builds this fork and mutation tests the added Go lines
+relative to the pull request's merge base. The existing `.gremlins.yaml`
+thresholds apply. Lines outside the diff are skipped; a change without mutation
+candidates passes without applying thresholds to an empty selection. Pushes to
+`main` still run mutation testing across the repository.
+
+Classify every new Go test by name: `TestRegression...` for a fix,
+or `TestFeature...` for new behavior. CI rejects unclassified new tests, so
+omitting a regression prefix cannot silently bypass the proof check. Existing
+test names need no changes. A new named subtest inherits its parent's
+classification. Put a new regression under a `TestRegression...` parent;
+new subtests under an unclassified historical test fail CI too.
+
+Name each new Go regression test `TestRegression` followed by its behavior,
+for example `TestRegressionDiffSeparatedAdditions`. Give each regression a
+distinct test or `t.Run` name; unnamed table rows cannot prove separate
+regressions. CI runs the head and base suites to discover test and subtest names,
+then proves each new regression leaf separately with race detection and caching
+disabled. A failing sibling cannot establish proof for a passing case.
+Each case must pass on the PR head and fail an assertion against the merge base
+with the PR's test files, `testdata` fixtures, and Go dependency files overlaid.
+A case that passes on base, fails to compile, panics, times out, skips, or does
+not run fails the proof check. An existing regression name is not treated as a
+new case; give each new regression its own name. `TestFeature...` cases run
+through the normal test suite and do not need to prove a regression.
+
+Keep regression files and helpers compatible with base production signatures.
+New APIs used by other tests in the same package can prevent the base tests
+from compiling; separate those changes when necessary. The base production
+files are never replaced by PR production files. Test-file and fixture symlinks
+are rejected rather than copied. A PR without new regression names reports
+that no proof cases are required.
+
+CI invokes `python .github/scripts/regression_proof.py "$BASE_COMMIT"` with
+Python 3.12, the Go version in `go.mod`, and full Git history. Test files and
+fixtures must be tracked by Git. The helper creates and removes a temporary
+base snapshot; it leaves the working tree and Git index intact. Keep local
+verification targeted: the full-suite discovery runs belong in CI.
+

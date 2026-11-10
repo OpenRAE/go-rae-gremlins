@@ -1,22 +1,96 @@
 {
   "version": 1,
-  "issue": 84,
-  "summary": "Make the fork ready for a release that the dependent repositories can pin. A binary installed with go install at a module version reported the version dev, because only GoReleaser builds set main.version. buildVersion in cmd/gremlins now uses the main module version from the embedded build information when main.version is dev. Remove the architecture.modules block from .ground-control.yaml so the configuration conforms to Ground Control schema version 1. Remove the plan text that made the release wait for the remediation issues.",
+  "issue": 146,
+  "summary": "Reconcile main into the dev promotion: preserve float threshold conversion, empty mutation selections, precise diff ranges, development tooling, and main mutation and regression gates.",
   "changes": [
     {
-      "package": "cmd/gremlins",
-      "imports": [
-        "cmd",
-        "internal/execution",
-        "internal/log"
-      ]
+      "package": "cmd"
+    },
+    {
+      "package": "cmd/gremlins"
+    },
+    {
+      "package": "cmd/internal/flags"
+    },
+    {
+      "package": "internal/configuration"
+    },
+    {
+      "package": "internal/coverage"
+    },
+    {
+      "package": "internal/diff"
+    },
+    {
+      "package": "internal/engine"
+    },
+    {
+      "package": "internal/engine/workdir"
+    },
+    {
+      "package": "internal/engine/workerpool"
+    },
+    {
+      "package": "internal/exclusion"
+    },
+    {
+      "package": "internal/execution"
+    },
+    {
+      "package": "internal/gomodule"
+    },
+    {
+      "package": "internal/log"
+    },
+    {
+      "package": "internal/mutator"
+    },
+    {
+      "package": "internal/report"
+    },
+    {
+      "package": "internal/report/internal"
+    },
+    {
+      "package": "tools/architecture"
+    },
+    {
+      "package": "tools/lintcontext"
     }
   ],
-  "contracts": [],
-  "trust_boundaries": "buildVersion reads the build information that the Go linker embeds in the binary through runtime/debug.ReadBuildInfo. It reads no file, environment variable, network resource, or user input. GoReleaser builds keep the version that the linker flag sets. No CLI flag, configuration key, report field, exit code, or network destination changes. The .ground-control.yaml change removes a block that no workflow command or gate reads.",
+  "contracts": [
+    "cli",
+    "configuration",
+    "schema",
+    "report",
+    "exit_codes",
+    "cli_persistent",
+    "cli_binding"
+  ],
+  "trust_boundaries": "Synchronization uses existing GitHub CI, local test runners and existing secret scanners. No runtime CLI, report, configuration or exit-code contract changes.",
   "conflicts": [],
   "policies": [
-    "workflow"
+    "model",
+    "baseline",
+    "ci",
+    "build",
+    "plan",
+    "guidance",
+    "contributing",
+    "hooks",
+    "lint",
+    "workflow",
+    "design_step",
+    "lint_baseline",
+    "lint_gate",
+    "lint_version",
+    "sonar",
+    "lint_coverage",
+    "coverage_admission",
+    "delivery_finalization",
+    "fork_finalization",
+    "finalizer_manifest",
+    "finalizer_lock"
   ],
   "trust_changes": {
     "development_checks": {
@@ -37,5 +111,14 @@
       "network": true,
       "execute_source": false
     }
+  },
+  "contract_changes": {
+    "cli": "compatible",
+    "configuration": "compatible",
+    "schema": "compatible",
+    "report": "compatible",
+    "exit_codes": "compatible",
+    "cli_persistent": "compatible",
+    "cli_binding": "compatible"
   }
 }

@@ -184,6 +184,13 @@ func Get[T any](k string) T {
 	var r T
 	mutex.RLock()
 	defer mutex.RUnlock()
+	// Viper returns changed float flags as strings; use its conversion so
+	// flags, environment variables and numeric config values agree.
+	if value, ok := any(&r).(*float64); ok {
+		*value = viper.GetFloat64(k)
+
+		return r
+	}
 	r, _ = viper.Get(k).(T)
 
 	return r
