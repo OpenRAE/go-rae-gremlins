@@ -16,7 +16,7 @@ func (failingWriter) Write([]byte) (int, error) {
 	return 0, io.ErrClosedPipe
 }
 
-func TestRunJSON(t *testing.T) {
+func TestFeatureRunJSON(t *testing.T) {
 	t.Parallel()
 	input := `{"a.go":"package p\nimport \"fmt\"\nfunc f() {}","empty.go":"package empty"}`
 	var output bytes.Buffer
@@ -32,7 +32,7 @@ func TestRunJSON(t *testing.T) {
 	}
 }
 
-func TestRunRejectsBadInputAndWriteFailure(t *testing.T) {
+func TestFeatureRunRejectsBadInputAndWriteFailure(t *testing.T) {
 	t.Parallel()
 	for _, input := range []string{"invalid JSON", `{"a.go":"package p\nfunc broken("}`} {
 		if err := run(strings.NewReader(input), io.Discard); err == nil {
@@ -44,7 +44,7 @@ func TestRunRejectsBadInputAndWriteFailure(t *testing.T) {
 	}
 }
 
-func TestDeclarationScopes(t *testing.T) {
+func TestFeatureDeclarationScopes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name   string
@@ -93,14 +93,14 @@ func TestDeclarationScopes(t *testing.T) {
 	}
 }
 
-func TestDeclarationScopesRejectInvalidSource(t *testing.T) {
+func TestFeatureDeclarationScopesRejectInvalidSource(t *testing.T) {
 	t.Parallel()
 	if _, err := declarations("package p\nfunc broken("); err == nil {
 		t.Fatal("declarations() accepted invalid source")
 	}
 }
 
-func TestDeclarationScopesIncludeTypeDocumentation(t *testing.T) {
+func TestFeatureDeclarationScopesIncludeTypeDocumentation(t *testing.T) {
 	t.Parallel()
 	got, err := declarations("package p\n// First line.\n// Second line.\ntype T struct { X int }")
 	if err != nil || len(got) != 1 || got[0].Start != 2 {
@@ -108,7 +108,7 @@ func TestDeclarationScopesIncludeTypeDocumentation(t *testing.T) {
 	}
 }
 
-func TestDeclarationScopesIncludeGroupedDocumentation(t *testing.T) {
+func TestFeatureDeclarationScopesIncludeGroupedDocumentation(t *testing.T) {
 	t.Parallel()
 	got, err := declarations("package p\ntype (\n// A documentation.\nA int\n// B documentation.\nB int\n)")
 	if err != nil || len(got) != 2 || got[0].Start != 3 || got[1].Start != 5 {

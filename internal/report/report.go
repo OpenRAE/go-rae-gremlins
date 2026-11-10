@@ -264,6 +264,9 @@ func Do(results Results) error {
 		return nil
 	}
 	rep.reportFindings()
+	if rep.skipped == len(results.Mutants) {
+		return nil
+	}
 
 	return rep.assess(rep.tEfficacy, rep.mCovered)
 }

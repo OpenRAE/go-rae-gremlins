@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hectane/go-acl"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
@@ -41,6 +42,27 @@ import (
 )
 
 var fakePosition = newPosition("aFolder/aFile.go", 3, 12)
+
+func TestRegressionSkippedMutantsDoNotFailThresholds(t *testing.T) {
+	viper.Set(configuration.UnleashThresholdEfficacyKey, 80)
+	viper.Set(configuration.UnleashThresholdMCoverageKey, 90)
+	t.Cleanup(viper.Reset)
+	log.Init(&bytes.Buffer{}, &bytes.Buffer{})
+	t.Cleanup(log.Reset)
+
+	data := report.Results{Mutants: []mutator.Mutator{
+		stubMutant{status: mutator.Skipped, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+	}}
+	if err := report.Do(data); err != nil {
+		t.Fatalf("no mutations selected, threshold must not fail: %v", err)
+	}
+	data.Mutants = append(data.Mutants, stubMutant{
+		status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition,
+	})
+	if err := report.Do(data); err == nil {
+		t.Fatal("uncovered selected mutants must still fail thresholds")
+	}
+}
 
 func TestReport(t *testing.T) {
 	const (
@@ -296,7 +318,7 @@ func TestAssessment(t *testing.T) {
 	}
 }
 
-func TestAssessmentEmptyResultsSkipsThreshold(t *testing.T) {
+func TestFeatureAssessmentEmptyResultsSkipsThreshold(t *testing.T) {
 	t.Run("no mutants bypasses the threshold assessment", func(t *testing.T) {
 		log.Init(&bytes.Buffer{}, &bytes.Buffer{})
 		defer log.Reset()
@@ -638,4 +660,50 @@ func (s stubMutant) OrigSnippet() []byte {
 
 func (s stubMutant) MutatedSnippet() []byte {
 	return s.mutatedSnippet
+}
+
+func TestRegressionThresholdFlags(t *testing.T) {
+	for _, tc := range []struct {
+		name, key string
+		code      int
+	}{
+		{"efficacy", configuration.UnleashThresholdEfficacyKey, 10},
+		{"coverage", configuration.UnleashThresholdMCoverageKey, 11},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, threshold := range []string{"50", "50.5"} {
+				t.Run(threshold, func(t *testing.T) {
+					configuration.Reset()
+					t.Cleanup(configuration.Reset)
+					log.Init(&bytes.Buffer{}, &bytes.Buffer{})
+					t.Cleanup(log.Reset)
+					flags := pflag.NewFlagSet("threshold", pflag.ContinueOnError)
+					flags.Float64("threshold", 0, "threshold percent")
+					if err := viper.BindPFlag(tc.key, flags.Lookup("threshold")); err != nil {
+						t.Fatal(err)
+					}
+					if err := flags.Parse([]string{"--threshold", threshold}); err != nil {
+						t.Fatal(err)
+					}
+					data := report.Results{Mutants: []mutator.Mutator{
+						stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.Lived, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.Lived, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+					}}
+					var exitErr *execution.ExitError
+					err := report.Do(data)
+					if !errors.As(err, &exitErr) {
+						t.Fatalf("expected exit %d, got %v", tc.code, err)
+					}
+					if exitErr.ExitCode() != tc.code {
+						t.Fatalf("expected exit %d, got %d", tc.code, exitErr.ExitCode())
+					}
+				})
+			}
+		})
+	}
 }

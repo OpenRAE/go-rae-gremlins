@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"bytes"
 	"go/token"
 	"reflect"
 	"testing"
@@ -12,6 +13,27 @@ const (
 	testFile  = "test"
 	testFile1 = "test1"
 )
+
+func TestRegressionDiffSeparatedAdditions(t *testing.T) {
+	patch := "diff --git a/example.go b/example.go\n--- a/example.go\n+++ b/example.go\n@@ -1,5 +1,7 @@\n first\n+added\n context\n-old\n+replacement\n last\n+added again\n end\n"
+	files, _, err := gitdiff.Parse(bytes.NewBufferString(patch))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := newDiff(files)
+	for line := 1; line <= 8; line++ {
+		want := line == 2 || line == 4 || line == 6
+		if changed := got.IsChanged(token.Position{Filename: "example.go", Line: line}); changed != want {
+			t.Errorf("line %d changed = %v, want %v", line, changed, want)
+		}
+	}
+}
+
+func TestRegressionDiffEmptySelection(t *testing.T) {
+	if newDiff(nil).IsChanged(token.Position{Filename: "example.go", Line: 1}) {
+		t.Fatal("an enabled diff with no additions must not select the whole repository")
+	}
+}
 
 func TestDiff_IsChanged(t *testing.T) {
 	tests := []struct {
@@ -25,12 +47,6 @@ func TestDiff_IsChanged(t *testing.T) {
 			d:    nil,
 			pos:  token.Position{},
 			want: true,
-		},
-		{
-			name: "must be unchanged on empty Diff",
-			d:    map[FileName][]Change{},
-			pos:  token.Position{},
-			want: false,
 		},
 		{
 			name: "must be changed if in range",
@@ -166,7 +182,7 @@ func opLines(op gitdiff.LineOp, count int) []gitdiff.Line {
 	return result
 }
 
-func Test_newChanges_separateEditsInOneFragment(t *testing.T) {
+func TestFeature_newChanges_separateEditsInOneFragment(t *testing.T) {
 	var lines []gitdiff.Line
 	lines = append(lines, opLines(gitdiff.OpContext, 3)...)
 	lines = append(lines, opLines(gitdiff.OpDelete, 1)...)

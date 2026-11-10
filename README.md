@@ -10,7 +10,6 @@
 [![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability/go-gremlins/gremlins?logo=codeclimate)](https://codeclimate.com/github/go-gremlins/gremlins/maintainability)
 [![DeepSource](https://deepsource.io/gh/go-gremlins/gremlins.svg/?label=active+issues&token=posNnh5FHpZG9DhM23YH7h6d)](https://deepsource.io/gh/go-gremlins/gremlins/?ref=repository-badge)
 [![Codacy grade](https://img.shields.io/codacy/grade/744b4ac720c34518b7578204cfc61997?logo=codacy)](https://www.codacy.com/gh/go-gremlins/gremlins/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=go-gremlins/gremlins&amp;utm_campaign=Badge_Grade)
-[![Codecov](https://img.shields.io/codecov/c/github/go-gremlins/gremlins?logo=codecov)](https://codecov.io/gh/go-gremlins/gremlins)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgo-gremlins%2Fgremlins.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgo-gremlins%2Fgremlins?ref=badge_shield)
 
 Gremlins is a mutation testing tool for Go. It has been made to work well on _smallish_ Go modules, for example

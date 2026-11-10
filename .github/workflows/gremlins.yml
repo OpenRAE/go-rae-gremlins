@@ -10,17 +10,22 @@ permissions:
   contents: read
 
 jobs:
-  # Mutation testing of the repository with the Gremlins of the same commit.
   gremlins:
+    name: Mutation testing
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version-file: go.mod
-          cache: false
+          go-version-file: 'go.mod'
+      - name: Build this fork
+        run: go build -o "$RUNNER_TEMP/gremlins" ./cmd/gremlins
       - name: Start the per-user systemd manager
         # loginctl enable-linger starts the per-user manager for the runner user.
         # It needs no sudo; polkit authorizes a user for their own account.
@@ -33,7 +38,39 @@ jobs:
             fi
             sleep 1
           done
-      - name: Run mutation testing inside a memory budget
+      - name: Mutate changed lines inside a memory budget
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
         run: |
           export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-          scripts/run-bounded.sh --budget 10G -- go run ./cmd/gremlins unleash --silent
+          scripts/run-bounded.sh --budget 10G -- "$RUNNER_TEMP/gremlins" unleash --diff "$BASE_COMMIT"
+      - name: Mutate the full repository inside a memory budget
+        if: github.event_name == 'push'
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          scripts/run-bounded.sh --budget 10G -- "$RUNNER_TEMP/gremlins" unleash
+
+  regression-proof:
+    name: Regression proof
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - name: Check regression proof helper
+        run: python -m unittest discover -s .github/scripts -p 'test_regression_proof.py'
+      - name: Prove new regression tests against base code
+        env:
+          BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
+        run: python .github/scripts/regression_proof.py "$BASE_COMMIT"

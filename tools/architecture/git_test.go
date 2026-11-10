@@ -35,7 +35,7 @@ func commitFixture(t *testing.T, root string) {
 	}
 }
 
-func TestGitBaselineHistory(t *testing.T) {
+func TestFeatureGitBaselineHistory(t *testing.T) {
 	root := gitFixture(t)
 	b, revision, err := targetBaseline(root, "HEAD")
 	if err != nil || b.Version != 1 || len(b.Findings) != 0 || revision == "" {
@@ -54,7 +54,7 @@ func TestGitBaselineHistory(t *testing.T) {
 	}
 }
 
-func TestChangedDesignGate(t *testing.T) {
+func TestFeatureChangedDesignGate(t *testing.T) {
 	root := gitFixture(t)
 	c := testModel(t)
 	writeFile(t, root, "core/a.go", "package core")
@@ -77,7 +77,7 @@ func TestChangedDesignGate(t *testing.T) {
 	if err := checkChangedDesign(root, "HEAD", c); err == nil {
 		t.Fatal("uncovered package accepted")
 	}
-	d.Changes = []change{{Package: corePackage, Imports: []string{}}}
+	d.Changes = []change{{Package: corePackage, Imports: nil}}
 	data, err = json.Marshal(d)
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +88,7 @@ func TestChangedDesignGate(t *testing.T) {
 	}
 }
 
-func TestMalformedTargetBaseline(t *testing.T) {
+func TestFeatureMalformedTargetBaseline(t *testing.T) {
 	root := gitFixture(t)
 	writeFile(t, root, baselineFile, `{"version":1,"version":2,"findings":[]}`)
 	commitFixture(t, root)
@@ -97,7 +97,7 @@ func TestMalformedTargetBaseline(t *testing.T) {
 	}
 }
 
-func TestGitDiagnosticDoesNotLeakSubprocessOutput(t *testing.T) {
+func TestFeatureGitDiagnosticDoesNotLeakSubprocessOutput(t *testing.T) {
 	root := gitFixture(t)
 	_, err := gitRead(root, "show", "nonexistent:private-file")
 	if err == nil || strings.Contains(err.Error(), "private-file") {
@@ -114,7 +114,7 @@ func writeDesign(t *testing.T, root string, d design) {
 	writeFile(t, root, designFile, string(data))
 }
 
-func TestContractAndPolicyChangesNeedDesign(t *testing.T) {
+func TestFeatureContractAndPolicyChangesNeedDesign(t *testing.T) {
 	for _, tc := range []struct {
 		name, path          string
 		contracts, policies []string
@@ -151,7 +151,7 @@ func TestContractAndPolicyChangesNeedDesign(t *testing.T) {
 	}
 }
 
-func TestPreCodeDesignStep(t *testing.T) {
+func TestFeaturePreCodeDesignStep(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Bash design step runs in the Linux architecture CI job")
 	}
@@ -169,7 +169,7 @@ func TestPreCodeDesignStep(t *testing.T) {
 		{"prohibited transfer", "tools/architecture/testdata/invalid-trust.json", "ARCH004", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := exec.Command("bash", "scripts/check-design.sh", tc.input) //nolint:gosec // Literal test fixture paths.
+			cmd := exec.CommandContext(t.Context(), "bash", "scripts/check-design.sh", tc.input) //nolint:gosec // Literal test fixture paths.
 			cmd.Dir = root
 			output, err := cmd.CombinedOutput()
 			if (err != nil) != tc.bad {
@@ -182,7 +182,7 @@ func TestPreCodeDesignStep(t *testing.T) {
 	}
 }
 
-func TestDesignOnlyChangeEvaluated(t *testing.T) {
+func TestFeatureDesignOnlyChangeEvaluated(t *testing.T) {
 	root := gitFixture(t)
 	writeFile(t, root, designFile, `{
   "version": 1,
@@ -202,7 +202,7 @@ func TestDesignOnlyChangeEvaluated(t *testing.T) {
 	}
 }
 
-func TestCLIContractSourcesRequireCompatibilityReview(t *testing.T) {
+func TestFeatureCLIContractSourcesRequireCompatibilityReview(t *testing.T) {
 	checkout, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -227,7 +227,7 @@ func TestCLIContractSourcesRequireCompatibilityReview(t *testing.T) {
 				Summary:         changeSummary,
 				TrustBoundaries: localBoundary,
 				TrustChanges:    c.TrustBoundaries,
-				Changes:         []change{{Package: packageOf(tc.file), Imports: []string{}}},
+				Changes:         []change{{Package: packageOf(tc.file), Imports: nil}},
 			}
 			data, err := json.Marshal(d)
 			if err != nil {

@@ -13,3 +13,5 @@
 ## Test Plan
 
 <!-- List the checks run and their results. -->
+
+- [ ] New Go tests use `TestRegression...` for fixes or `TestFeature...` for features; regression cases pass the base-code proof check

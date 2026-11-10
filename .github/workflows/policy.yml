@@ -1,0 +1,41 @@
+name: Repository policy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    name: Configuration and secret checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195
+        with:
+          version: 2026.10.25
+          install_args: aqua:golangci/golangci-lint
+          cache: false
+      - name: Provision Go modules
+        run: go mod download
+      - name: Install repository check runner
+        run: python -m pip install pre-commit==4.3.0
+      - name: Check configuration and tracked files
+        env:
+          LINT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          LINT_ADOPTION_BASE: origin/dev
+        run: make policy
+      - name: Scan Git history for secrets
+        run: pre-commit run gitleaks-history --hook-stage manual --all-files

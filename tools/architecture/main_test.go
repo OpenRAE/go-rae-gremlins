@@ -51,7 +51,7 @@ func writeFile(t *testing.T, root, name, contents string) {
 	}
 }
 
-func TestScanBoundaries(t *testing.T) {
+func TestFeatureScanBoundaries(t *testing.T) {
 	for _, tc := range []struct{ name, file, source, want string }{
 		{"allowed", appFile, "package app; import _ `example.org/app/core`", ""},
 		{"forbidden alias", "core/a.go", "package core; import alias `example.org/app/app`", dependencyRule},
@@ -84,7 +84,7 @@ func TestScanBoundaries(t *testing.T) {
 	}
 }
 
-func TestBaselineRatchet(t *testing.T) {
+func TestFeatureBaselineRatchet(t *testing.T) {
 	a := finding{Rule: dependencyRule, File: "core/a.go", Subject: appPackage}
 	b := finding{Rule: dependencyRule, File: "core/b.go", Subject: appPackage}
 	for _, tc := range []struct {
@@ -118,7 +118,7 @@ func TestBaselineRatchet(t *testing.T) {
 	}
 }
 
-func TestDesignUsesCompiledRules(t *testing.T) {
+func TestFeatureDesignUsesCompiledRules(t *testing.T) {
 	for _, tc := range []struct {
 		name, pkg, dep string
 		bad            bool
@@ -162,7 +162,7 @@ func TestDesignUsesCompiledRules(t *testing.T) {
 	}
 }
 
-func TestStrictJSON(t *testing.T) {
+func TestFeatureStrictJSON(t *testing.T) {
 	for _, data := range []string{
 		`{"version":1,"version":2}`,
 		`{"version":1,"unknown":0}`,
@@ -181,7 +181,7 @@ func TestStrictJSON(t *testing.T) {
 	}
 }
 
-func TestInvalidModels(t *testing.T) {
+func TestFeatureInvalidModels(t *testing.T) {
 	cases := []func(*model){
 		func(m *model) { m.Version = 2 },
 		func(m *model) { m.Rules[0].Fix = "" },
@@ -200,7 +200,7 @@ func TestInvalidModels(t *testing.T) {
 	}
 }
 
-func TestScanFailsClosed(t *testing.T) {
+func TestFeatureScanFailsClosed(t *testing.T) {
 	for _, name := range []string{"symlink", "parse", "nested module"} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
@@ -224,7 +224,7 @@ func TestScanFailsClosed(t *testing.T) {
 	}
 }
 
-func TestSafePathsAndDiagnostics(t *testing.T) {
+func TestFeatureSafePathsAndDiagnostics(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "regular", "ok")
 	for _, name := range []string{"../outside", "/tmp/outside", "a/../regular"} {
@@ -243,7 +243,7 @@ func TestSafePathsAndDiagnostics(t *testing.T) {
 	}
 }
 
-func TestDesignConflictsAndContracts(t *testing.T) {
+func TestFeatureDesignConflictsAndContracts(t *testing.T) {
 	for _, tc := range []struct{ conflicts, contracts []string }{
 		{conflicts: []string{"unresolved"}},
 		{contracts: []string{unknownName}},
@@ -263,7 +263,7 @@ func TestDesignConflictsAndContracts(t *testing.T) {
 	}
 }
 
-func TestModelFixtureRoundTrip(t *testing.T) {
+func TestFeatureModelFixtureRoundTrip(t *testing.T) {
 	data, err := json.Marshal(testModel(t).model)
 	if err != nil {
 		t.Fatal(err)
@@ -277,7 +277,7 @@ func TestModelFixtureRoundTrip(t *testing.T) {
 	}
 }
 
-func TestScanAllowsInternalDocumentationLink(t *testing.T) {
+func TestFeatureScanAllowsInternalDocumentationLink(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, appFile, "package app")
 	writeFile(t, root, "docs/source.md", "documentation")
@@ -289,7 +289,7 @@ func TestScanAllowsInternalDocumentationLink(t *testing.T) {
 	}
 }
 
-func TestRunEndToEnd(t *testing.T) {
+func TestFeatureRunEndToEnd(t *testing.T) {
 	for _, tc := range []struct {
 		name, proposed, base string
 		edit                 func(*testing.T, string)
@@ -301,35 +301,37 @@ func TestRunEndToEnd(t *testing.T) {
 		{name: "missing history", base: "unavailable", bad: true},
 		{
 			name: "invalid model",
-			edit: func(t *testing.T, r string) { writeFile(t, r, modelFile, `{"version":2}`) },
+			edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, modelFile, `{"version":2}`) },
 			bad:  true,
 		},
-		{name: "malformed model", edit: func(t *testing.T, r string) { writeFile(t, r, modelFile, `{`) }, bad: true},
+		{name: "malformed model", edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, modelFile, `{`) }, bad: true},
 		{name: "missing model", edit: func(t *testing.T, r string) {
+			t.Helper()
 			if err := os.Remove(filepath.Join(r, modelFile)); err != nil {
 				t.Fatal(err)
 			}
 		}, bad: true},
-		{name: "malformed baseline", edit: func(t *testing.T, r string) { writeFile(t, r, baselineFile, `{`) }, bad: true},
+		{name: "malformed baseline", edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, baselineFile, `{`) }, bad: true},
 		{
 			name: "invalid baseline",
-			edit: func(t *testing.T, r string) { writeFile(t, r, baselineFile, `{"version":2,"findings":[]}`) },
+			edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, baselineFile, `{"version":2,"findings":[]}`) },
 			bad:  true,
 		},
 		{name: "new violation", edit: func(t *testing.T, r string) {
+			t.Helper()
 			writeFile(t, r, "core/a.go", "package core; import _ `example.org/app/app`")
 		}, bad: true},
-		{name: "broken source", edit: func(t *testing.T, r string) { writeFile(t, r, "core/a.go", "not Go") }, bad: true},
+		{name: "broken source", edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, "core/a.go", "not Go") }, bad: true},
 		{
 			name:     "invalid design",
 			proposed: designFile,
-			edit:     func(t *testing.T, r string) { writeFile(t, r, designFile, `{"version":2}`) },
+			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, designFile, `{"version":2}`) },
 			bad:      true,
 		},
 		{
 			name:     "malformed design",
 			proposed: designFile,
-			edit:     func(t *testing.T, r string) { writeFile(t, r, designFile, `{`) },
+			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, designFile, `{`) },
 			bad:      true,
 		},
 	} {
@@ -381,9 +383,9 @@ func TestRunEndToEnd(t *testing.T) {
 	}
 }
 
-func TestBaselineValidation(t *testing.T) {
+func TestFeatureBaselineValidation(t *testing.T) {
 	for _, b := range []baseline{
-		{Version: 2, Findings: []finding{}},
+		{Version: 2, Findings: nil},
 		{Version: 1, Findings: []finding{{Rule: "UNKNOWN", File: appFile, Subject: "x"}}},
 		{Version: 1, Findings: []finding{{Rule: "CON", File: appFile, Subject: cliContract}}},
 	} {
@@ -393,7 +395,7 @@ func TestBaselineValidation(t *testing.T) {
 	}
 }
 
-func TestInputRegularFileAndNestedDuplicate(t *testing.T) {
+func TestFeatureInputRegularFileAndNestedDuplicate(t *testing.T) {
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "directory"), 0750); err != nil {
 		t.Fatal(err)
@@ -407,7 +409,7 @@ func TestInputRegularFileAndNestedDuplicate(t *testing.T) {
 	}
 }
 
-func TestModelMessagesAreEscaped(t *testing.T) {
+func TestFeatureModelMessagesAreEscaped(t *testing.T) {
 	c := testModel(t)
 	r := c.byID[dependencyRule]
 	r.Description = "bad\n::error::"
@@ -418,7 +420,7 @@ func TestModelMessagesAreEscaped(t *testing.T) {
 	}
 }
 
-func TestEmptyCanonicalNamesRejected(t *testing.T) {
+func TestFeatureEmptyCanonicalNamesRejected(t *testing.T) {
 	for _, contract := range []bool{true, false} {
 		m := testModel(t).model
 		if contract {
@@ -433,7 +435,7 @@ func TestEmptyCanonicalNamesRejected(t *testing.T) {
 	}
 }
 
-func TestScanResolvesCheckoutParentAliases(t *testing.T) {
+func TestFeatureScanResolvesCheckoutParentAliases(t *testing.T) {
 	parent := t.TempDir()
 	realParent := filepath.Join(parent, "real")
 	if err := os.MkdirAll(filepath.Join(realParent, "checkout"), 0750); err != nil {

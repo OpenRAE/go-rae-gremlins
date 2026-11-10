@@ -53,7 +53,8 @@ lint-cover:
 
 .PHONY: policy
 policy:
-	pre-commit run --all-files
+	pre-commit validate-config
+	pre-commit run --hook-stage pre-commit --all-files
 
 .PHONY: hooks
 hooks:

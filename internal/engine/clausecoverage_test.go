@@ -55,7 +55,7 @@ type clauseMutant struct {
 	want      mutator.Status
 }
 
-func TestClauseExpressionCoverage(t *testing.T) {
+func TestFeatureClauseExpressionCoverage(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name    string

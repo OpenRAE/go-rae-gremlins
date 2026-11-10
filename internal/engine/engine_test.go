@@ -616,7 +616,7 @@ func TestSkipTestAndNonGoFiles(t *testing.T) {
 	}
 }
 
-func TestSkipTestdataVendorAndNestedModuleTrees(t *testing.T) {
+func TestFeatureSkipTestdataVendorAndNestedModuleTrees(t *testing.T) {
 	t.Parallel()
 	src, err := os.ReadFile("testdata/fixtures/geq_go")
 	if err != nil {
@@ -654,7 +654,7 @@ func TestSkipTestdataVendorAndNestedModuleTrees(t *testing.T) {
 	}
 }
 
-func TestSkipUnparsableFiles(t *testing.T) {
+func TestFeatureSkipUnparsableFiles(t *testing.T) {
 	t.Parallel()
 	src, err := os.ReadFile("testdata/fixtures/geq_go")
 	if err != nil {
