@@ -85,3 +85,8 @@ architecture:
 
 architecture-design:
 	bash scripts/check-design.sh
+
+# Prove that the cgroup-v2 memory budget stops a runaway allocator. Linux only.
+.PHONY: memcheck
+memcheck:
+	bash scripts/memory-budget-check.sh

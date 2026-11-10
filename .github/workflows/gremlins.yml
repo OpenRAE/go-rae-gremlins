@@ -21,4 +21,19 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - run: go run ./cmd/gremlins unleash --silent
+      - name: Start the per-user systemd manager
+        # loginctl enable-linger starts the per-user manager for the runner user.
+        # It needs no sudo; polkit authorizes a user for their own account.
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          loginctl enable-linger "$(id -un)"
+          for _ in $(seq 1 30); do
+            if systemctl --user show-environment >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+      - name: Run mutation testing inside a memory budget
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          scripts/run-bounded.sh --budget 10G -- go run ./cmd/gremlins unleash --silent

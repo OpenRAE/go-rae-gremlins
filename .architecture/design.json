@@ -1,22 +1,14 @@
 {
   "version": 1,
-  "issue": 84,
-  "summary": "Make the fork ready for a release that the dependent repositories can pin. A binary installed with go install at a module version reported the version dev, because only GoReleaser builds set main.version. buildVersion in cmd/gremlins now uses the main module version from the embedded build information when main.version is dev. Remove the architecture.modules block from .ground-control.yaml so the configuration conforms to Ground Control schema version 1. Remove the plan text that made the release wait for the remediation issues.",
-  "changes": [
-    {
-      "package": "cmd/gremlins",
-      "imports": [
-        "cmd",
-        "internal/execution",
-        "internal/log"
-      ]
-    }
-  ],
+  "issue": 127,
+  "summary": "Bound one complete Gremlins invocation with a Linux cgroup-v2 memory controller through a per-user systemd transient service (MemoryMax, MemorySwapMax=0, OOMPolicy=kill, KillMode=control-group). A new supervisor script scripts/run-bounded.sh verifies a finite memory limit and a zero swap limit, rejects a budget not smaller than host memory, runs the invocation inside the unit as the unprivileged user (no sudo, no root), reports the OOM result as exit 137 with partial output dropped, and passes other inner exit codes through. The Makefile adds a memcheck target and .github/workflows/ci.yml adds a required memory job that proves enforcement with a small controlled allocator inside an enforced outer slice. The mutation workflow .github/workflows/gremlins.yml runs through the bounded entry point. No Go package, dependency, CLI flag, configuration key, JSON report field, exit code, architecture rule, or baseline changes. See docs/adr/0006-bounded-memory-for-mutation-runs.md, docs/development/memory-budget.md, and docs/development/memory-budget-preflight.md.",
+  "changes": [],
   "contracts": [],
-  "trust_boundaries": "buildVersion reads the build information that the Go linker embeds in the binary through runtime/debug.ReadBuildInfo. It reads no file, environment variable, network resource, or user input. GoReleaser builds keep the version that the linker flag sets. No CLI flag, configuration key, report field, exit code, or network destination changes. The .ground-control.yaml change removes a block that no workflow command or gate reads.",
+  "trust_boundaries": "The bounded unit is a runtime OS boundary; the per-user systemd manager enforces MemoryMax and MemorySwapMax=0 before coverage, downloads, compilers, mutants, and descendants start. The supervisor script stays outside the unit, reports the runner OOM result after group termination, and owns cleanup. The script uses only the per-user manager, so the command runs as the unprivileged user; it rejects a root caller (decided from the shell's readonly effective user id), never uses sudo, and never runs the command as root. It builds the command environment from scratch with env -i, then forwards the caller's allowlist, the GREMLINS_* configuration, and the non-secret Go settings, so the manager environment is not inherited and a bounded run matches a direct command; it skips a value that carries URL credentials and never forwards tokens, the manager bus address, or the whole environment. It verifies a finite memory limit and a zero swap limit, rejects a budget not smaller than host memory, and never runs the workload unbounded. The application CLI, configuration schema, report, and exit codes do not change. The trust_changes entries below restate the model's existing development-check and delivery-finalization boundaries; this change adds no new model trust boundary, Go package, or dependency. The modeled policy changes are the Makefile build target and the ci.yml memory job.",
   "conflicts": [],
   "policies": [
-    "workflow"
+    "build",
+    "ci"
   ],
   "trust_changes": {
     "development_checks": {
