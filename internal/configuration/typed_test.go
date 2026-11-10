@@ -63,7 +63,7 @@ func writeConfig(t *testing.T, content string) string {
 	return dir
 }
 
-func TestGetConvertsEnvironmentValues(t *testing.T) {
+func TestFeatureGetConvertsEnvironmentValues(t *testing.T) {
 	initIsolated(t, t.TempDir())
 	t.Setenv(envDryRun, trueValue)
 	t.Setenv(envWorkers, "4")
@@ -87,7 +87,7 @@ func TestGetConvertsEnvironmentValues(t *testing.T) {
 	}
 }
 
-func TestGetPrecedence(t *testing.T) {
+func TestFeatureGetPrecedence(t *testing.T) {
 	testCases := []struct {
 		env          map[string]string
 		flags        []string
@@ -185,7 +185,7 @@ func bindFlags(t *testing.T, args []string) {
 	}
 }
 
-func TestValidateRejectsInvalidValues(t *testing.T) {
+func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
 	testCases := []struct {
 		env     map[string]string
 		config  string
@@ -247,7 +247,7 @@ func TestValidateRejectsInvalidValues(t *testing.T) {
 	}
 }
 
-func TestValidateAcceptsUnsetValues(t *testing.T) {
+func TestFeatureValidateAcceptsUnsetValues(t *testing.T) {
 	initIsolated(t, t.TempDir())
 
 	if err := Validate(); err != nil {
@@ -255,7 +255,7 @@ func TestValidateAcceptsUnsetValues(t *testing.T) {
 	}
 }
 
-func TestGetReturnsZeroForInvalidValue(t *testing.T) {
+func TestFeatureGetReturnsZeroForInvalidValue(t *testing.T) {
 	initIsolated(t, t.TempDir())
 	t.Setenv(envWorkers, badInt)
 
@@ -264,7 +264,7 @@ func TestGetReturnsZeroForInvalidValue(t *testing.T) {
 	}
 }
 
-func TestTypedValueChecks(t *testing.T) {
+func TestFeatureTypedValueChecks(t *testing.T) {
 	testCases := []struct {
 		check   func(any) error
 		name    string
@@ -319,7 +319,7 @@ func TestTypedValueChecks(t *testing.T) {
 	}
 }
 
-func TestGetConvertsFileValues(t *testing.T) {
+func TestFeatureGetConvertsFileValues(t *testing.T) {
 	initIsolated(t, writeConfig(t, "unleash:\n  workers: 4.0\n  threshold:\n    efficacy: 90\n  tags: 123\n"))
 
 	if got := Get[int](UnleashWorkersKey); got != 4 {
@@ -336,7 +336,7 @@ func TestGetConvertsFileValues(t *testing.T) {
 	}
 }
 
-func TestGetUntypedReturnsRawValue(t *testing.T) {
+func TestFeatureGetUntypedReturnsRawValue(t *testing.T) {
 	initIsolated(t, t.TempDir())
 	Set("test.rune", 'a')
 

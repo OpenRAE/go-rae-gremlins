@@ -205,7 +205,7 @@ func TestUnleash(t *testing.T) {
 	}
 }
 
-func TestUnleashRejectsInvalidConfiguration(t *testing.T) {
+func TestFeatureUnleashRejectsInvalidConfiguration(t *testing.T) {
 	configuration.Reset()
 	t.Cleanup(configuration.Reset)
 	if err := configuration.Init([]string{t.TempDir()}); err != nil {
@@ -222,7 +222,7 @@ func TestUnleashRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
-func TestUnleashRequiresGoModule(t *testing.T) {
+func TestFeatureUnleashRequiresGoModule(t *testing.T) {
 	configuration.Reset()
 	t.Cleanup(configuration.Reset)
 	if err := configuration.Init([]string{t.TempDir()}); err != nil {
@@ -236,7 +236,7 @@ func TestUnleashRequiresGoModule(t *testing.T) {
 	}
 }
 
-func TestModulePath(t *testing.T) {
+func TestFeatureModulePath(t *testing.T) {
 	t.Run("argument", func(t *testing.T) {
 		got, err := modulePath([]string{"some/path"})
 		if err != nil || got != "some/path" {

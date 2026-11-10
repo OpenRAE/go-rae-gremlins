@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 	"github.com/OpenRAE/go-rae-gremlins/internal/log"
 )
 
@@ -115,6 +116,24 @@ func TestLogError(t *testing.T) {
 			t.Errorf("expected out to be empty, got %s", got)
 		}
 	})
+}
+
+func TestRegressionSilentModeFromEnvironment(t *testing.T) {
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	t.Setenv("GREMLINS_SILENT", "true")
+	sOut := &bytes.Buffer{}
+	log.Init(sOut, &bytes.Buffer{})
+	t.Cleanup(log.Reset)
+
+	log.Infoln("test")
+
+	if got := sOut.String(); got != "" {
+		t.Errorf("silent output = %q, want empty", got)
+	}
 }
 
 func TestSilentMode(t *testing.T) {

@@ -64,6 +64,25 @@ func TestRegressionSkippedMutantsDoNotFailThresholds(t *testing.T) {
 	}
 }
 
+func TestRegressionDryRunFromEnvironment(t *testing.T) {
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	t.Setenv("GREMLINS_UNLEASH_DRY_RUN", "true")
+	configuration.Set(configuration.UnleashThresholdMCoverageKey, 90)
+	log.Init(&bytes.Buffer{}, &bytes.Buffer{})
+	t.Cleanup(log.Reset)
+
+	data := report.Results{Mutants: []mutator.Mutator{
+		stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+	}}
+	if err := report.Do(data); err != nil {
+		t.Errorf("report.Do in dry-run mode error = %v, want nil", err)
+	}
+}
+
 func TestReport(t *testing.T) {
 	const (
 		testingLine  = "Mutation testing completed in 2 minutes 22 seconds\n"
