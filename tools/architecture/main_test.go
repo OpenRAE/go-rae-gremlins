@@ -301,35 +301,37 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 		{name: "missing history", base: "unavailable", bad: true},
 		{
 			name: "invalid model",
-			edit: func(t *testing.T, r string) { writeFile(t, r, modelFile, `{"version":2}`) },
+			edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, modelFile, `{"version":2}`) },
 			bad:  true,
 		},
-		{name: "malformed model", edit: func(t *testing.T, r string) { writeFile(t, r, modelFile, `{`) }, bad: true},
+		{name: "malformed model", edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, modelFile, `{`) }, bad: true},
 		{name: "missing model", edit: func(t *testing.T, r string) {
+			t.Helper()
 			if err := os.Remove(filepath.Join(r, modelFile)); err != nil {
 				t.Fatal(err)
 			}
 		}, bad: true},
-		{name: "malformed baseline", edit: func(t *testing.T, r string) { writeFile(t, r, baselineFile, `{`) }, bad: true},
+		{name: "malformed baseline", edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, baselineFile, `{`) }, bad: true},
 		{
 			name: "invalid baseline",
-			edit: func(t *testing.T, r string) { writeFile(t, r, baselineFile, `{"version":2,"findings":[]}`) },
+			edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, baselineFile, `{"version":2,"findings":[]}`) },
 			bad:  true,
 		},
 		{name: "new violation", edit: func(t *testing.T, r string) {
+			t.Helper()
 			writeFile(t, r, "core/a.go", "package core; import _ `example.org/app/app`")
 		}, bad: true},
-		{name: "broken source", edit: func(t *testing.T, r string) { writeFile(t, r, "core/a.go", "not Go") }, bad: true},
+		{name: "broken source", edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, "core/a.go", "not Go") }, bad: true},
 		{
 			name:     "invalid design",
 			proposed: designFile,
-			edit:     func(t *testing.T, r string) { writeFile(t, r, designFile, `{"version":2}`) },
+			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, designFile, `{"version":2}`) },
 			bad:      true,
 		},
 		{
 			name:     "malformed design",
 			proposed: designFile,
-			edit:     func(t *testing.T, r string) { writeFile(t, r, designFile, `{`) },
+			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, designFile, `{`) },
 			bad:      true,
 		},
 	} {
@@ -383,7 +385,7 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 
 func TestFeatureBaselineValidation(t *testing.T) {
 	for _, b := range []baseline{
-		{Version: 2, Findings: []finding{}},
+		{Version: 2, Findings: nil},
 		{Version: 1, Findings: []finding{{Rule: "UNKNOWN", File: appFile, Subject: "x"}}},
 		{Version: 1, Findings: []finding{{Rule: "CON", File: appFile, Subject: cliContract}}},
 	} {

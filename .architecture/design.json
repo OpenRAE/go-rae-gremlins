@@ -1,7 +1,7 @@
 {
   "version": 1,
   "issue": 146,
-  "summary": "Reconcile main into the dev promotion: preserve float threshold conversion, empty mutation selections, precise diff ranges, development tooling, and main mutation and regression gates. Classify promoted acceptance tests and preserve regression identities across the fork module-path migration; keep the base production code unchanged during proofs.",
+  "summary": "Reconcile main into the dev promotion: preserve float threshold conversion, empty mutation selections, precise diff ranges, development tooling, and main mutation and regression gates. Classify promoted acceptance tests and preserve regression identities across the fork module-path migration; keep the base production code unchanged during proofs. Validate generic configuration conversions explicitly and remove duplicate empty-diff coverage; repair promoted test lint findings.",
   "changes": [
     {
       "package": "cmd"

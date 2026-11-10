@@ -77,7 +77,7 @@ func TestFeatureChangedDesignGate(t *testing.T) {
 	if err := checkChangedDesign(root, "HEAD", c); err == nil {
 		t.Fatal("uncovered package accepted")
 	}
-	d.Changes = []change{{Package: corePackage, Imports: []string{}}}
+	d.Changes = []change{{Package: corePackage, Imports: nil}}
 	data, err = json.Marshal(d)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +169,7 @@ func TestFeaturePreCodeDesignStep(t *testing.T) {
 		{"prohibited transfer", "tools/architecture/testdata/invalid-trust.json", "ARCH004", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := exec.Command("bash", "scripts/check-design.sh", tc.input) //nolint:gosec // Literal test fixture paths.
+			cmd := exec.CommandContext(t.Context(), "bash", "scripts/check-design.sh", tc.input) //nolint:gosec // Literal test fixture paths.
 			cmd.Dir = root
 			output, err := cmd.CombinedOutput()
 			if (err != nil) != tc.bad {
@@ -227,7 +227,7 @@ func TestFeatureCLIContractSourcesRequireCompatibilityReview(t *testing.T) {
 				Summary:         changeSummary,
 				TrustBoundaries: localBoundary,
 				TrustChanges:    c.TrustBoundaries,
-				Changes:         []change{{Package: packageOf(tc.file), Imports: []string{}}},
+				Changes:         []change{{Package: packageOf(tc.file), Imports: nil}},
 			}
 			data, err := json.Marshal(d)
 			if err != nil {

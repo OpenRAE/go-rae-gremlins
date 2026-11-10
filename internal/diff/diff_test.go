@@ -49,12 +49,6 @@ func TestDiff_IsChanged(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "must be unchanged on empty Diff",
-			d:    map[FileName][]Change{},
-			pos:  token.Position{},
-			want: false,
-		},
-		{
 			name: "must be changed if in range",
 			d: map[FileName][]Change{
 				testFile: {{StartLine: 21, EndLine: 21}},

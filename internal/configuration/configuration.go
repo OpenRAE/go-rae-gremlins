@@ -191,7 +191,9 @@ func Get[T any](k string) T {
 
 		return r
 	}
-	r, _ = viper.Get(k).(T)
+	if value, ok := viper.Get(k).(T); ok {
+		return value
+	}
 
 	return r
 }
