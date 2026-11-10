@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/spf13/viper"
-
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 )
 
@@ -17,9 +15,7 @@ type Rules []*regexp.Regexp
 func New() (Rules, error) {
 	var rules Rules
 
-	// TODO: modify and use configuration package
-	// NOTE: configuration.Get can't type cast to []string a value from .gremlins file, because viper.Get(k) returns []interface{}
-	flagValues := viper.GetStringSlice(configuration.UnleashExcludeFiles)
+	flagValues := configuration.Get[[]string](configuration.UnleashExcludeFiles)
 
 	for i, s := range flagValues {
 		r, err := regexp.Compile(s)

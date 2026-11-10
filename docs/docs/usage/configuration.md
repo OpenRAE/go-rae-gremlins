@@ -117,5 +117,10 @@ mutants:
 Can be set with:
 
 ```shell
-export GREMLINS_MUTANTS_ARITHMETIC_BASE=true
+export GREMLINS_MUTANTS_ARITHMETIC_BASE_ENABLED=true
 ```
+
+Gremlins converts each value to the type of its key: boolean, integer, number, string, or list of strings.
+For a list, separate the items with spaces. For example, `GREMLINS_UNLEASH_EXCLUDE_FILES="_mock.go$ ^gen/"`.
+If a value does not convert, `unleash` stops with an error that names the configuration key.
+This check also applies to values from flags and from the configuration file.

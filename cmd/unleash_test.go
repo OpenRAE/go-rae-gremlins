@@ -201,3 +201,20 @@ func TestUnleash(t *testing.T) {
 		}
 	}
 }
+
+func TestUnleashRejectsInvalidConfiguration(t *testing.T) {
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	t.Setenv("GREMLINS_UNLEASH_WORKERS", "four")
+
+	err := runUnleash(context.Background())(nil, []string{t.TempDir()})
+	if err == nil {
+		t.Fatal("runUnleash error = nil, want an invalid-value error")
+	}
+	if !strings.Contains(err.Error(), configuration.UnleashWorkersKey) {
+		t.Errorf("runUnleash error = %q, want it to name %q", err, configuration.UnleashWorkersKey)
+	}
+}
