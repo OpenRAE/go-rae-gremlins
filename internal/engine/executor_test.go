@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -28,11 +29,19 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/go-gremlins/gremlins/internal/configuration"
-	"github.com/go-gremlins/gremlins/internal/engine"
-	"github.com/go-gremlins/gremlins/internal/engine/workerpool"
-	"github.com/go-gremlins/gremlins/internal/gomodule"
-	"github.com/go-gremlins/gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
+	"github.com/OpenRAE/go-rae-gremlins/internal/engine"
+	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workdir"
+	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
+	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
+	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+)
+
+const (
+	testWorkerName = "test"
+	examplePackage = "example.com/my/package"
+	exampleCallDir = "test/dir"
+	exampleTags    = "tag1,t1g2"
 )
 
 func TestApplyAndRollback(t *testing.T) {
@@ -40,7 +49,7 @@ func TestApplyAndRollback(t *testing.T) {
 		wdDealer := newWdDealerStub(t)
 		tmpDir, _ := wdDealer.Get("")
 		mod := gomodule.GoModule{
-			Name:       "example.com",
+			Name:       expectedModule,
 			Root:       tmpDir,
 			CallingDir: ".",
 		}
@@ -48,14 +57,14 @@ func TestApplyAndRollback(t *testing.T) {
 		mut := &mutantStub{
 			status:  mutator.Runnable,
 			mutType: mutator.ConditionalsBoundary,
-			pkg:     "example.com",
+			pkg:     expectedModule,
 		}
 		outCh := make(chan mutator.Mutator)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.NewExecutor(mut, outCh, &wg)
 		w := &workerpool.Worker{
-			Name: "test",
+			Name: testWorkerName,
 			ID:   1,
 		}
 		go func() {
@@ -80,7 +89,7 @@ func TestApplyAndRollback(t *testing.T) {
 		wdDealer := newWdDealerStub(t)
 		tmpDir, _ := wdDealer.Get("")
 		mod := gomodule.GoModule{
-			Name:       "example.com",
+			Name:       expectedModule,
 			Root:       tmpDir,
 			CallingDir: ".",
 		}
@@ -88,7 +97,7 @@ func TestApplyAndRollback(t *testing.T) {
 		mut := &mutantStub{
 			status:        mutator.Runnable,
 			mutType:       mutator.ConditionalsBoundary,
-			pkg:           "example.com",
+			pkg:           expectedModule,
 			hasApplyError: true,
 		}
 		outCh := make(chan mutator.Mutator)
@@ -96,7 +105,7 @@ func TestApplyAndRollback(t *testing.T) {
 		wg.Add(1)
 		executor := mjd.NewExecutor(mut, outCh, &wg)
 		w := &workerpool.Worker{
-			Name: "test",
+			Name: testWorkerName,
 			ID:   1,
 		}
 		go func() {
@@ -145,12 +154,6 @@ func TestMutatorTestExecution(t *testing.T) {
 			mutantStatus:  mutator.Runnable,
 			wantMutStatus: mutator.Killed,
 		},
-		{
-			name:          "if build fails then mutation is BUILD FAILED",
-			testResult:    fakeExecCommandBuildFailure,
-			mutantStatus:  mutator.Runnable,
-			wantMutStatus: mutator.NotViable,
-		},
 	}
 	for _, tc := range testCases {
 		tc := tc
@@ -160,7 +163,7 @@ func TestMutatorTestExecution(t *testing.T) {
 			wdDealer := newWdDealerStub(t)
 			holder := &commandHolder{}
 			mod := gomodule.GoModule{
-				Name:       "example.com",
+				Name:       expectedModule,
 				Root:       ".",
 				CallingDir: ".",
 			}
@@ -170,14 +173,14 @@ func TestMutatorTestExecution(t *testing.T) {
 			mut := &mutantStub{
 				status:  tc.mutantStatus,
 				mutType: mutator.ConditionalsBoundary,
-				pkg:     "example.com",
+				pkg:     expectedModule,
 			}
 			outCh := make(chan mutator.Mutator)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			executor := mjd.NewExecutor(mut, outCh, &wg)
 			w := &workerpool.Worker{
-				Name: "test",
+				Name: testWorkerName,
 				ID:   1,
 			}
 
@@ -217,6 +220,124 @@ func TestMutatorTestExecution(t *testing.T) {
 	}
 }
 
+// TestMutatorTestExecutionBuildFailureIsNotViable runs the real go toolchain
+// against a small, purpose-built package that does not compile, so the
+// classification is proven against go test's actual output rather than an
+// invented exit code (issue #59): go test exits 1 for a build failure and
+// for an assertion failure alike, so only the compiler's own markers in the
+// output can tell them apart.
+func TestRegressionMutatorTestExecutionBuildFailureIsNotViable(t *testing.T) {
+	const probeModule = "probe"
+
+	viperSet(map[string]any{configuration.UnleashDryRunKey: false})
+	defer viperReset()
+
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"go.mod":   "module " + probeModule + "\n\ngo 1.25\n",
+		"probe.go": "package probe\n\nfunc Label(n int) string { return \"n\" - n }\n",
+		"probe_test.go": `package probe
+
+import "testing"
+
+func TestFeatureLabel(t *testing.T) {
+	_ = Label(3)
+}
+`,
+	})
+
+	mod := gomodule.GoModule{
+		Name:       probeModule,
+		Root:       root,
+		CallingDir: ".",
+	}
+	wdDealer := workdir.NewCachedDealer(t.TempDir(), mod.Root)
+	defer wdDealer.Clean()
+
+	mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout)
+	mut := &mutantStub{
+		status:  mutator.Runnable,
+		mutType: mutator.ConditionalsBoundary,
+		pkg:     probeModule,
+	}
+	outCh := make(chan mutator.Mutator, 1)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	executor := mjd.NewExecutor(mut, outCh, &wg)
+	w := &workerpool.Worker{
+		Name: testWorkerName,
+		ID:   1,
+	}
+
+	executor.Start(w)
+	wg.Wait()
+
+	got := <-outCh
+	if got.Status() != mutator.NotViable {
+		t.Errorf("status = %v, want %v", got.Status(), mutator.NotViable)
+	}
+}
+
+// TestMutatorRunErrorIsNotReportedAsLived proves that an infrastructure
+// failure in running the test command (here, a missing executable) is never
+// folded into mutator.Lived: the mutant must not be reported as a kill the
+// suite survived when the suite never ran at all (issue #59).
+func TestRegressionMutatorRunErrorIsNotReportedAsLived(t *testing.T) {
+	viperSet(map[string]any{configuration.UnleashDryRunKey: false})
+	defer viperReset()
+
+	wdDealer := newWdDealerStub(t)
+	mod := gomodule.GoModule{
+		Name:       expectedModule,
+		Root:       ".",
+		CallingDir: ".",
+	}
+	missingExecutable := filepath.Join(t.TempDir(), "no-such-executable")
+	missingExec := func(ctx context.Context, _ string, _ ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, missingExecutable)
+	}
+	mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(missingExec))
+	mut := &mutantStub{
+		status:  mutator.Runnable,
+		mutType: mutator.ConditionalsBoundary,
+		pkg:     expectedModule,
+	}
+	outCh := make(chan mutator.Mutator, 1)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	executor := mjd.NewExecutor(mut, outCh, &wg)
+	w := &workerpool.Worker{
+		Name: testWorkerName,
+		ID:   1,
+	}
+
+	executor.Start(w)
+	wg.Wait()
+
+	select {
+	case got := <-outCh:
+		t.Fatalf("expected no mutant to be reported for a run error, got status %v", got.Status())
+	default:
+	}
+
+	if !mut.rollbackCalled {
+		t.Error("expected rollback to be called even when the test run errors")
+	}
+}
+
+func writeFiles(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for name, content := range files {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatalf("create directory of %s: %v", name, err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+}
+
 const expectedTimeout = 10 * time.Second
 
 type commandHolder struct {
@@ -240,26 +361,26 @@ func TestMutatorRun(t *testing.T) {
 		{
 			name:     "normal mode",
 			intMode:  false,
-			pkg:      "example.com/my/package",
-			callDir:  "test/dir",
-			tags:     "tag1,t1g2",
-			wantPath: "example.com/my/package",
+			pkg:      examplePackage,
+			callDir:  exampleCallDir,
+			tags:     exampleTags,
+			wantPath: examplePackage,
 		},
 		{
 			name:     "integration mode",
 			intMode:  true,
-			pkg:      "example.com/my/package",
-			callDir:  "test/dir",
-			tags:     "tag1,t1g2",
+			pkg:      examplePackage,
+			callDir:  exampleCallDir,
+			tags:     exampleTags,
 			wantPath: "./...",
 		},
 		{
 			name:               "it can override timeout coefficient",
 			timeoutCoefficient: 4,
-			pkg:                "example.com/my/package",
-			callDir:            "test/dir",
-			tags:               "tag1,t1g2",
-			wantPath:           "example.com/my/package",
+			pkg:                examplePackage,
+			callDir:            exampleCallDir,
+			tags:               exampleTags,
+			wantPath:           examplePackage,
 		},
 	}
 	for _, tc := range testCases {
@@ -276,7 +397,7 @@ func TestMutatorRun(t *testing.T) {
 			defer viperReset()
 
 			mod := gomodule.GoModule{
-				Name:       "example.com",
+				Name:       expectedModule,
 				Root:       ".",
 				CallingDir: tc.callDir,
 			}
@@ -294,7 +415,7 @@ func TestMutatorRun(t *testing.T) {
 			wg.Add(1)
 			executor := mjd.NewExecutor(mut, outCh, &wg)
 			w := &workerpool.Worker{
-				Name: "test",
+				Name: testWorkerName,
 				ID:   1,
 			}
 			go func() {
@@ -365,7 +486,7 @@ func TestCPU(t *testing.T) {
 			defer viperReset()
 
 			mod := gomodule.GoModule{
-				Name:       "example.com",
+				Name:       expectedModule,
 				Root:       ".",
 				CallingDir: ".",
 			}
@@ -383,7 +504,7 @@ func TestCPU(t *testing.T) {
 			wg.Add(1)
 			executor := mjd.NewExecutor(mut, outCh, &wg)
 			w := &workerpool.Worker{
-				Name: "test",
+				Name: testWorkerName,
 				ID:   1,
 			}
 			go func() {
@@ -435,18 +556,11 @@ func TestProcessTestsFailure(_ *testing.T) {
 	os.Exit(1) // skipcq: RVV-A0003
 }
 
-func TestProcessBuildFailure(_ *testing.T) {
-	if os.Getenv("GO_TEST_PROCESS") != "1" {
-		return
-	}
-	os.Exit(2) // skipcq: RVV-A0003
-}
-
 func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 	t.Run("mutation should run in the correct folder", func(t *testing.T) {
-		callingDir := "test/dir"
+		callingDir := exampleCallDir
 		mod := gomodule.GoModule{
-			Name:       "example.com",
+			Name:       expectedModule,
 			Root:       ".",
 			CallingDir: callingDir,
 		}
@@ -457,14 +571,14 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		mut := &mutantStub{
 			status:  mutator.Runnable,
 			mutType: mutator.ConditionalsBoundary,
-			pkg:     "example.com/my/package",
+			pkg:     examplePackage,
 		}
 		outCh := make(chan mutator.Mutator)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.NewExecutor(mut, outCh, &wg)
 		w := &workerpool.Worker{
-			Name: "test",
+			Name: testWorkerName,
 			ID:   1,
 		}
 		go func() {
@@ -483,9 +597,9 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 			configuration.UnleashIntegrationMode: true,
 		})
 		defer viperReset()
-		callingDir := "test/dir"
+		callingDir := exampleCallDir
 		mod := gomodule.GoModule{
-			Name:       "example.com",
+			Name:       expectedModule,
 			Root:       ".",
 			CallingDir: callingDir,
 		}
@@ -503,14 +617,14 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		mut := &mutantStub{
 			status:  mutator.Runnable,
 			mutType: mutator.ConditionalsBoundary,
-			pkg:     "example.com/my/package",
+			pkg:     examplePackage,
 		}
 		outCh := make(chan mutator.Mutator)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.NewExecutor(mut, outCh, &wg)
 		w := &workerpool.Worker{
-			Name: "test",
+			Name: testWorkerName,
 			ID:   1,
 		}
 		go func() {
@@ -573,13 +687,6 @@ func fakeExecCommandWithHolder(got *commandHolder, fakeCmd func(ctx context.Cont
 
 func fakeExecCommandTestsFailure(ctx context.Context, command string, args ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestProcessTestsFailure", "--", command}
-	cs = append(cs, args...)
-
-	return getCmd(ctx, cs)
-}
-
-func fakeExecCommandBuildFailure(ctx context.Context, command string, args ...string) *exec.Cmd {
-	cs := []string{"-test.run=TestProcessBuildFailure", "--", command}
 	cs = append(cs, args...)
 
 	return getCmd(ctx, cs)

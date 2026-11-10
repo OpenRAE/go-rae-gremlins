@@ -19,26 +19,29 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-gremlins/gremlins/internal/coverage"
-	"github.com/go-gremlins/gremlins/internal/diff"
-	"github.com/go-gremlins/gremlins/internal/engine/workerpool"
-	"github.com/go-gremlins/gremlins/internal/exclusion"
-	"github.com/go-gremlins/gremlins/internal/mutator"
-	"github.com/go-gremlins/gremlins/internal/report"
+	"github.com/OpenRAE/go-rae-gremlins/internal/coverage"
+	"github.com/OpenRAE/go-rae-gremlins/internal/diff"
+	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
+	"github.com/OpenRAE/go-rae-gremlins/internal/exclusion"
+	"github.com/OpenRAE/go-rae-gremlins/internal/log"
+	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/report"
 
-	"github.com/go-gremlins/gremlins/internal/configuration"
-	"github.com/go-gremlins/gremlins/internal/gomodule"
+	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
+	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
 )
 
 // Engine is the "engine" that performs the mutation testing.
@@ -101,15 +104,31 @@ func (mu *Engine) Run(ctx context.Context) report.Results {
 	mu.mutantStream = make(chan mutator.Mutator)
 	go func() {
 		defer close(mu.mutantStream)
-		_ = fs.WalkDir(mu.fs, ".", func(path string, _ fs.DirEntry, _ error) error {
-			isGoCode := filepath.Ext(path) == ".go" && !strings.HasSuffix(path, "_test.go")
+		walkErr := fs.WalkDir(mu.fs, ".", func(walkPath string, d fs.DirEntry, err error) error {
+			if err != nil {
+				log.Errorf("skipping %s: %v\n", walkPath, err)
 
-			if isGoCode && !mu.codeData.Exclusion.IsFileExcluded(path) {
-				mu.runOnFile(path)
+				return nil
+			}
+			if d.IsDir() {
+				if walkPath != "." && mu.skipDir(walkPath, d.Name()) {
+					return fs.SkipDir
+				}
+
+				return nil
+			}
+
+			isGoCode := filepath.Ext(walkPath) == ".go" && !strings.HasSuffix(walkPath, "_test.go")
+
+			if isGoCode && !mu.codeData.Exclusion.IsFileExcluded(walkPath) {
+				mu.runOnFile(walkPath)
 			}
 
 			return nil
 		})
+		if walkErr != nil {
+			log.Errorf("walking module tree: %v\n", walkErr)
+		}
 	}()
 
 	start := time.Now()
@@ -120,30 +139,66 @@ func (mu *Engine) Run(ctx context.Context) report.Results {
 	return res
 }
 
-func (mu *Engine) runOnFile(fileName string) {
-	src, _ := mu.fs.Open(fileName)
-	set := token.NewFileSet()
-	file, _ := parser.ParseFile(set, fileName, src, parser.ParseComments)
-	_ = src.Close()
+// skipDir reports whether dirPath is a testdata tree, a vendor tree, or the
+// root of a nested Go module. None of these belong to the module being
+// mutated, so Run must not descend into them.
+func (mu *Engine) skipDir(dirPath, name string) bool {
+	if name == "testdata" || name == "vendor" {
+		return true
+	}
 
+	_, err := fs.Stat(mu.fs, path.Join(dirPath, "go.mod"))
+
+	return err == nil
+}
+
+func (mu *Engine) runOnFile(fileName string) {
+	set := token.NewFileSet()
+	file, err := mu.parseFile(set, fileName)
+	if err != nil {
+		log.Errorf("skipping %s: %v\n", fileName, err)
+
+		return
+	}
+
+	cov := newFileCoverage(set, file, mu.codeData.Cov)
 	ast.Inspect(file, func(node ast.Node) bool {
 		n, ok := NewTokenNode(node)
 		if !ok {
 			return true
 		}
-		mu.findMutations(fileName, set, file, n)
+		mu.findMutations(fileName, set, file, n, cov)
 
 		return true
 	})
 }
 
-func (mu *Engine) findMutations(fileName string, set *token.FileSet, file *ast.File, node *NodeToken) {
+// parseFile parses a Go file of the module file system.
+func (mu *Engine) parseFile(set *token.FileSet, fileName string) (*ast.File, error) {
+	src, err := mu.fs.Open(fileName)
+	if err != nil {
+		return nil, fmt.Errorf("open: %w", err)
+	}
+	file, err := parser.ParseFile(set, fileName, src, parser.ParseComments)
+	if closeErr := src.Close(); closeErr != nil {
+		err = errors.Join(err, fmt.Errorf("close: %w", closeErr))
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
+func (mu *Engine) findMutations(
+	fileName string, set *token.FileSet, file *ast.File, node *NodeToken, cov fileCoverage,
+) {
 	mutantTypes, ok := TokenMutantType[node.Tok()]
 	if !ok {
 		return
 	}
 
-	pkg := mu.pkgName(fileName, file.Name.Name)
+	pkg := mu.pkgName(fileName)
 	for _, mt := range mutantTypes {
 		if !configuration.Get[bool](configuration.MutantTypeEnabledKey(mt)) {
 			continue
@@ -151,44 +206,30 @@ func (mu *Engine) findMutations(fileName string, set *token.FileSet, file *ast.F
 		mutantType := mt
 		tm := NewTokenMutant(pkg, set, file, node)
 		tm.SetType(mutantType)
-		tm.SetStatus(mu.mutationStatus(set.Position(node.TokPos)))
+		tm.SetStatus(mu.mutationStatus(set.Position(node.TokPos), cov.isCovered(node.TokPos)))
 
 		mu.mutantStream <- tm
 	}
 }
 
-func (mu *Engine) pkgName(fileName, fPkg string) string {
-	var pkg string
-	fn := fmt.Sprintf("%s/%s", mu.module.CallingDir, fileName)
-	p := filepath.Dir(fn)
-	for {
-		if strings.HasSuffix(p, fPkg) {
-			pkg = fmt.Sprintf("%s/%s", mu.module.Name, p)
-
-			break
-		}
-		d := filepath.Dir(p)
-		if d == p {
-			pkg = mu.module.Name
-
-			break
-		}
-		p = d
+// pkgName returns the import path of the package that fileName belongs to.
+// The package is the directory of the file, relative to the module root. The
+// package declaration name does not identify the directory, for example for a
+// main package. fileName is slash-separated and relative to the calling
+// directory, as fs.WalkDir reports it.
+func (mu *Engine) pkgName(fileName string) string {
+	dir := path.Join(filepath.ToSlash(mu.module.CallingDir), path.Dir(fileName))
+	if dir == "." {
+		return mu.module.Name
 	}
 
-	return normalisePkgPath(pkg)
+	return mu.module.Name + "/" + dir
 }
 
-func normalisePkgPath(pkg string) string {
-	sep := fmt.Sprintf("%c", os.PathSeparator)
-
-	return strings.ReplaceAll(pkg, sep, "/")
-}
-
-func (mu *Engine) mutationStatus(pos token.Position) mutator.Status {
+func (mu *Engine) mutationStatus(pos token.Position, covered bool) mutator.Status {
 	var status mutator.Status
 
-	if mu.codeData.Cov.IsCovered(pos) {
+	if covered {
 		status = mutator.Runnable
 	}
 

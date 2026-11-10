@@ -35,33 +35,51 @@ func newChanges(file *gitdiff.File) (FileName, []Change) {
 	var changes []Change
 
 	for _, fragment := range file.TextFragments {
-		if fragment.LinesAdded == 0 {
-			continue
-		}
-
-		line := int(fragment.NewPosition)
-		for _, entry := range fragment.Lines {
-			switch entry.Op {
-			case gitdiff.OpAdd:
-				if len(changes) > 0 && changes[len(changes)-1].EndLine == line-1 {
-					changes[len(changes)-1].EndLine = line
-				} else {
-					changes = append(changes, Change{StartLine: line, EndLine: line})
-				}
-				line++
-			case gitdiff.OpContext:
-				line++
-			case gitdiff.OpDelete:
-				// Deleted lines do not advance the new file's position.
-			}
-		}
+		changes = append(changes, changesInFragment(fragment)...)
 	}
 
 	return FileName(file.NewName), changes
 }
 
+// changesInFragment walks a fragment's lines in order and returns one Change
+// per contiguous run of added lines, tracked by the line's actual position in
+// the new file. A hunk can hold more than one such run when git merges two
+// nearby edits into a single fragment.
+func changesInFragment(fragment *gitdiff.TextFragment) []Change {
+	var changes []Change
+
+	newLine := int(fragment.NewPosition)
+	var current *Change
+
+	for _, line := range fragment.Lines {
+		switch {
+		case line.Op != gitdiff.OpAdd:
+			if current != nil {
+				changes = append(changes, *current)
+				current = nil
+			}
+		case current == nil:
+			current = &Change{StartLine: newLine, EndLine: newLine}
+		default:
+			current.EndLine = newLine
+		}
+
+		if line.New() {
+			newLine++
+		}
+	}
+
+	if current != nil {
+		changes = append(changes, *current)
+	}
+
+	return changes
+}
+
 // IsChanged returns true if the given position is within a changed region.
-// A nil diff disables filtering; an empty, non-nil diff selects no positions.
+// A nil Diff means diff-based selection is disabled, so every position is
+// changed. A non-nil Diff with no matching range means diff-based selection
+// is enabled but found no added lines for that position, so it is unchanged.
 func (d Diff) IsChanged(pos token.Position) bool {
 	if d == nil {
 		return true

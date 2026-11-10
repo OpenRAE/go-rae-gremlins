@@ -27,11 +27,11 @@ import (
 	"github.com/fatih/color"
 	"github.com/hako/durafmt"
 
-	"github.com/go-gremlins/gremlins/internal/configuration"
-	"github.com/go-gremlins/gremlins/internal/execution"
-	"github.com/go-gremlins/gremlins/internal/log"
-	"github.com/go-gremlins/gremlins/internal/mutator"
-	"github.com/go-gremlins/gremlins/internal/report/internal"
+	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
+	"github.com/OpenRAE/go-rae-gremlins/internal/execution"
+	"github.com/OpenRAE/go-rae-gremlins/internal/log"
+	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/report/internal"
 )
 
 var (
@@ -235,14 +235,14 @@ func (r *reportStatus) assess(tEfficacy, rCoverage float64) error {
 	if et == 0 {
 		et = float64(configuration.Get[int](configuration.UnleashThresholdEfficacyKey))
 	}
-	if et > 0 && tEfficacy <= et {
+	if et > 0 && tEfficacy < et {
 		return execution.NewExitErr(execution.EfficacyThreshold)
 	}
 	ct := configuration.Get[float64](configuration.UnleashThresholdMCoverageKey)
 	if ct == 0 {
 		ct = float64(configuration.Get[int](configuration.UnleashThresholdMCoverageKey))
 	}
-	if ct > 0 && rCoverage <= ct {
+	if ct > 0 && rCoverage < ct {
 		return execution.NewExitErr(execution.MutantCoverageThreshold)
 	}
 
@@ -253,6 +253,9 @@ func (r *reportStatus) assess(tEfficacy, rCoverage float64) error {
 // This function uses the log package in gremlins to write to the
 // chosen io.Writer, so it is necessary to call log.Init before
 // the report generation.
+//
+// An empty Results skips the threshold assessment and always returns nil,
+// since there are no mutants to compute an efficacy or coverage percent from.
 func Do(results Results) error {
 	rep, ok := newReport(results)
 	if !ok {

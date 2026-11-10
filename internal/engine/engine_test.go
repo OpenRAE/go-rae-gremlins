@@ -24,12 +24,12 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-gremlins/gremlins/internal/configuration"
-	"github.com/go-gremlins/gremlins/internal/coverage"
-	"github.com/go-gremlins/gremlins/internal/diff"
-	"github.com/go-gremlins/gremlins/internal/engine"
-	"github.com/go-gremlins/gremlins/internal/gomodule"
-	"github.com/go-gremlins/gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
+	"github.com/OpenRAE/go-rae-gremlins/internal/coverage"
+	"github.com/OpenRAE/go-rae-gremlins/internal/diff"
+	"github.com/OpenRAE/go-rae-gremlins/internal/engine"
+	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
+	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
 const (
@@ -602,7 +602,7 @@ func TestSkipTestAndNonGoFiles(t *testing.T) {
 		"folder1/file": {Data: file},
 	}
 	mod := gomodule.GoModule{
-		Name:       "example.com",
+		Name:       expectedModule,
 		Root:       ".",
 		CallingDir: ".",
 	}
@@ -612,7 +612,79 @@ func TestSkipTestAndNonGoFiles(t *testing.T) {
 	res := mut.Run(context.Background())
 
 	if got := res.Mutants; len(got) != 0 {
-		t.Errorf("should not receive results")
+		t.Error("should not receive results")
+	}
+}
+
+func TestFeatureSkipTestdataVendorAndNestedModuleTrees(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile("testdata/fixtures/geq_go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sys := fstest.MapFS{
+		"pkg/file.go":         {Data: src},
+		"testdata/fixture.go": {Data: src},
+		"vendor/dep/file.go":  {Data: src},
+		"nested/go.mod":       {Data: []byte("module nested\n\ngo 1.25\n")},
+		"nested/file.go":      {Data: src},
+	}
+	mod := gomodule.GoModule{
+		Name:       expectedModule,
+		Root:       ".",
+		CallingDir: ".",
+	}
+	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+	defer viperReset()
+	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
+	res := mut.Run(context.Background())
+
+	files := make(map[string]int)
+	for _, m := range res.Mutants {
+		files[m.Position().Filename]++
+	}
+	if files["pkg/file.go"] == 0 {
+		t.Errorf("got no mutants of pkg/file.go, want mutants; mutants by file: %v", files)
+	}
+	for _, excluded := range []string{"testdata/fixture.go", "vendor/dep/file.go", "nested/file.go"} {
+		if files[excluded] != 0 {
+			t.Errorf("got mutants of %s, want none; mutants by file: %v", excluded, files)
+		}
+	}
+}
+
+func TestFeatureSkipUnparsableFiles(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile("testdata/fixtures/geq_go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sys := fstest.MapFS{
+		"good.go":           {Data: src},
+		"broken.go":         {Data: []byte("package main\n\nfunc main() {\n  if 1 >= 2 {\n")},
+		"directory.go/x.go": {Data: src},
+	}
+	mod := gomodule.GoModule{
+		Name:       expectedModule,
+		Root:       ".",
+		CallingDir: ".",
+	}
+	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+	defer viperReset()
+	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
+	res := mut.Run(context.Background())
+
+	files := make(map[string]int)
+	for _, m := range res.Mutants {
+		files[m.Position().Filename]++
+	}
+	if files["good.go"] == 0 {
+		t.Errorf("got no mutants of good.go, want mutants; mutants by file: %v", files)
+	}
+	if files["broken.go"] != 0 || files["directory.go"] != 0 {
+		t.Errorf("got mutants of an unparsable file, want none; mutants by file: %v", files)
 	}
 }
 
@@ -625,7 +697,7 @@ func TestSkipNotDiffMutants(t *testing.T) {
 		"file.go": {Data: file},
 	}
 	mod := gomodule.GoModule{
-		Name:       "example.com",
+		Name:       expectedModule,
 		Root:       ".",
 		CallingDir: ".",
 	}
@@ -675,13 +747,13 @@ func TestPackageDiscovery(t *testing.T) {
 			name:     "from root, normal mode",
 			fromPkg:  ".",
 			intMode:  false,
-			wantPath: "example.com",
+			wantPath: "example.com/fixtures",
 		},
 		{
 			name:     "from subpackage, normal mode",
 			fromPkg:  "testdata/main/fixture",
 			intMode:  false,
-			wantPath: "example.com/testdata/main",
+			wantPath: "example.com/testdata/main/fixture/fixtures",
 		},
 	}
 	for _, tc := range testCases {

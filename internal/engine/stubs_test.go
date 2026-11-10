@@ -26,10 +26,10 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-gremlins/gremlins/internal/configuration"
-	"github.com/go-gremlins/gremlins/internal/engine/workerpool"
-	"github.com/go-gremlins/gremlins/internal/gomodule"
-	"github.com/go-gremlins/gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
+	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
+	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
+	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
 var viperMutex sync.RWMutex
@@ -63,19 +63,20 @@ func loadFixture(fixture, fromPackage string) (fstest.MapFS, gomodule.GoModule, 
 		filename: {Data: src},
 	}
 
-	module := gomodule.GoModule{
-		Name:       "example.com",
+	return mapFS, gomodule.GoModule{
+		Name:       expectedModule,
 		Root:       ".",
 		CallingDir: fromPackage,
-	}
-
-	return mapFS, module, func() {
+	}, func() {
 		_ = f.Close()
 	}
 }
 
 func filenameFromFixture(fix string) string {
-	return strings.ReplaceAll(fix, "_go", ".go")
+	// Strip testdata/ so the virtual path isn't excluded by Engine.Run's testdata exclusion.
+	virtual := strings.TrimPrefix(fix, "testdata/")
+
+	return strings.ReplaceAll(virtual, "_go", ".go")
 }
 
 type dealerStub struct {

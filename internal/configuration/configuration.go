@@ -28,7 +28,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 
-	"github.com/go-gremlins/gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
 // This is the list of the keys available in config files and as flags.
@@ -191,7 +191,9 @@ func Get[T any](k string) T {
 
 		return r
 	}
-	r, _ = viper.Get(k).(T)
+	if value, ok := viper.Get(k).(T); ok {
+		return value
+	}
 
 	return r
 }

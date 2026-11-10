@@ -35,7 +35,7 @@ make cover                    # Creates coverage.out
 # Run linter (golangci-lint)
 make lint
 
-# Format imports (with local package priority)
+# Format Go files and imports with the pinned tool
 make goimports
 
 # Fix struct field alignment
@@ -165,11 +165,9 @@ make clean
 
 ## Testing Conventions
 
-- All test files use `_test.go` suffix
-- Tests use table-driven approach where applicable
-- Race detector always enabled: `-race` flag
-- Test names follow pattern: `Test<ComponentName><Behavior>`
-- Use `testdata/` directories for test fixtures
+Follow the [Go test standard](docs/development/test-standard.md) for all Go packages.
+The [test assessment](docs/development/test-assessment.md) records current gaps and evidence limits.
+Use the [contributor guide](docs/CONTRIBUTING.md#verify-the-change) for local and hosted verification.
 
 ## Module Structure
 
@@ -190,9 +188,20 @@ internal/
 
 ## Quality Standards
 
-- Go 1.21+ required
-- Comprehensive linter configuration (`.golangci.yml`) with 30+
-  enabled rules
+- Use the Go version and toolchain in `go.mod`.
+- Follow [the Go coding standard](docs/development/coding-standards.md).
+  `make lint` checks strict rules, formatting, and the shrink-only baseline.
+  Provision the mise-pinned linter and run `go mod download` before offline analysis.
+  Set `LINT_BASE` to the fetched comparison commit when needed.
+  Fix debt, then use `make lint-shrink`; never add baseline allowances.
 - Test coverage tracked (Codecov integration)
 - All commits must pass: lint, tests, build
 - Mutation testing runs on itself (`.gremlins.yaml` configured)
+
+## Architecture design check
+
+Before coding, update `.architecture/design.json` and run `make architecture-design`.
+Record the model digest, affected rules, and result in the issue plan.
+Resolve conflicts before implementation. Repeat after model or design changes.
+See [the architecture model and design check](docs/development/architecture.md).
+CI runs `make architecture` and rejects baseline growth and missing design coverage.

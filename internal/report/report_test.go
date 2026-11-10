@@ -33,12 +33,12 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/go-gremlins/gremlins/internal/configuration"
-	"github.com/go-gremlins/gremlins/internal/execution"
-	"github.com/go-gremlins/gremlins/internal/log"
-	"github.com/go-gremlins/gremlins/internal/mutator"
-	"github.com/go-gremlins/gremlins/internal/report"
-	"github.com/go-gremlins/gremlins/internal/report/internal"
+	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
+	"github.com/OpenRAE/go-rae-gremlins/internal/execution"
+	"github.com/OpenRAE/go-rae-gremlins/internal/log"
+	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/report"
+	"github.com/OpenRAE/go-rae-gremlins/internal/report/internal"
 )
 
 var fakePosition = newPosition("aFolder/aFile.go", 3, 12)
@@ -296,11 +296,15 @@ func TestAssessment(t *testing.T) {
 
 			err := report.Do(data)
 
-			if tc.expectError && err == nil {
-				t.Fatal("expected an error")
-			}
 			if !tc.expectError {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+
 				return
+			}
+			if err == nil {
+				t.Fatal("expected an error")
 			}
 			var exitErr *execution.ExitError
 			if errors.As(err, &exitErr) {
@@ -312,6 +316,22 @@ func TestAssessment(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFeatureAssessmentEmptyResultsSkipsThreshold(t *testing.T) {
+	t.Run("no mutants bypasses the threshold assessment", func(t *testing.T) {
+		log.Init(&bytes.Buffer{}, &bytes.Buffer{})
+		defer log.Reset()
+
+		viper.Set(configuration.UnleashThresholdEfficacyKey, float64(100))
+		defer viper.Reset()
+
+		err := report.Do(report.Results{})
+
+		if err != nil {
+			t.Errorf("expected no error for empty results, got %v", err)
+		}
+	})
 }
 
 func TestMutantNoDiff(t *testing.T) {
@@ -668,6 +688,9 @@ func TestRegressionThresholdFlags(t *testing.T) {
 					data := report.Results{Mutants: []mutator.Mutator{
 						stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 						stubMutant{status: mutator.Lived, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.Lived, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 						stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
 					}}

@@ -9,6 +9,11 @@ import (
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
 )
 
+const (
+	testFile  = "test"
+	testFile1 = "test1"
+)
+
 func TestRegressionDiffSeparatedAdditions(t *testing.T) {
 	patch := "diff --git a/example.go b/example.go\n--- a/example.go\n+++ b/example.go\n@@ -1,5 +1,7 @@\n first\n+added\n context\n-old\n+replacement\n last\n+added again\n end\n"
 	files, _, err := gitdiff.Parse(bytes.NewBufferString(patch))
@@ -46,25 +51,25 @@ func TestDiff_IsChanged(t *testing.T) {
 		{
 			name: "must be changed if in range",
 			d: map[FileName][]Change{
-				"test": {{StartLine: 21, EndLine: 21}},
+				testFile: {{StartLine: 21, EndLine: 21}},
 			},
-			pos:  token.Position{Filename: "test", Line: 21},
+			pos:  token.Position{Filename: testFile, Line: 21},
 			want: true,
 		},
 		{
 			name: "must be unchanged if outside range",
 			d: map[FileName][]Change{
-				"test": {{StartLine: 21, EndLine: 21}},
+				testFile: {{StartLine: 21, EndLine: 21}},
 			},
-			pos:  token.Position{Filename: "test", Line: 22},
+			pos:  token.Position{Filename: testFile, Line: 22},
 			want: false,
 		},
 		{
 			name: "must be unchanged if no such file",
 			d: map[FileName][]Change{
-				"test": {{StartLine: 21, EndLine: 21}},
+				testFile: {{StartLine: 21, EndLine: 21}},
 			},
-			pos:  token.Position{Filename: "test1", Line: 21},
+			pos:  token.Position{Filename: testFile1, Line: 21},
 			want: false,
 		},
 	}
@@ -83,7 +88,7 @@ func Test_newDiff(t *testing.T) {
 
 	files := []*gitdiff.File{
 		{
-			NewName:       "test1",
+			NewName:       testFile1,
 			TextFragments: fragments,
 		},
 		{
@@ -93,8 +98,8 @@ func Test_newDiff(t *testing.T) {
 	}
 
 	expected := Diff{
-		"test1": {{StartLine: 25, EndLine: 25}},
-		"test2": {{StartLine: 25, EndLine: 25}},
+		testFile1: {{StartLine: 25, EndLine: 25}},
+		"test2":   {{StartLine: 25, EndLine: 25}},
 	}
 
 	result := newDiff(files)
@@ -114,7 +119,7 @@ func Test_newChanges(t *testing.T) {
 		fragment(231, 201),
 	}
 	file := &gitdiff.File{
-		NewName:       "test",
+		NewName:       testFile,
 		TextFragments: fragments,
 	}
 
@@ -127,7 +132,7 @@ func Test_newChanges(t *testing.T) {
 
 	name, changes := newChanges(file)
 
-	if name != "test" {
+	if name != testFile {
 		t.Fatalf("name %s unexpected", name)
 	}
 	if !reflect.DeepEqual(changes, expect) {
@@ -175,4 +180,41 @@ func opLines(op gitdiff.LineOp, count int) []gitdiff.Line {
 	}
 
 	return result
+}
+
+func TestFeature_newChanges_separateEditsInOneFragment(t *testing.T) {
+	var lines []gitdiff.Line
+	lines = append(lines, opLines(gitdiff.OpContext, 3)...)
+	lines = append(lines, opLines(gitdiff.OpDelete, 1)...)
+	lines = append(lines, opLines(gitdiff.OpAdd, 1)...)
+	lines = append(lines, opLines(gitdiff.OpContext, 5)...)
+	lines = append(lines, opLines(gitdiff.OpDelete, 1)...)
+	lines = append(lines, opLines(gitdiff.OpAdd, 1)...)
+	lines = append(lines, opLines(gitdiff.OpContext, 3)...)
+
+	file := &gitdiff.File{
+		NewName: testFile,
+		TextFragments: []*gitdiff.TextFragment{
+			{
+				NewPosition: 5,
+				Lines:       lines,
+			},
+		},
+	}
+
+	expect := []Change{
+		{StartLine: 8, EndLine: 8},
+		{StartLine: 14, EndLine: 14},
+	}
+
+	name, changes := newChanges(file)
+
+	if name != testFile {
+		t.Fatalf("name %s unexpected", name)
+	}
+	if !reflect.DeepEqual(changes, expect) {
+		t.Log("want", expect)
+		t.Log("got", changes)
+		t.Fatal("unexpected newChanges result for a hunk with two separate edits")
+	}
 }
