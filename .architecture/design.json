@@ -1,87 +1,22 @@
 {
   "version": 1,
-  "issue": 104,
-  "summary": "Read typed configuration values at the configuration boundary. configuration.Get reads bool, int, float64, string, and string-slice values with the Viper conversion methods (GetBool, GetInt, GetFloat64, GetString, GetStringSlice), so environment strings reach consumers as typed values. configuration.Validate checks every typed key with the standard library and returns a configuration error for an invalid value; the unleash command calls it before it runs. exclusion.New reads its string slice through configuration.Get instead of Viper. The report threshold check reads each threshold once as float64. Regression tests in the workerpool, log, and report packages prove that environment values reach those consumers. The lint baseline shrinks because the change fixes the findings in the changed code. The flag, environment, and file precedence does not change. No dependency, CLI flag, configuration key, JSON report field, or exit code changes. Each Go file that had no license header now starts with the repository's Apache header, with no code change.",
+  "issue": 105,
+  "summary": "Return errors from a malformed or unreadable discovered configuration file. configuration.Init ignores only viper.ConfigFileNotFoundError from the directory-search read and returns every other read or parse error. An explicit file returns its read result directly. The CLI already exits on an Init error, so a bad file stops the run before test execution. Focused tests cover the explicit-file and directory-search paths. TestConfigPaths uses t.Chdir and checks its errors, and the lint baseline shrinks because the change fixes those findings. No dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
   "changes": [
-    {
-      "package": "cmd",
-      "imports": [
-        "cmd/internal/flags",
-        "internal/configuration",
-        "internal/coverage",
-        "internal/diff",
-        "internal/engine",
-        "internal/engine/workdir",
-        "internal/exclusion",
-        "internal/gomodule",
-        "internal/log",
-        "internal/mutator",
-        "internal/report"
-      ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/mutator"
-      ]
-    },
     {
       "package": "internal/configuration",
       "imports": [
         "internal/mutator"
-      ]
-    },
-    {
-      "package": "internal/diff"
-    },
-    {
-      "package": "internal/engine"
-    },
-    {
-      "package": "internal/engine/workerpool",
-      "imports": [
-        "internal/configuration"
       ],
       "test_imports": [
-        "internal/configuration",
         "internal/mutator"
       ]
-    },
-    {
-      "package": "internal/exclusion",
-      "imports": [
-        "internal/configuration"
-      ]
-    },
-    {
-      "package": "internal/log",
-      "imports": [
-        "internal/configuration"
-      ],
-      "test_imports": [
-        "internal/configuration"
-      ]
-    },
-    {
-      "package": "internal/report",
-      "imports": [
-        "internal/configuration",
-        "internal/execution",
-        "internal/log",
-        "internal/mutator",
-        "internal/report/internal"
-      ]
-    },
-    {
-      "package": "tools/architecture"
-    },
-    {
-      "package": "tools/lintcontext"
     }
   ],
   "contracts": [
-    "configuration",
-    "cli"
+    "configuration"
   ],
-  "trust_boundaries": "Configuration values from flags, the environment, and the configuration file cross into the process at the configuration boundary. The change converts and validates those values there and rejects an invalid typed value with an error. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "trust_boundaries": "The configuration file crosses into the process at the configuration boundary. The change rejects a file that the process cannot read or parse, instead of a silent fallback to defaults. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
   "conflicts": [],
   "policies": [
     "lint_baseline"
@@ -107,7 +42,6 @@
     }
   },
   "contract_changes": {
-    "configuration": "compatible",
-    "cli": "compatible"
+    "configuration": "compatible"
   }
 }
