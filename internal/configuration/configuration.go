@@ -81,11 +81,11 @@ func Init(cPaths []string) error {
 
 	if isSpecificFile(cPaths) {
 		viper.SetConfigFile(cPaths[0])
-		err := viper.ReadInConfig()
-		if err != nil {
-			return err
-		}
-	} else if arePathsNotSet(cPaths) {
+
+		return viper.ReadInConfig()
+	}
+
+	if arePathsNotSet(cPaths) {
 		cPaths = defaultConfigPaths()
 	}
 
@@ -93,7 +93,11 @@ func Init(cPaths []string) error {
 		viper.AddConfigPath(p)
 	}
 
-	_ = viper.ReadInConfig() // ignoring error if file not present
+	// The discovered configuration file is optional. Ignore only its absence.
+	var notFound viper.ConfigFileNotFoundError
+	if err := viper.ReadInConfig(); err != nil && !errors.As(err, &notFound) {
+		return fmt.Errorf("reading configuration: %w", err)
+	}
 
 	return nil
 }
