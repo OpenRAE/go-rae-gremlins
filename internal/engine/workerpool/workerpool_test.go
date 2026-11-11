@@ -19,6 +19,7 @@ package workerpool_test
 import (
 	"go/token"
 	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
@@ -153,6 +154,47 @@ func TestPool(t *testing.T) {
 			t.Errorf("want %d, got %d", 1, pool.ActiveWorkers())
 		}
 	})
+}
+
+func TestRegressionPoolReadsEnvironmentSettings(t *testing.T) {
+	t.Run("workers", func(t *testing.T) {
+		initConfiguration(t)
+		want := runtime.NumCPU() + 1
+		t.Setenv("GREMLINS_UNLEASH_WORKERS", strconv.Itoa(want))
+
+		pool := workerpool.Initialize("test")
+		pool.Start()
+		defer pool.Stop()
+
+		if got := pool.ActiveWorkers(); got != want {
+			t.Errorf("ActiveWorkers() = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("integration mode", func(t *testing.T) {
+		initConfiguration(t)
+		configuration.Set(configuration.UnleashWorkersKey, 2)
+		t.Setenv("GREMLINS_UNLEASH_INTEGRATION", "true")
+
+		pool := workerpool.Initialize("test")
+		pool.Start()
+		defer pool.Stop()
+
+		if got := pool.ActiveWorkers(); got != 1 {
+			t.Errorf("ActiveWorkers() = %d, want 1", got)
+		}
+	})
+}
+
+// initConfiguration loads an empty configuration that reads GREMLINS_*
+// environment variables, and resets it after the test.
+func initConfiguration(t *testing.T) {
+	t.Helper()
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
 }
 
 type fakeMutant struct {

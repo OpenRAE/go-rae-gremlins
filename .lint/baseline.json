@@ -9,12 +9,6 @@
     },
     {
       "linter": "errcheck",
-      "file": "cmd/unleash.go",
-      "fingerprint": "86b7e144feae443f9097bce0a1b4736dec163ad4eb2adc459e14f85d387d3ca0",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
       "file": "internal/configuration/configuration.go",
       "fingerprint": "1434a864b92d907034465528082f879097d59012476f3efdc173b01158474a81",
       "count": 1
@@ -400,49 +394,7 @@
     {
       "linter": "revive",
       "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "08676bd212fd945b3ee34b0fa88e6c0775b5937ab09e432198f3f9f97692f655",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "3433ca0e5c9b025c5985cdb399bf7f7b5c48f983ff432da8d2351dc58cb2900e",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "42faf24bac3eb6af4e9d97323a91a59ba5aa2ad3f90decbc34cfa76f4493208d",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "569c802f0ae0ec2ea9ceaa7b609b70b9835135485410fb9ba48835bb7c20d293",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "77486eb9cfe0610b97b52fd53c4125d2da4234a0fdd2af0956f90f1df3e0204b",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "7de9c9e086038afc0e63da5689e2d887e408a68f8a0cfd844323da29023100cb",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/configuration/configuration_test.go",
       "fingerprint": "90ed0b1b5d347cc541cea9f439c4d4e5b1b8d3ef0ca61093b3582db71064ad21",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "d29854a95bc2d38120876927e7e7e26e5c4d3bcca95c62e5024e143faac3d3c5",
       "count": 1
     },
     {

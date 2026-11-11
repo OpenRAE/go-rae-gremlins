@@ -1,15 +1,90 @@
 {
   "version": 1,
-  "issue": 152,
-  "summary": "Run the required dev checks on the merge_group event so that the dev merge queue can merge. .github/workflows/ci.yml (PR Gate), .github/workflows/gremlins.yml (Mutation testing), and .github/workflows/pr-title.yml (Conventional PR title) run on merge_group checks_requested. On a merge group, the architecture, lint, and policy jobs compare with the merge group base commit. Mutation testing and the regression proof use the merge group commit and its base commit. The Sonar admission job reads the queued pull request from the GitHub API and gives the Sonar job the pull request key, branch, and base dev, so SonarCloud runs the pull request analysis and quality gate on the merge group commit. The title check reads the current title of the queued pull request and applies the rules of the pull request action. docs/CONTRIBUTING.md and docs/development/architecture.md describe the merge group runs. No Go package, dependency, CLI flag, configuration key, JSON report field, exit code, architecture rule, or baseline changes. The new .github/workflows/maintainer-gate.yml produces the required maintainer-gate check on pull_request, pull_request_review, and merge_group events. The check passes only when the maintainer wrote or approved the pull request. go.mod and .ground-control.yaml move the toolchain to go1.26.11, which fixes GO-2026-6859 in net/http.",
-  "changes": [],
-  "contracts": [],
-  "trust_boundaries": "The merge group jobs run the same commands as the pull request jobs, on a commit that the merge queue makes in this repository. The Sonar admission job, which holds no secret, gets pull-requests read permission and reads the queued pull request with the job GITHUB_TOKEN. It accepts only a merge group ref of the form refs/heads/gh-readonly-queue/dev/pr-<number>-<sha>, a pull request with base dev, and a head branch of plain ref characters; other values fail the job. The token-bearing Sonar job still runs no commands; it receives only these validated scanner arguments. The maintainer-gate job, which holds no secret and checks out no code, gets pull-requests read permission and reads the pull request author and reviews with the job GITHUB_TOKEN. Event values reach the shell only through the environment. On a merge group, it accepts only a ref of the form refs/heads/gh-readonly-queue/<base>/pr-<number>-<sha>; other values fail the job. The trust_changes entries restate the existing model boundaries; this change adds no new model trust boundary, Go package, or dependency. The modeled policy changes are ci.yml, the CONTRIBUTING.md check description, and the toolchain text in .ground-control.yaml.",
+  "issue": 104,
+  "summary": "Read typed configuration values at the configuration boundary. configuration.Get reads bool, int, float64, string, and string-slice values with the Viper conversion methods (GetBool, GetInt, GetFloat64, GetString, GetStringSlice), so environment strings reach consumers as typed values. configuration.Validate checks every typed key with the standard library and returns a configuration error for an invalid value; the unleash command calls it before it runs. exclusion.New reads its string slice through configuration.Get instead of Viper. The report threshold check reads each threshold once as float64. Regression tests in the workerpool, log, and report packages prove that environment values reach those consumers. The lint baseline shrinks because the change fixes the findings in the changed code. The flag, environment, and file precedence does not change. No dependency, CLI flag, configuration key, JSON report field, or exit code changes. Each Go file that had no license header now starts with the repository's Apache header, with no code change.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "cmd/internal/flags",
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    },
+    {
+      "package": "internal/configuration",
+      "imports": [
+        "internal/mutator"
+      ]
+    },
+    {
+      "package": "internal/diff"
+    },
+    {
+      "package": "internal/engine"
+    },
+    {
+      "package": "internal/engine/workerpool",
+      "imports": [
+        "internal/configuration"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    },
+    {
+      "package": "internal/exclusion",
+      "imports": [
+        "internal/configuration"
+      ]
+    },
+    {
+      "package": "internal/log",
+      "imports": [
+        "internal/configuration"
+      ],
+      "test_imports": [
+        "internal/configuration"
+      ]
+    },
+    {
+      "package": "internal/report",
+      "imports": [
+        "internal/configuration",
+        "internal/execution",
+        "internal/log",
+        "internal/mutator",
+        "internal/report/internal"
+      ]
+    },
+    {
+      "package": "tools/architecture"
+    },
+    {
+      "package": "tools/lintcontext"
+    }
+  ],
+  "contracts": [
+    "configuration",
+    "cli"
+  ],
+  "trust_boundaries": "Configuration values from flags, the environment, and the configuration file cross into the process at the configuration boundary. The change converts and validates those values there and rejects an invalid typed value with an error. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
   "conflicts": [],
   "policies": [
-    "ci",
-    "contributing",
-    "workflow"
+    "lint_baseline"
   ],
   "trust_changes": {
     "development_checks": {
@@ -30,5 +105,9 @@
       "network": true,
       "execute_source": false
     }
+  },
+  "contract_changes": {
+    "configuration": "compatible",
+    "cli": "compatible"
   }
 }

@@ -103,10 +103,13 @@ func longExplainer() string {
 
 func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) error {
 	return func(_ *cobra.Command, args []string) error {
+		if err := configuration.Validate(); err != nil {
+			return err
+		}
 		log.Infoln("Starting...")
-		path, _ := os.Getwd()
-		if len(args) > 0 {
-			path = args[0]
+		path, err := modulePath(args)
+		if err != nil {
+			return err
 		}
 		mod, err := gomodule.Init(path)
 		if err != nil {
@@ -138,6 +141,19 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 
 		return report.Do(results)
 	}
+}
+
+// modulePath returns the path in args, or the current directory when args is empty.
+func modulePath(args []string) (string, error) {
+	if len(args) > 0 {
+		return args[0], nil
+	}
+	path, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("impossible to get the current directory: %w", err)
+	}
+
+	return path, nil
 }
 
 func runWithCancel(ctx context.Context, wg *sync.WaitGroup, runner func(c context.Context), onCancel func()) {

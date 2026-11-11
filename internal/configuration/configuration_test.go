@@ -41,7 +41,7 @@ type envEntry struct {
 
 func TestConfiguration(t *testing.T) {
 	testCases := []struct {
-		wantedConfig map[string]interface{}
+		wantedConfig map[string]any
 		name         string
 		configPaths  []string
 		envEntries   []envEntry
@@ -50,7 +50,7 @@ func TestConfiguration(t *testing.T) {
 		{
 			name:        "from single file",
 			configPaths: []string{"testdata/config1/.gremlins.yaml"},
-			wantedConfig: map[string]interface{}{
+			wantedConfig: map[string]any{
 				UnleashDryRunKey: true,
 				UnleashTagsKey:   testTags,
 			},
@@ -58,7 +58,7 @@ func TestConfiguration(t *testing.T) {
 		{
 			name:        "from returns error if unreadable",
 			configPaths: []string{"testdata/config1/.gremlin"},
-			wantedConfig: map[string]interface{}{
+			wantedConfig: map[string]any{
 				UnleashDryRunKey: true,
 				UnleashTagsKey:   testTags,
 			},
@@ -67,7 +67,7 @@ func TestConfiguration(t *testing.T) {
 		{
 			name:        "from cfg",
 			configPaths: []string{testConfig1},
-			wantedConfig: map[string]interface{}{
+			wantedConfig: map[string]any{
 				UnleashDryRunKey: true,
 				UnleashTagsKey:   testTags,
 			},
@@ -75,7 +75,7 @@ func TestConfiguration(t *testing.T) {
 		{
 			name:        "from cfg multi",
 			configPaths: []string{"./testdata/config2", testConfig1},
-			wantedConfig: map[string]interface{}{
+			wantedConfig: map[string]any{
 				UnleashDryRunKey: true,
 				UnleashTagsKey:   "tag1.2,tag2.2,tag3.2",
 			},
@@ -83,11 +83,11 @@ func TestConfiguration(t *testing.T) {
 		{
 			name: "from env",
 			envEntries: []envEntry{
-				{name: "GREMLINS_UNLEASH_DRY_RUN", value: "true"},
+				{name: envDryRun, value: trueValue},
 				{name: "GREMLINS_UNLEASH_TAGS", value: testTags},
 			},
-			wantedConfig: map[string]interface{}{
-				UnleashDryRunKey: "true",
+			wantedConfig: map[string]any{
+				UnleashDryRunKey: trueValue,
 				UnleashTagsKey:   testTags,
 			},
 		},
@@ -97,7 +97,7 @@ func TestConfiguration(t *testing.T) {
 				{name: "GREMLINS_UNLEASH_TAGS", value: "tag1env,tag2env,tag3env"},
 			},
 			configPaths: []string{testConfig1},
-			wantedConfig: map[string]interface{}{
+			wantedConfig: map[string]any{
 				UnleashDryRunKey: true,
 				UnleashTagsKey:   "tag1env,tag2env,tag3env",
 			},
