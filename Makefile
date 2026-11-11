@@ -48,7 +48,10 @@ lint-test:
 	python3 -m unittest discover -s scripts -p test_lint.py
 
 lint-cover:
+	python3 -m coverage erase
 	python3 -m coverage run -m unittest discover -s scripts -p test_lint.py
+	python3 -m coverage run -m unittest discover -s .github/scripts -p test_regression_proof.py
+	python3 -m coverage combine
 	python3 -m coverage xml -o python-coverage.xml
 
 .PHONY: policy

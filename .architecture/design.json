@@ -1,25 +1,24 @@
 {
   "version": 1,
-  "issue": 105,
-  "summary": "Return errors from a malformed or unreadable discovered configuration file. configuration.Init ignores only viper.ConfigFileNotFoundError from the directory-search read and returns every other read or parse error. An explicit file returns its read result directly. The CLI already exits on an Init error, so a bad file stops the run before test execution. Focused tests cover the explicit-file and directory-search paths. TestConfigPaths uses t.Chdir and checks its errors, and the lint baseline shrinks because the change fixes those findings. No dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "issue": 58,
+  "summary": "Close the source and destination files that workdir.doCopy opens. Deferred calls close both files on every path. A new closeJoin helper joins a close error with the copy error, and a feature test covers it with a failing closer. Focused regression tests count the open descriptors after repeated copies and after failed copies, and they compare the copied content. The regression proof script now runs a case again with base versions of the other test files in its package when that package does not compile on base. CONTRIBUTING.md records this rule. The Python coverage run now measures .github/scripts through the proof tests, with subprocess coverage, and Sonar treats the proof test file as a test. The package keeps its single internal/log import. No dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
   "changes": [
     {
-      "package": "internal/configuration",
+      "package": "internal/engine/workdir",
       "imports": [
-        "internal/mutator"
+        "internal/log"
       ],
-      "test_imports": [
-        "internal/mutator"
-      ]
+      "test_imports": []
     }
   ],
-  "contracts": [
-    "configuration"
-  ],
-  "trust_boundaries": "The configuration file crosses into the process at the configuration boundary. The change rejects a file that the process cannot read or parse, instead of a silent fallback to defaults. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "contracts": [],
+  "trust_boundaries": "The change adds no data flow, network access, or source execution. The work directory copy reads the module source and writes the temporary copy as before. The regression proof script reads base test files from the local Git history into its temporary snapshot. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
   "conflicts": [],
   "policies": [
-    "lint_baseline"
+    "build",
+    "contributing",
+    "lint_coverage",
+    "sonar"
   ],
   "trust_changes": {
     "development_checks": {
@@ -41,7 +40,5 @@
       "execute_source": false
     }
   },
-  "contract_changes": {
-    "configuration": "compatible"
-  }
+  "contract_changes": {}
 }

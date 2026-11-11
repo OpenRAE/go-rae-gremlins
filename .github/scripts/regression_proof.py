@@ -76,6 +76,11 @@ def overlay_tests(root, base):
             "module " + head_module, "module " + base_module, 1))
 
 
+def build_failed(events):
+    return any(event.get("Action") == "build-fail" or event.get("FailedBuild")
+               for event in events)
+
+
 def observe(root, package, name):
     pattern = "/".join("^" + re.escape(part) + "$" for part in name.split("/"))
     code, events, output = go_events(root, "-race", "-run", pattern, package)
@@ -86,10 +91,33 @@ def observe(root, package, name):
     passed = code == 0 and "run" in actions and "pass" in actions and not skipped
     failed = code != 0 and "run" in actions and "fail" in actions and not skipped
     # A timeout, panic, or package build failure is not an assertion proving the fix.
-    failed = failed and "panic:" not in output and not any(
-        event.get("Action") == "build-fail" for event in events
-    )
-    return passed, failed, output
+    failed = failed and "panic:" not in output and not build_failed(events)
+    return passed, failed, build_failed(events), output
+
+
+def declaring_files(root, package, name):
+    """Return the head test files in package that declare the top-level test of name."""
+    declaration = re.compile(r"(?m)^func\s+" + re.escape(name.split("/")[0]) + r"\s*\(")
+    return {path.name for path in (root / package).glob("*_test.go")
+            if declaration.search(path.read_text())}
+
+
+def use_base_tests(root, base, merge_base, package, keep):
+    """Replace the overlaid test files of one package with base versions, except keep."""
+    directory = base / package
+    for path in directory.glob("*_test.go"):
+        if path.name not in keep:
+            path.unlink()
+    listing = command(root, "git", "ls-tree", "-z", "--name-only", merge_base,
+                      "--", Path(package).as_posix() + "/")
+    for name in filter(None, listing.decode().split("\0")):
+        relative = Path(name)
+        if not relative.name.endswith("_test.go") or relative.name in keep:
+            continue
+        target = base / relative
+        if not target.resolve().is_relative_to(base):
+            raise ValueError("unsafe base overlay: " + name)
+        target.write_bytes(command(root, "git", "show", f"{merge_base}:{name}"))
 
 
 def prove(root, base_ref):
@@ -121,15 +149,24 @@ def prove(root, base_ref):
             return
         overlay_tests(root, base)
         for package, name in new_tests:
-            passed, _, output = observe(root, package, name)
+            passed, _, _, output = observe(root, package, name)
             if not passed:
                 raise ValueError(f"{package}:{name} did not pass on head:\n{output[-6000:]}")
-            passed, failed, output = observe(base, package, name)
+            passed, failed, build_failure, output = observe(base, package, name)
+            note = ""
+            if build_failure:
+                # Other test files can use head-only APIs. Retry with only the files that
+                # declare this regression; the package's other test files come from base.
+                keep = declaring_files(root, package, name)
+                use_base_tests(root, base, merge_base, package, keep)
+                passed, failed, _, output = observe(base, package, name)
+                overlay_tests(root, base)
+                note = "; other test files from base"
             if passed:
                 raise ValueError(f"{package}:{name} passes on base; regression not proved")
             if not failed:
                 raise ValueError(f"{package}:{name} not an assertion failure on base:\n{output[-6000:]}")
-            print(f"{package}:{name} proved (head passes, base assertion fails)")
+            print(f"{package}:{name} proved (head passes, base assertion fails{note})")
 
 
 def main():
