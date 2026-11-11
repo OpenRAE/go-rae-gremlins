@@ -4,6 +4,9 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
     branches: [main, dev]
+  # The dev merge queue requires Conventional PR title on each merge group.
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -14,22 +17,76 @@ jobs:
   lint-title:
     name: Conventional PR title
     runs-on: ubuntu-latest
+    # One rule set for the pull request action and the merge group check.
+    env:
+      TITLE_TYPES: |
+        feat
+        fix
+        docs
+        chore
+        refactor
+        test
+        build
+        ci
+        perf
+        style
+        revert
+      TITLE_REQUIRE_SCOPE: 'false'
+      TITLE_SUBJECT_PATTERN: ^[a-z].*$
     steps:
-      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+      - if: github.event_name == 'pull_request'
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          types: |
-            feat
-            fix
-            docs
-            chore
-            refactor
-            test
-            build
-            ci
-            perf
-            style
-            revert
-          requireScope: false
-          subjectPattern: ^[a-z].*$
+          types: ${{ env.TITLE_TYPES }}
+          requireScope: ${{ env.TITLE_REQUIRE_SCOPE }}
+          subjectPattern: ${{ env.TITLE_SUBJECT_PATTERN }}
+      # A merge group event carries no pull request. Read the current title of
+      # the queued pull request from the API and apply the same rules as the
+      # action: the header pattern of its conventional commits preset, the
+      # type list, the scope rule, and a full match of the subject pattern.
+      - name: Check the title of the queued pull request
+        if: github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUEUE_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          pattern='^refs/heads/gh-readonly-queue/dev/pr-([0-9]+)-[0-9a-f]{40}$'
+          if [[ ! "$QUEUE_REF" =~ $pattern ]]; then
+            echo "::error::Unexpected merge group ref '$QUEUE_REF'"
+            exit 1
+          fi
+          title_file="$RUNNER_TEMP/pull-request-title.txt"
+          gh api "repos/$GITHUB_REPOSITORY/pulls/${BASH_REMATCH[1]}" \
+            --jq 'if .base.ref == "dev" then .title else error("not a dev pull request") end' \
+            > "$title_file"
+          python3 - "$title_file" <<'PY'
+          import os
+          import re
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              title = handle.read().removesuffix("\n")
+          types = os.environ["TITLE_TYPES"].split()
+          header = re.fullmatch(r"(\w*)(?:\((.*)\))?!?: (.*)", title, re.ASCII)
+          errors = []
+          if header is None or not header[1]:
+              errors.append("No release type found in the pull request title.")
+          else:
+              kind, scope, subject = header.groups()
+              if kind not in types:
+                  errors.append(f"Unknown release type {kind!r}. Use one of: {', '.join(types)}.")
+              if os.environ["TITLE_REQUIRE_SCOPE"] == "true" and not scope:
+                  errors.append("No scope found in the pull request title.")
+              if not subject:
+                  errors.append("No subject found in the pull request title.")
+              elif not re.fullmatch(os.environ["TITLE_SUBJECT_PATTERN"], subject):
+                  errors.append(
+                      f"The subject {subject!r} does not match {os.environ['TITLE_SUBJECT_PATTERN']!r}."
+                  )
+          for error in errors:
+              print(f"::error::{error}")
+          sys.exit(1 if errors else 0)
+          PY

@@ -2,7 +2,7 @@ module github.com/OpenRAE/go-rae-gremlins
 
 go 1.25.0
 
-toolchain go1.26.10
+toolchain go1.26.11
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
