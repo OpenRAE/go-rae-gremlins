@@ -25,6 +25,8 @@ The configuration file can be placed in (in order of precedence)
 4. `$XDG_CONFIG_HOME/gremlins/.gremlins.yaml`
 5. `$HOME/.gremlins.yaml`
 
+The configuration file is optional. If Gremlins finds a file that it cannot read or parse, it stops with an error.
+
 [//]: # (@formatter:off)
 !!! hint
     `XDG_CONFIG_HOME` is usually `~/.config`.

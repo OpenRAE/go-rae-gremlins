@@ -131,15 +131,103 @@ func TestConfiguration(t *testing.T) {
 	}
 }
 
+const malformedConfig = "unleash: [malformed\n"
+
+type initCase struct {
+	setup     func(t *testing.T) []string
+	name      string
+	expectErr bool
+}
+
+func TestFeatureInitConfigurationFile(t *testing.T) {
+	runInitCases(t, []initCase{
+		{
+			name: "missing discovered file is allowed",
+			setup: func(t *testing.T) []string {
+				t.Helper()
+
+				return []string{t.TempDir()}
+			},
+		},
+		{
+			name: "malformed explicit file returns error",
+			setup: func(t *testing.T) []string {
+				t.Helper()
+
+				return []string{writeConfigFile(t, t.TempDir(), malformedConfig, 0o600)}
+			},
+			expectErr: true,
+		},
+	})
+}
+
+func TestRegressionInitDiscoveredConfigurationErrors(t *testing.T) {
+	runInitCases(t, []initCase{
+		{
+			name: "malformed discovered file returns error",
+			setup: func(t *testing.T) []string {
+				t.Helper()
+				dir := t.TempDir()
+				writeConfigFile(t, dir, malformedConfig, 0o600)
+
+				return []string{dir}
+			},
+			expectErr: true,
+		},
+		{
+			name: "unreadable discovered file returns error",
+			setup: func(t *testing.T) []string {
+				t.Helper()
+				if runtime.GOOS == windowsOs || os.Geteuid() == 0 {
+					t.Skip("file permissions do not block reads on this platform or user")
+				}
+				dir := t.TempDir()
+				writeConfigFile(t, dir, "unleash:\n  dry-run: true\n", 0o000)
+
+				return []string{dir}
+			},
+			expectErr: true,
+		},
+	})
+}
+
+func runInitCases(t *testing.T, testCases []initCase) {
+	t.Helper()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Cleanup(viper.Reset)
+			paths := tc.setup(t)
+
+			err := Init(paths)
+
+			if tc.expectErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tc.expectErr && err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+		})
+	}
+}
+
+func writeConfigFile(t *testing.T, dir, content string, perm os.FileMode) string {
+	t.Helper()
+	path := filepath.Join(dir, gremlinsCfgName+".yaml")
+	if err := os.WriteFile(path, []byte(content), perm); err != nil {
+		t.Fatal(err)
+	}
+
+	return path
+}
+
 func TestConfigPaths(t *testing.T) {
-	home, _ := homedir.Dir()
+	home, err := homedir.Dir()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("it lookups in default locations", func(t *testing.T) {
-		oldDir, _ := os.Getwd()
-		_ = os.Chdir("testdata/config1")
-		defer func(dir string) {
-			_ = os.Chdir(dir)
-		}(oldDir)
+		t.Chdir("testdata/config1")
 
 		var want []string
 
@@ -155,7 +243,10 @@ func TestConfigPaths(t *testing.T) {
 		)
 
 		// Then module root
-		moduleRoot, _ := os.Getwd()
+		moduleRoot, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
 		want = append(want, moduleRoot)
 
 		// Last current folder
@@ -169,11 +260,7 @@ func TestConfigPaths(t *testing.T) {
 	})
 
 	t.Run("no module root if not in go module", func(t *testing.T) {
-		oldDir, _ := os.Getwd()
-		_ = os.Chdir(t.TempDir())
-		defer func(dir string) {
-			_ = os.Chdir(dir)
-		}(oldDir)
+		t.Chdir(t.TempDir())
 
 		var want []string
 
@@ -199,11 +286,7 @@ func TestConfigPaths(t *testing.T) {
 	})
 
 	t.Run("when XDG_CONFIG_HOME is set, it lookups in that locations", func(t *testing.T) {
-		oldDir, _ := os.Getwd()
-		_ = os.Chdir("testdata/config1")
-		defer func(dir string) {
-			_ = os.Chdir(dir)
-		}(oldDir)
+		t.Chdir("testdata/config1")
 
 		customPath := filepath.Join("my", "custom", "path")
 		t.Setenv("XDG_CONFIG_HOME", customPath)
@@ -221,7 +304,10 @@ func TestConfigPaths(t *testing.T) {
 			filepath.Join(home, ".gremlins"))
 
 		// Then Go module root
-		moduleRoot, _ := os.Getwd()
+		moduleRoot, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
 		want = append(want, moduleRoot)
 
 		// Last the current directory

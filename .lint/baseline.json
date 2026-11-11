@@ -21,84 +21,6 @@
     },
     {
       "linter": "errcheck",
-      "file": "internal/configuration/configuration.go",
-      "fingerprint": "e0fd4e3d939ed2e4472aba29114e1b2a47e18c842fd472798b6219bc2f633ca5",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "03bcc44fadf8e7e3687101a7fc79776a85a9fd31d0b57ce46b3a36ba55a2be5d",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "087d6b2e525f9184ff36c2c70d7c3e34f28ff3171a04465dc653c72d63eafab0",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "08c2c011e772696b7dcd23b5aea67ac2313548b79135d9cd4378ae53af10d275",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "3de163b4a2667a9700ebd927cc51e75ef736f090680a7169380c3e8c94de5409",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "4e9d02efa3d593f71655dd1500854d969ed25c7cc4bd5342919534fb9d7926ad",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "565edc6dcc2a09cef18bb795a982e4d5ec29c11e923c4a44deda85f926db5536",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "60dda4562cb12f520392d7909ec3aeec64001ecd6d4f6c5943c98fab60216c65",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "61f9bb5f1f2bf107effdb1a8f5f5eb54e0c5b8b690d6b59c21f36efb42699db3",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "97e3b2a67256d6b094b4a6d8fec53d674c65f9c2a6dfdd27e72c9ed1f1a3f31c",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "adc0d0460afbd2b3dbaf5ad82775f9901cd855c4198fd8097625034a899328b0",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "bf2cdb7a870c4f1a4695f1110f773755f04b62f77078627c33b5d29752281996",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "fd445c8aeb19a5d60e072085983a2c1700acef347df9ed5cee352ee8e5607f71",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
       "file": "internal/coverage/coverage.go",
       "fingerprint": "50aa115f427407dfe434c1e80a49d66dc028d3924a814e1e5a3a087275d15678",
       "count": 1
@@ -701,42 +623,6 @@
       "linter": "revive",
       "file": "tools/architecture/scan.go",
       "fingerprint": "447003f2a4a2e614f0513896c1935ca1e6db7e8de276cbcf682fc3f75e92a211",
-      "count": 1
-    },
-    {
-      "linter": "usetesting",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "2595d915b4c8e2b8acf67ac06aec332e29a6e091d38188c4b2bacbe342cdec49",
-      "count": 1
-    },
-    {
-      "linter": "usetesting",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "4d96c5afeacb2091a9064a07b637068db672ff4f5643e5686e88e2530bc2958d",
-      "count": 1
-    },
-    {
-      "linter": "usetesting",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "af1d3852328301f30b633822a9f7a38c3eb9b05ea4542ce1150310152c636ff6",
-      "count": 1
-    },
-    {
-      "linter": "usetesting",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "c682ef2a96de138b27ea95477834600825008f1115f700005eacd86653e19bb9",
-      "count": 1
-    },
-    {
-      "linter": "usetesting",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "cffa6e286dd71bccce32eaeb14a900791b4888dd69175ffd66d9582377f17a54",
-      "count": 1
-    },
-    {
-      "linter": "usetesting",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "e6dc9bdc183f262f8336b1f45c87b66c4c180eb3705597446ddff91a6af7f004",
       "count": 1
     },
     {
