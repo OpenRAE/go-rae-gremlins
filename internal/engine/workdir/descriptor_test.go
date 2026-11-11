@@ -29,7 +29,7 @@ import (
 
 const procFDDir = "/proc/self/fd"
 
-func TestCopyReleasesFileDescriptors(t *testing.T) {
+func TestRegressionCopyReleasesFileDescriptors(t *testing.T) {
 	root := t.TempDir()
 	skipWithoutProcFD(t, root)
 	disableGC(t)
@@ -76,7 +76,7 @@ func TestCopyReleasesFileDescriptors(t *testing.T) {
 	}
 }
 
-func TestCopyFailureReleasesFileDescriptors(t *testing.T) {
+func TestRegressionCopyFailureReleasesFileDescriptors(t *testing.T) {
 	testCases := []struct {
 		setup func(t *testing.T, root string) (srcPath, dstPath string)
 		name  string
