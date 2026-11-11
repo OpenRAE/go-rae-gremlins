@@ -18,6 +18,8 @@
 package workdir
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -154,21 +156,29 @@ func copyPath(srcPath, dstPath string, info fs.FileInfo) error {
 	return nil
 }
 
-func doCopy(srcPath, dstPath string, fileMode fs.FileMode) error {
+func doCopy(srcPath, dstPath string, fileMode fs.FileMode) (err error) {
 	//nolint:gosec // srcPath is internally controlled, not user input
 	s, err := os.Open(srcPath)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if closeErr := s.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close source: %w", closeErr))
+		}
+	}()
 	//nolint:gosec // dstPath is internally controlled, not user input
 	d, err := os.OpenFile(dstPath, os.O_CREATE|os.O_RDWR, fileMode)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if closeErr := d.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close destination: %w", closeErr))
+		}
+	}()
 
-	if _, err = io.Copy(d, s); err != nil {
-		return err
-	}
+	_, err = io.Copy(d, s)
 
-	return nil
+	return err
 }
