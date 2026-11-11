@@ -113,6 +113,9 @@ The current hosted checks are defined in the repository:
 | [Gremlins](../.github/workflows/gremlins.yml) | Mutation testing with the Gremlins source from the candidate commit. |
 | [PR title](../.github/workflows/pr-title.yml) | A Conventional Commit PR title with a lowercase subject. |
 
+The `dev` merge queue requires `PR Gate`, `Mutation testing`, and `Conventional PR title` on each merge group commit.
+These workflows also run on merge groups. They compare with the merge group base commit and read the queued PR.
+
 CI deliberately skips the Sonar jobs for PRs from other repositories because they have no access to the token;
 `PR Gate` accepts that specific skip. Ground Control readiness still requires the configured Sonar result.
 Inspect every check on the current PR head, including installed security checks. A green `PR Gate` alone does
