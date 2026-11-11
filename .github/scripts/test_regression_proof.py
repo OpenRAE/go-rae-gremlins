@@ -87,6 +87,35 @@ class RegressionProofTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("not an assertion failure on base", result.stderr)
 
+    def test_proves_regression_beside_feature_test_of_new_api(self):
+        self.regression('if Value() != 2 { t.Fatal("wrong value") }')
+        self.write("feature_test.go", 'package proof\nimport "testing"\n'
+                   'func TestFeatureNewValue(t *testing.T) { '
+                   'if NewValue() != 3 { t.Fatal("wrong value") } }\n')
+        self.write("value.go", "package proof\nfunc Value() int { return 2 }\n"
+                   "func NewValue() int { return 3 }\n")
+        self.git("add", ".")
+        result = self.proof()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("TestRegressionValue proved", result.stdout)
+        self.assertIn("other test files from base", result.stdout)
+
+    def test_retry_uses_base_versions_of_other_test_files(self):
+        self.write("helper_test.go", "package proof\nfunc want() int { return 2 }\n")
+        self.git("add", ".")
+        self.git("-c", "user.name=Test", "-c", "user.email=test@example.test",
+                 "-c", "commit.gpgsign=false", "commit", "-qm", "helper")
+        self.base = self.git("rev-parse", "HEAD").strip()
+        self.regression('if Value() != want() { t.Fatal("wrong value") }')
+        self.write("helper_test.go", "package proof\nfunc want() int { return 2 }\n"
+                   "var _ = NewValue()\n")
+        self.write("value.go", "package proof\nfunc Value() int { return 2 }\n"
+                   "func NewValue() int { return 3 }\n")
+        self.git("add", ".")
+        result = self.proof()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("TestRegressionValue proved", result.stdout)
+
     def test_no_regressions(self):
         result = self.proof()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

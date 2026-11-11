@@ -210,12 +210,16 @@ not run fails the proof check. An existing regression name is not treated as a
 new case; give each new regression its own name. `TestFeature...` cases run
 through the normal test suite and do not need to prove a regression.
 
-Keep regression files and helpers compatible with base production signatures.
-New APIs used by other tests in the same package can prevent the base tests
-from compiling; separate those changes when necessary. The base production
-files are never replaced by PR production files. Test-file and fixture symlinks
-are rejected rather than copied. A PR without new regression names reports
-that no proof cases are required.
+Keep each regression file compatible with base production signatures.
+Other test files in the package can use APIs that the PR adds. When the
+package does not compile on base, CI runs the case again. The second run keeps
+the PR files that declare the regression test. The other test files of the
+package come from the base, and test files that the base does not have are
+removed. A case that does not compile in the second run fails the proof check.
+
+The base production files are never replaced by PR production files.
+Test-file and fixture symlinks are rejected rather than copied. A PR without
+new regression names reports that no proof cases are required.
 
 CI invokes `python .github/scripts/regression_proof.py "$BASE_COMMIT"` with
 Python 3.12, the Go version in `go.mod`, and full Git history. Test files and
