@@ -1,7 +1,7 @@
 {
   "version": 1,
   "issue": 104,
-  "summary": "Read typed configuration values at the configuration boundary. configuration.Get reads bool, int, float64, string, and string-slice values with the Viper conversion methods (GetBool, GetInt, GetFloat64, GetString, GetStringSlice), so environment strings reach consumers as typed values. configuration.Validate checks every typed key with the standard library and returns a configuration error for an invalid value; the unleash command calls it before it runs. exclusion.New reads its string slice through configuration.Get instead of Viper. The report threshold check reads each threshold once as float64. Regression tests in the workerpool, log, and report packages prove that environment values reach those consumers. The lint baseline shrinks because the change fixes the findings in the changed code. The flag, environment, and file precedence does not change. No dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "summary": "Read typed configuration values at the configuration boundary. configuration.Get reads bool, int, float64, string, and string-slice values with the Viper conversion methods (GetBool, GetInt, GetFloat64, GetString, GetStringSlice), so environment strings reach consumers as typed values. configuration.Validate checks every typed key with the standard library and returns a configuration error for an invalid value; the unleash command calls it before it runs. exclusion.New reads its string slice through configuration.Get instead of Viper. The report threshold check reads each threshold once as float64. Regression tests in the workerpool, log, and report packages prove that environment values reach those consumers. The lint baseline shrinks because the change fixes the findings in the changed code. The flag, environment, and file precedence does not change. No dependency, CLI flag, configuration key, JSON report field, or exit code changes. Each Go file that had no license header now starts with the repository's Apache header, with no code change.",
   "changes": [
     {
       "package": "cmd",
@@ -28,6 +28,12 @@
       "imports": [
         "internal/mutator"
       ]
+    },
+    {
+      "package": "internal/diff"
+    },
+    {
+      "package": "internal/engine"
     },
     {
       "package": "internal/engine/workerpool",
@@ -63,6 +69,12 @@
         "internal/mutator",
         "internal/report/internal"
       ]
+    },
+    {
+      "package": "tools/architecture"
+    },
+    {
+      "package": "tools/lintcontext"
     }
   ],
   "contracts": [
