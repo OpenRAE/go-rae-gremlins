@@ -131,14 +131,16 @@ func TestConfiguration(t *testing.T) {
 	}
 }
 
-func TestInitConfigurationFileErrors(t *testing.T) {
-	const malformed = "unleash: [malformed\n"
+const malformedConfig = "unleash: [malformed\n"
 
-	testCases := []struct {
-		setup     func(t *testing.T) []string
-		name      string
-		expectErr bool
-	}{
+type initCase struct {
+	setup     func(t *testing.T) []string
+	name      string
+	expectErr bool
+}
+
+func TestFeatureInitConfigurationFile(t *testing.T) {
+	runInitCases(t, []initCase{
 		{
 			name: "missing discovered file is allowed",
 			setup: func(t *testing.T) []string {
@@ -152,16 +154,21 @@ func TestInitConfigurationFileErrors(t *testing.T) {
 			setup: func(t *testing.T) []string {
 				t.Helper()
 
-				return []string{writeConfigFile(t, t.TempDir(), malformed, 0o600)}
+				return []string{writeConfigFile(t, t.TempDir(), malformedConfig, 0o600)}
 			},
 			expectErr: true,
 		},
+	})
+}
+
+func TestRegressionInitDiscoveredConfigurationErrors(t *testing.T) {
+	runInitCases(t, []initCase{
 		{
 			name: "malformed discovered file returns error",
 			setup: func(t *testing.T) []string {
 				t.Helper()
 				dir := t.TempDir()
-				writeConfigFile(t, dir, malformed, 0o600)
+				writeConfigFile(t, dir, malformedConfig, 0o600)
 
 				return []string{dir}
 			},
@@ -181,8 +188,11 @@ func TestInitConfigurationFileErrors(t *testing.T) {
 			},
 			expectErr: true,
 		},
-	}
+	})
+}
 
+func runInitCases(t *testing.T, testCases []initCase) {
+	t.Helper()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Cleanup(viper.Reset)
