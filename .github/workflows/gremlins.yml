@@ -5,6 +5,9 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  # The dev merge queue requires Mutation testing on each merge group commit.
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -39,9 +42,9 @@ jobs:
             sleep 1
           done
       - name: Mutate changed lines inside a memory budget
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         env:
-          BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
+          BASE_COMMIT: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
         run: |
           export XDG_RUNTIME_DIR="/run/user/$(id -u)"
           scripts/run-bounded.sh --budget 10G -- "$RUNNER_TEMP/gremlins" unleash --diff "$BASE_COMMIT"
@@ -53,13 +56,13 @@ jobs:
 
   regression-proof:
     name: Regression proof
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
@@ -72,5 +75,5 @@ jobs:
         run: python -m unittest discover -s .github/scripts -p 'test_regression_proof.py'
       - name: Prove new regression tests against base code
         env:
-          BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
+          BASE_COMMIT: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
         run: python .github/scripts/regression_proof.py "$BASE_COMMIT"

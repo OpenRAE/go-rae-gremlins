@@ -5,6 +5,9 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  # The dev merge queue requires PR Gate on each merge group commit.
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
@@ -25,7 +28,7 @@ jobs:
           cache: false
       - name: Check model, design, and shrink-only baseline
         env:
-          COMPARISON: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
+          COMPARISON: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
         run: |
           if [ "$COMPARISON" = 0000000000000000000000000000000000000000 ]; then
             COMPARISON=''
@@ -66,7 +69,7 @@ jobs:
       - name: Check lint with the pinned lint comparison
         env:
           LINT_ADOPTION_BASE: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && 'origin/dev' || '' }}
-          COMPARISON: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
+          COMPARISON: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
         run: |
           if [ "$COMPARISON" = 0000000000000000000000000000000000000000 ]; then
             COMPARISON=origin/dev
@@ -125,7 +128,7 @@ jobs:
       - name: Check policy with the pinned lint comparison
         env:
           LINT_ADOPTION_BASE: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && 'origin/dev' || '' }}
-          COMPARISON: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
+          COMPARISON: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
         run: |
           if [ "$COMPARISON" = 0000000000000000000000000000000000000000 ]; then
             COMPARISON=origin/dev
@@ -167,6 +170,11 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [test, lint]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout
+      pull-requests: read # read the queued pull request on a merge group
+    outputs:
+      args: ${{ steps.target.outputs.args }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -204,6 +212,35 @@ jobs:
             echo "::error file=$settings::Duplicate Sonar setting"
             exit 1
           fi
+      # SonarCloud has no merge queue support. A merge group runs the pull
+      # request analysis and quality gate of the queued pull request against
+      # dev on the merge group commit. An unexpected merge group ref fails.
+      - name: Resolve the analysis target
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          QUEUE_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" != merge_group ]; then
+            echo "args=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pattern='^refs/heads/gh-readonly-queue/dev/pr-([0-9]+)-[0-9a-f]{40}$'
+          if [[ ! "$QUEUE_REF" =~ $pattern ]]; then
+            echo "::error::Unexpected merge group ref '$QUEUE_REF'"
+            exit 1
+          fi
+          number="${BASH_REMATCH[1]}"
+          branch="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$number" \
+            --jq 'if .base.ref == "dev" then .head.ref else error("not a dev pull request") end')"
+          if [[ ! "$branch" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::Queued pull request branch '$branch' is not a plain ref name"
+            exit 1
+          fi
+          printf 'args=-Dsonar.pullrequest.key=%s -Dsonar.pullrequest.branch=%s -Dsonar.pullrequest.base=dev\n' \
+            "$number" "$branch" >> "$GITHUB_OUTPUT"
 
   # Holds SONAR_TOKEN, so it runs no commands.
   sonar:
@@ -228,7 +265,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          args: -Dsonar.qualitygate.wait=true
+          args: -Dsonar.qualitygate.wait=true ${{ needs.sonar-admission.outputs.args }}
 
   gate:
     name: PR Gate

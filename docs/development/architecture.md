@@ -68,7 +68,7 @@ Current findings must equal the candidate baseline identities. Remove stale entr
 The candidate baseline must be a subset of the baseline at the comparison commit.
 Equal-count replacements fail. Repeated baseline identities fail.
 A missing baseline at first adoption means an empty baseline. Missing Git history is an error.
-CI pins the PR base commit or the preceding push commit. Manual runs compare with `origin/dev`.
+CI pins the PR base commit, the merge group base commit, or the preceding push commit. Manual runs compare with `origin/dev`.
 An initial branch push with no preceding commit compares with an empty baseline.
 
 ## Design before coding
