@@ -306,6 +306,7 @@ gremlins unleash --invert_negatives=false
 :material-flag: `--output`/`-o` · :material-sign-direction: Default: empty
 
 When set, Gremlins will write the give output file with machine readable results.
+Gremlins resolves a relative path from the current directory.
 
 ```shell
 gremlins unleash --output=output.json

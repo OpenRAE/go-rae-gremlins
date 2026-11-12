@@ -19,6 +19,7 @@ package coverage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -98,13 +99,16 @@ func NewWithCmd(cmdContext execContext, workdir string, mod gomodule.GoModule, o
 // The cancellation of ctx stops the running command.
 func (c *Coverage) Run(ctx context.Context) (Result, error) {
 	log.Infof("Gathering coverage... ")
-	if err := os.Chdir(c.mod.Root); err != nil {
-		return Result{}, fmt.Errorf("impossible to enter the module root: %w", err)
+	// The go command runs in the module root, so the profile path must not
+	// depend on the directory that resolves it.
+	profilePath, err := filepath.Abs(c.filePath())
+	if err != nil {
+		return Result{}, fmt.Errorf("impossible to resolve the coverage profile path: %w", err)
 	}
 	if err := c.downloadModules(ctx); err != nil {
 		return Result{}, fmt.Errorf("impossible to download modules: %w", err)
 	}
-	elapsed, err := c.executeCoverage(ctx)
+	elapsed, err := c.executeCoverage(ctx, profilePath)
 	if err != nil {
 		return Result{}, fmt.Errorf("impossible to executeCoverage coverage: %w", err)
 	}
@@ -117,20 +121,16 @@ func (c *Coverage) Run(ctx context.Context) (Result, error) {
 	return Result{Profile: profile, Elapsed: elapsed}, nil
 }
 
-func (c *Coverage) profile() (Profile, error) {
-	cf, err := os.Open(c.filePath())
-	defer func(cf *os.File) {
-		_ = cf.Close()
-	}(cf)
+func (c *Coverage) profile() (_ Profile, err error) {
+	cf, err := os.OpenInRoot(c.workDir, c.fileName)
 	if err != nil {
 		return nil, err
 	}
-	profile, err := c.parse(cf)
-	if err != nil {
-		return nil, err
-	}
+	defer func() {
+		err = errors.Join(err, cf.Close())
+	}()
 
-	return profile, nil
+	return c.parse(cf)
 }
 
 func (c *Coverage) filePath() string {
@@ -139,13 +139,14 @@ func (c *Coverage) filePath() string {
 
 func (c *Coverage) downloadModules(ctx context.Context) error {
 	cmd := c.cmdContext(ctx, "go", "mod", "download")
+	cmd.Dir = c.mod.Root
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
 }
 
-func (c *Coverage) executeCoverage(ctx context.Context) (time.Duration, error) {
+func (c *Coverage) executeCoverage(ctx context.Context, profilePath string) (time.Duration, error) {
 	args := []string{"test"}
 	if c.buildTags != "" {
 		args = append(args, "-tags", c.buildTags)
@@ -154,8 +155,9 @@ func (c *Coverage) executeCoverage(ctx context.Context) (time.Duration, error) {
 		args = append(args, "-coverpkg", c.coverPkg)
 	}
 
-	args = append(args, "-cover", "-coverprofile", c.filePath(), c.scanPath())
+	args = append(args, "-cover", "-coverprofile", profilePath, c.scanPath())
 	cmd := c.cmdContext(ctx, "go", args...)
+	cmd.Dir = c.mod.Root
 
 	start := time.Now()
 	if out, err := cmd.CombinedOutput(); err != nil {

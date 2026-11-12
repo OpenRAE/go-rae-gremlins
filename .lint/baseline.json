@@ -22,12 +22,6 @@
     {
       "linter": "errcheck",
       "file": "internal/coverage/coverage.go",
-      "fingerprint": "50aa115f427407dfe434c1e80a49d66dc028d3924a814e1e5a3a087275d15678",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/coverage/coverage.go",
       "fingerprint": "b5da5d3dadce2da6e85534e721621da6dc5920c07f9ea75763332a4bbc7d33e0",
       "count": 1
     },
@@ -293,12 +287,6 @@
       "linter": "revive",
       "file": "internal/configuration/configuration_test.go",
       "fingerprint": "90ed0b1b5d347cc541cea9f439c4d4e5b1b8d3ef0ca61093b3582db71064ad21",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/coverage/coverage_test.go",
-      "fingerprint": "ccd71bb2b1458b1a46f55d7a86b9926b0244844cf6b9bd008f03e5cf5c4e71b3",
       "count": 1
     },
     {
