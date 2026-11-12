@@ -51,6 +51,7 @@ lint-cover:
 	python3 -m coverage erase
 	python3 -m coverage run -m unittest discover -s scripts -p test_lint.py
 	python3 -m coverage run -m unittest discover -s .github/scripts -p test_regression_proof.py
+	python3 -m coverage run -m unittest discover -s .github/scripts -p test_merge_queue_policy.py
 	python3 -m coverage combine
 	python3 -m coverage xml -o python-coverage.xml
 
@@ -58,6 +59,11 @@ lint-cover:
 policy:
 	pre-commit validate-config
 	pre-commit run --hook-stage pre-commit --all-files
+
+# Reads the live branch rules of the repository with gh.
+.PHONY: merge-queue-policy
+merge-queue-policy:
+	python3 .github/scripts/merge_queue_policy.py --repository OpenRAE/go-rae-gremlins
 
 .PHONY: hooks
 hooks:
