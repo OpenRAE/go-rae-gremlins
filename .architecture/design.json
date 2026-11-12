@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "issue": 110,
-  "summary": "Run coverage without a change to the caller working directory. Coverage.Run no longer calls os.Chdir. It sets exec.Cmd.Dir to the module root for go mod download and go test, and it resolves the coverage profile path to an absolute path before the go command runs. The unleash command resolves a relative module argument to an absolute path when it composes the module. A relative --output path now resolves from the caller working directory, not from the module root. The unleash Output documentation states this. The profile read uses os.OpenInRoot and returns the close error. The lint baseline shrinks because the change fixes the findings in the changed coverage files. Tests prove that coverage and the command keep the caller working directory, with a relative module argument and with an invocation from a package subdirectory. No package import, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "issue": 107,
+  "summary": "Return source discovery errors instead of partial success. Engine.Run now returns its results and an error. A walk, open, or parse failure stops the discovery, and Run returns the error after the running mutants finish. The discovery stops without an error when the context is done, and the mutant send no longer blocks after a cancel. cmd/unleash.go returns the Run error through the existing command error path, so the run does not write a report. Engine feature tests cover a malformed source, an illegal token, a failed file open, a failed directory read, and a directory named directory.go. A command regression test runs unleash on a module with an unparsable file outside the build and expects the parse error. The lint baseline shrinks because the change fixes two engine test findings. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
   "changes": [
     {
       "package": "cmd",
@@ -24,22 +24,26 @@
       ]
     },
     {
-      "package": "internal/coverage",
+      "package": "internal/engine",
       "imports": [
         "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
         "internal/gomodule",
-        "internal/log"
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
       ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/gomodule"
-      ]
+      "test_imports": []
     }
   ],
   "contracts": [
     "cli"
   ],
-  "trust_boundaries": "The change adds no data flow, network access, or source execution. The go command runs in the module root as before, through exec.Cmd.Dir instead of a process-wide directory change. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "trust_boundaries": "The module source crosses into the process at the file system boundary. The change rejects a source tree that the process cannot walk, open, or parse, instead of a silent partial result. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
   "conflicts": [],
   "policies": [
     "lint_baseline"

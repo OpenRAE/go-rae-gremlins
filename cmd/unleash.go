@@ -211,9 +211,8 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 	}
 
 	mut := engine.New(mod, codeData, jDealer)
-	results := mut.Run(ctx)
 
-	return results, nil
+	return mut.Run(ctx)
 }
 
 func setFlagsOnCmd(cmd *cobra.Command) error {

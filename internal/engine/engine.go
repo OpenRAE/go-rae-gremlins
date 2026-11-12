@@ -36,7 +36,6 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/diff"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
 	"github.com/OpenRAE/go-rae-gremlins/internal/exclusion"
-	"github.com/OpenRAE/go-rae-gremlins/internal/log"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 	"github.com/OpenRAE/go-rae-gremlins/internal/report"
 
@@ -100,35 +99,14 @@ func WithDirFs(dirFS fs.FS) Option {
 //
 // It walks the fs.FS provided and checks every .go file which is not a test.
 // For each file it will scan for tokenMutations and gather all the mutants found.
-func (mu *Engine) Run(ctx context.Context) report.Results {
+// A walk, open, or parse failure stops the discovery. Run then returns the
+// error with the partial results, which the caller must not report as success.
+func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
 	mu.mutantStream = make(chan mutator.Mutator)
+	discoverErr := make(chan error, 1)
 	go func() {
 		defer close(mu.mutantStream)
-		walkErr := fs.WalkDir(mu.fs, ".", func(walkPath string, d fs.DirEntry, err error) error {
-			if err != nil {
-				log.Errorf("skipping %s: %v\n", walkPath, err)
-
-				return nil
-			}
-			if d.IsDir() {
-				if walkPath != "." && mu.skipDir(walkPath, d.Name()) {
-					return fs.SkipDir
-				}
-
-				return nil
-			}
-
-			isGoCode := filepath.Ext(walkPath) == ".go" && !strings.HasSuffix(walkPath, "_test.go")
-
-			if isGoCode && !mu.codeData.Exclusion.IsFileExcluded(walkPath) {
-				mu.runOnFile(walkPath)
-			}
-
-			return nil
-		})
-		if walkErr != nil {
-			log.Errorf("walking module tree: %v\n", walkErr)
-		}
+		discoverErr <- mu.discover(ctx)
 	}()
 
 	start := time.Now()
@@ -136,7 +114,36 @@ func (mu *Engine) Run(ctx context.Context) report.Results {
 	res.Elapsed = time.Since(start)
 	res.Module = mu.module.Name
 
-	return res
+	if err := <-discoverErr; err != nil {
+		return res, fmt.Errorf("discovering mutants: %w", err)
+	}
+
+	return res, nil
+}
+
+// discover walks the module file system and sends the mutants of each Go
+// source file to the mutant stream. It returns the first walk, open, or parse
+// error. It stops without an error when ctx is done.
+func (mu *Engine) discover(ctx context.Context) error {
+	return fs.WalkDir(mu.fs, ".", func(walkPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if walkPath != "." && mu.skipDir(walkPath, d.Name()) {
+				return fs.SkipDir
+			}
+
+			return nil
+		}
+
+		isGoCode := filepath.Ext(walkPath) == ".go" && !strings.HasSuffix(walkPath, "_test.go")
+		if !isGoCode || mu.codeData.Exclusion.IsFileExcluded(walkPath) {
+			return nil
+		}
+
+		return mu.runOnFile(ctx, walkPath)
+	})
 }
 
 // skipDir reports whether dirPath is a testdata tree, a vendor tree, or the
@@ -152,32 +159,39 @@ func (mu *Engine) skipDir(dirPath, name string) bool {
 	return err == nil
 }
 
-func (mu *Engine) runOnFile(fileName string) {
+func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	set := token.NewFileSet()
 	file, err := mu.parseFile(set, fileName)
 	if err != nil {
-		log.Errorf("skipping %s: %v\n", fileName, err)
-
-		return
+		return err
 	}
 
 	cov := newFileCoverage(set, file, mu.codeData.Cov)
+	stopped := false
 	ast.Inspect(file, func(node ast.Node) bool {
+		if stopped {
+			return false
+		}
 		n, ok := NewTokenNode(node)
 		if !ok {
 			return true
 		}
-		mu.findMutations(fileName, set, file, n, cov)
+		stopped = !mu.findMutations(ctx, fileName, set, file, n, cov)
 
-		return true
+		return !stopped
 	})
+	if stopped {
+		return fs.SkipAll
+	}
+
+	return nil
 }
 
 // parseFile parses a Go file of the module file system.
 func (mu *Engine) parseFile(set *token.FileSet, fileName string) (*ast.File, error) {
 	src, err := mu.fs.Open(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("open: %w", err)
+		return nil, err
 	}
 	file, err := parser.ParseFile(set, fileName, src, parser.ParseComments)
 	if closeErr := src.Close(); closeErr != nil {
@@ -190,12 +204,14 @@ func (mu *Engine) parseFile(set *token.FileSet, fileName string) (*ast.File, err
 	return file, nil
 }
 
+// findMutations sends the mutants of node to the mutant stream. It returns
+// false when ctx is done before a mutant is sent.
 func (mu *Engine) findMutations(
-	fileName string, set *token.FileSet, file *ast.File, node *NodeToken, cov fileCoverage,
-) {
+	ctx context.Context, fileName string, set *token.FileSet, file *ast.File, node *NodeToken, cov fileCoverage,
+) bool {
 	mutantTypes, ok := TokenMutantType[node.Tok()]
 	if !ok {
-		return
+		return true
 	}
 
 	pkg := mu.pkgName(fileName)
@@ -208,8 +224,14 @@ func (mu *Engine) findMutations(
 		tm.SetType(mutantType)
 		tm.SetStatus(mu.mutationStatus(set.Position(node.TokPos), cov.isCovered(node.TokPos)))
 
-		mu.mutantStream <- tm
+		select {
+		case mu.mutantStream <- tm:
+		case <-ctx.Done():
+			return false
+		}
 	}
+
+	return true
 }
 
 // pkgName returns the import path of the package that fileName belongs to.
