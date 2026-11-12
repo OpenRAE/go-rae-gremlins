@@ -19,9 +19,7 @@ import sys
 import yaml
 
 
-def load_json(path):
-    with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
+WORKFLOWS = Path(__file__).resolve().parents[1] / "workflows"
 
 
 def fetch_json(endpoint, run=subprocess.run):
@@ -59,56 +57,55 @@ def rules_of_type(rules, kind):
     return [rule for rule in rules if rule.get("type") == kind]
 
 
-def check(dev_rules, main_rules, dev_branch, workflow_dir):
-    """Return the list of policy errors."""
+def queue_errors(dev_rules, main_rules):
     errors = []
-    queue = bool(rules_of_type(dev_rules, "merge_queue"))
-    if not queue:
+    if not rules_of_type(dev_rules, "merge_queue"):
         errors.append("dev has no merge queue rule.")
     if rules_of_type(main_rules, "merge_queue"):
         errors.append("main has a merge queue rule. Merges into main stay manual.")
+    return errors
 
-    classic = ((dev_branch.get("protection") or {}).get("required_status_checks") or {}).get("contexts") or []
-    if classic:
-        errors.append(
-            "dev has required checks in classic branch protection: "
-            f"{', '.join(sorted(classic))}. Move them to a ruleset so that this check can read the strict setting."
-        )
 
+def classic_errors(dev_branch):
+    protection = dev_branch.get("protection") or {}
+    classic = (protection.get("required_status_checks") or {}).get("contexts") or []
+    if not classic:
+        return []
+    return [
+        "dev has required checks in classic branch protection: "
+        f"{', '.join(sorted(classic))}. Move them to a ruleset so that this check can read the strict setting."
+    ]
+
+
+def required_check_errors(dev_rules, workflow_dir):
+    errors = []
+    queue = bool(rules_of_type(dev_rules, "merge_queue"))
     required = set()
     for rule in rules_of_type(dev_rules, "required_status_checks"):
         parameters = rule.get("parameters") or {}
-        if not parameters.get("strict_required_status_checks_policy") and not queue:
+        if not queue and not parameters.get("strict_required_status_checks_policy"):
             errors.append(f"Ruleset {rule.get('ruleset_id')} has non-strict required checks on dev without a merge queue.")
-        for item in parameters.get("required_status_checks") or []:
-            required.add(item["context"])
+        required.update(item["context"] for item in parameters.get("required_status_checks") or [])
     if queue and not required:
         errors.append("dev has a merge queue but no required status checks.")
-
-    producers = merge_group_producers(workflow_dir)
-    for context in sorted(required - producers):
+    for context in sorted(required - merge_group_producers(workflow_dir)):
         errors.append(f"Required dev check '{context}' has no workflow job that runs on merge_group.")
     return errors
 
 
-def main(argv=None, fetch=fetch_json):
+def check(dev_rules, main_rules, dev_branch, workflow_dir=WORKFLOWS):
+    """Return the list of policy errors."""
+    return queue_errors(dev_rules, main_rules) + classic_errors(dev_branch) + required_check_errors(
+        dev_rules, workflow_dir)
+
+
+def main(argv=None, fetch=fetch_json, workflow_dir=WORKFLOWS):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--repository", help="owner/name; read the live rules with gh api")
-    source.add_argument("--dev-rules", help="JSON from GET /repos/{repo}/rules/branches/dev")
-    parser.add_argument("--main-rules", help="JSON from GET /repos/{repo}/rules/branches/main")
-    parser.add_argument("--dev-branch", help="JSON from GET /repos/{repo}/branches/dev")
-    parser.add_argument("--workflows", default=".github/workflows")
+    parser.add_argument("--repository", required=True, help="owner/name; read the live rules with gh api")
     args = parser.parse_args(argv)
-    if args.repository:
-        base = f"repos/{args.repository}"
-        inputs = [fetch(f"{base}/rules/branches/dev"), fetch(f"{base}/rules/branches/main"),
-                  fetch(f"{base}/branches/dev")]
-    elif args.main_rules and args.dev_branch:
-        inputs = [load_json(args.dev_rules), load_json(args.main_rules), load_json(args.dev_branch)]
-    else:
-        parser.error("--dev-rules needs --main-rules and --dev-branch")
-    errors = check(*inputs, args.workflows)
+    base = f"repos/{args.repository}"
+    errors = check(fetch(f"{base}/rules/branches/dev"), fetch(f"{base}/rules/branches/main"),
+                   fetch(f"{base}/branches/dev"), workflow_dir)
     for error in errors:
         print(f"::error::{error}")
     if not errors:

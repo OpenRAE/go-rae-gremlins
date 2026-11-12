@@ -3,7 +3,6 @@
 from contextlib import redirect_stderr, redirect_stdout
 import importlib.util
 import io
-import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -89,40 +88,35 @@ class MergeQueuePolicyTests(unittest.TestCase):
         self.assertEqual(policy.workflow_events({"on": {"merge_group": None}}), {"merge_group"})
         self.assertEqual(policy.workflow_events({}), set())
 
-    def test_main_reports_result(self):
-        files = {}
-        for name, value in {"dev": [QUEUE, checks("PR Gate")], "main": [], "branch": NO_CLASSIC}.items():
-            path = self.workflows.parent / f"{name}.json"
-            path.write_text(json.dumps(value), encoding="utf-8")
-            files[name] = str(path)
-        argv = ["--dev-rules", files["dev"], "--main-rules", files["main"], "--dev-branch", files["branch"],
-                "--workflows", str(self.workflows)]
+    def run_main(self, responses):
         output = io.StringIO()
         with redirect_stdout(output):
-            self.assertEqual(policy.main(argv), 0)
-        self.assertIn("policy holds", output.getvalue())
+            status = policy.main(["--repository", "o/r"], fetch=responses.__getitem__,
+                                 workflow_dir=self.workflows)
+        return status, output.getvalue()
 
-        Path(files["dev"]).write_text(json.dumps([checks("PR only")]), encoding="utf-8")
-        output = io.StringIO()
-        with redirect_stdout(output):
-            self.assertEqual(policy.main(argv), 1)
-        self.assertIn("::error::dev has no merge queue rule.", output.getvalue())
-
-    def test_repository_reads_live_rules(self):
+    def test_main_reads_live_rules(self):
         responses = {
             "repos/o/r/rules/branches/dev": [QUEUE, checks("ggshield")],
             "repos/o/r/rules/branches/main": [],
             "repos/o/r/branches/dev": NO_CLASSIC,
         }
-        output = io.StringIO()
-        with redirect_stdout(output):
-            status = policy.main(["--repository", "o/r", "--workflows", str(self.workflows)],
-                                 fetch=responses.__getitem__)
+        status, output = self.run_main(responses)
         self.assertEqual(status, 0)
+        self.assertIn("policy holds", output)
 
-    def test_file_inputs_need_all_three_files(self):
+        responses["repos/o/r/rules/branches/dev"] = [checks("PR only")]
+        status, output = self.run_main(responses)
+        self.assertEqual(status, 1)
+        self.assertIn("::error::dev has no merge queue rule.", output)
+
+    def test_main_needs_repository(self):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-            policy.main(["--dev-rules", "dev.json"])
+            policy.main([])
+
+    def test_default_workflows_are_the_repository_workflows(self):
+        self.assertEqual(policy.WORKFLOWS, SCRIPT.resolve().parents[1] / "workflows")
+        self.assertIn("ggshield", policy.merge_group_producers(policy.WORKFLOWS))
 
     def test_fetch_json_uses_gh_api(self):
         calls = []
