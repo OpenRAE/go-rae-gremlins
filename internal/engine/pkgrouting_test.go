@@ -140,7 +140,12 @@ func runRoutingModule(t *testing.T, callingDir string, wantPkgs map[string]strin
 	codeData := engine.CodeData{Cov: wholeFilesCovered(wantPkgs)}
 	eng := engine.New(mod, codeData, jDealer)
 
-	return eng.Run(context.Background()).Mutants
+	res, err := eng.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	return res.Mutants
 }
 
 // checkRoutedMutants checks that each file of wantPkgs has mutants, and that

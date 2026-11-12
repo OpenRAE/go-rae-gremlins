@@ -158,7 +158,10 @@ func TestFeatureClauseExpressionCoverage(t *testing.T) {
 			profile := coverage.Profile{filenameFromFixture(clausesFixture): tc.blocks}
 
 			mut := engine.New(mod, engine.CodeData{Cov: profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := mut.Run(context.Background())
+			res, err := mut.Run(context.Background())
+			if err != nil {
+				t.Fatalf("Run() error = %v, want nil", err)
+			}
 
 			got := make(map[string]mutator.Status)
 			for _, m := range res.Mutants {

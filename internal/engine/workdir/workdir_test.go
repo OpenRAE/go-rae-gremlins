@@ -17,6 +17,7 @@
 package workdir_test
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -315,15 +316,67 @@ func populateSrcDir(t testT, srcDir string, depth int) {
 
 	for i := 0; i < 10; i++ {
 		fileName := filepath.Join(srcDir, fmt.Sprintf("srcfile-%d", i))
-		err := os.WriteFile(fileName, getFileBytes(), 0400)
+		err := os.WriteFile(fileName, getFileBytes(t), 0400)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 }
 
-func getFileBytes() []byte {
-	b, _ := os.ReadFile("testdata/filetocopy_go")
+func getFileBytes(t testT) []byte {
+	t.Helper()
+	b, err := os.ReadFile("testdata/filetocopy_go")
+	if err != nil {
+		t.Fatal("read the copy fixture: ", err)
+	}
 
 	return b
+}
+
+// TestFeatureDiscardGivesNewCopy proves that a discarded worker directory
+// cannot be used again (issue #106). After Discard, the old directory is
+// removed, and the next Get returns a new copy with the original source.
+func TestFeatureDiscardGivesNewCopy(t *testing.T) {
+	const name = "source.go"
+	const original = "package main\n"
+	srcDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(srcDir, name), []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dealer := workdir.NewCachedDealer(t.TempDir(), srcDir)
+	defer dealer.Clean()
+
+	firstDir, err := dealer.Get("worker-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(firstDir, name), []byte("package changed\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := dealer.Discard("worker-1"); err != nil {
+		t.Fatalf("Discard() error = %v, want nil", err)
+	}
+
+	if _, err := os.Stat(firstDir); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("Stat(discarded directory) error = %v, want %v", err, fs.ErrNotExist)
+	}
+	secondDir, err := dealer.Get("worker-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondDir == firstDir {
+		t.Errorf("Get() after Discard() = %s, want a new directory", secondDir)
+	}
+	//nolint:gosec // test code reading the test copy
+	got, err := os.ReadFile(filepath.Join(secondDir, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != original {
+		t.Errorf("copied source = %q, want %q", got, original)
+	}
+	if err := dealer.Discard("unknown"); err != nil {
+		t.Errorf("Discard(unknown) error = %v, want nil", err)
+	}
 }

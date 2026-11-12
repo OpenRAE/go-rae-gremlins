@@ -18,6 +18,7 @@ package engine_test
 
 import (
 	"context"
+	"errors"
 	"go/token"
 	"io"
 	"os"
@@ -504,7 +505,10 @@ func TestMutations(t *testing.T) {
 			defer c()
 
 			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := mut.Run(context.Background())
+			res, err := mut.Run(context.Background())
+			if err != nil {
+				t.Fatalf("Run() error = %v, want nil", err)
+			}
 			got := res.Mutants
 
 			if res.Module != expectedModule {
@@ -548,7 +552,10 @@ func TestMutantSkipDisabled(t *testing.T) {
 			defer viperReset()
 
 			mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := mut.Run(context.Background())
+			res, err := mut.Run(context.Background())
+			if err != nil {
+				t.Fatalf("Run() error = %v, want nil", err)
+			}
 			got := res.Mutants
 
 			for _, m := range got {
@@ -573,7 +580,10 @@ func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 	defer viperReset()
 
 	mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
-	res := mut.Run(context.Background())
+	res, err := mut.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
 
 	var hasNegation, hasBoundary bool
 	for _, m := range res.Mutants {
@@ -609,7 +619,10 @@ func TestSkipTestAndNonGoFiles(t *testing.T) {
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()
 	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res, err := mut.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
 
 	if got := res.Mutants; len(got) != 0 {
 		t.Error("should not receive results")
@@ -638,7 +651,10 @@ func TestFeatureSkipTestdataVendorAndNestedModuleTrees(t *testing.T) {
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()
 	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res, err := mut.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
 
 	files := make(map[string]int)
 	for _, m := range res.Mutants {
@@ -674,7 +690,10 @@ func TestFeatureSkipUnparsableFiles(t *testing.T) {
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()
 	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res, err := mut.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
 
 	files := make(map[string]int)
 	for _, m := range res.Mutants {
@@ -708,10 +727,13 @@ func TestSkipNotDiffMutants(t *testing.T) {
 		"file.go": nil,
 	}}
 	mut := engine.New(mod, codeData, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res, err := mut.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
 
 	if got := res.Mutants; len(got) == 0 {
-		t.Errorf("should receive mutants")
+		t.Error("should receive mutants")
 	}
 
 	for _, mutant := range res.Mutants {
@@ -729,10 +751,45 @@ func TestStopsOnCancel(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	res := mut.Run(ctx)
+	res, err := mut.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
 
 	if len(res.Mutants) > 0 {
 		t.Errorf("expected to receive no mutants, got %d", len(res.Mutants))
+	}
+}
+
+// TestFeatureRunReturnsExecutorError proves that a failed executor fails
+// the run instead of leaving a missing mutant in successful results
+// (issue #106).
+func TestFeatureRunReturnsExecutorError(t *testing.T) {
+	mapFS, mod, c := loadFixture(defaultFixture, ".")
+	defer c()
+
+	errExecutor := errors.New("executor stub error")
+	var failed mutator.Mutator
+	jds := newJobDealerStub(t)
+	jds.errFor = func(mut mutator.Mutator) error {
+		if failed != nil {
+			return nil
+		}
+		failed = mut
+
+		return errExecutor
+	}
+	mut := engine.New(mod, testCodeData, jds, engine.WithDirFs(mapFS))
+
+	res, err := mut.Run(context.Background())
+
+	if !errors.Is(err, errExecutor) {
+		t.Fatalf("Run() error = %v, want %v", err, errExecutor)
+	}
+	for _, m := range res.Mutants {
+		if m == failed {
+			t.Errorf("Run() results contain the failed mutant at %s", m.Position())
+		}
 	}
 }
 
@@ -770,7 +827,9 @@ func TestPackageDiscovery(t *testing.T) {
 			jds := newJobDealerStub(t)
 			mut := engine.New(mod, testCodeData, jds, engine.WithDirFs(mapFS))
 
-			_ = mut.Run(context.Background())
+			if _, err := mut.Run(context.Background()); err != nil {
+				t.Fatalf("Run() error = %v, want nil", err)
+			}
 
 			got := jds.gotMutants[0].Pkg()
 

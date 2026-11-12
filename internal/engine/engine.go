@@ -100,7 +100,9 @@ func WithDirFs(dirFS fs.FS) Option {
 //
 // It walks the fs.FS provided and checks every .go file which is not a test.
 // For each file it will scan for tokenMutations and gather all the mutants found.
-func (mu *Engine) Run(ctx context.Context) report.Results {
+// When an executor fails, Run schedules no new mutants and returns the joined
+// executor errors. The results then do not contain the failed mutants.
+func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
 	mu.mutantStream = make(chan mutator.Mutator)
 	go func() {
 		defer close(mu.mutantStream)
@@ -132,11 +134,11 @@ func (mu *Engine) Run(ctx context.Context) report.Results {
 	}()
 
 	start := time.Now()
-	res := mu.executeTests(ctx)
+	res, err := mu.executeTests(ctx)
 	res.Elapsed = time.Since(start)
 	res.Module = mu.module.Name
 
-	return res
+	return res, err
 }
 
 // skipDir reports whether dirPath is a testdata tree, a vendor tree, or the
@@ -240,22 +242,32 @@ func (mu *Engine) mutationStatus(pos token.Position, covered bool) mutator.Statu
 	return status
 }
 
-func (mu *Engine) executeTests(ctx context.Context) report.Results {
+func (mu *Engine) executeTests(ctx context.Context) (report.Results, error) {
+	runCtx, stop := context.WithCancel(ctx)
+	defer stop()
+
 	pool := workerpool.Initialize("mutator")
 	pool.Start()
 
 	var mutants []mutator.Mutator
-	outCh := make(chan mutator.Mutator)
+	var errs []error
+	outCh := make(chan ExecutorResult)
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		stopped := false
 		for mut := range mu.mutantStream {
-			ok := checkDone(ctx)
-			if !ok {
+			// After a stop, read the rest of the stream without scheduling,
+			// so the walker can finish and does not block on its send.
+			if stopped {
+				continue
+			}
+			if !checkDone(runCtx) {
 				pool.Stop()
+				stopped = true
 
-				break
+				continue
 			}
 			wg.Add(1)
 			pool.AppendExecutor(mu.jDealer.NewExecutor(mut, outCh, wg))
@@ -267,12 +279,22 @@ func (mu *Engine) executeTests(ctx context.Context) report.Results {
 		close(outCh)
 	}()
 
-	for m := range outCh {
-		mu.logger.Mutant(m)
-		mutants = append(mutants, m)
+	for r := range outCh {
+		if r.Err != nil {
+			errs = append(errs, r.Err)
+			stop()
+
+			continue
+		}
+		mu.logger.Mutant(r.Mutant)
+		mutants = append(mutants, r.Mutant)
 	}
 
-	return results(mutants)
+	if len(errs) > 0 {
+		return results(mutants), fmt.Errorf("mutation testing failed: %w", errors.Join(errs...))
+	}
+
+	return results(mutants), nil
 }
 
 func checkDone(ctx context.Context) bool {

@@ -1,18 +1,56 @@
 {
   "version": 1,
-  "issue": 157,
-  "summary": "Make the lint gate fail when the active Go is newer than the Go that built the pinned golangci-lint. With a newer Go, the linter loses type information, and revive skips its type-aware rules without an error. scripts/lint.py reads the linter's build Go and the Go that mise exec gives, and stops on a newer Go. mise.toml pins Go 1.26.11, the go.mod toolchain, so local lint uses the same Go as CI. The CI mise steps, the Makefile, and the guidance install that Go. No Go package, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
-  "changes": [],
-  "contracts": [],
-  "trust_boundaries": "The lint gate keeps its offline analysis environment. mise installs the pinned Go toolchain before analysis, as it installs the pinned linter. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "issue": 106,
+  "summary": "Stop a failed mutation from contaminating later results. TokenMutator.Apply puts back the shared AST token on every path, and it writes back the original file when the mutated write fails. Each executor sends one result for each mutant, with the mutant or an error. A failed workdir, apply, test run, or rollback gives an error, not a panic or a missing result. After a failed apply or rollback, the executor discards the worker directory, so the next mutant gets a new copy. Engine.Run returns the joined errors and stops new work after the first error. The unleash command returns that error. A run with a failed mutant now exits with the existing general error code 1 and writes no report. The lint baseline drops the fixed findings of the changed engine and workdir files. No package import, dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "cmd/internal/flags",
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": []
+    },
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": []
+    },
+    {
+      "package": "internal/engine/workdir",
+      "imports": [
+        "internal/log"
+      ],
+      "test_imports": []
+    }
+  ],
+  "contracts": [
+    "cli"
+  ],
+  "trust_boundaries": "The change adds no data flow, network access, or source execution. The executor removes only the temporary worker directory that the work directory dealer created. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
   "conflicts": [],
   "policies": [
-    "build",
-    "ci",
-    "contributing",
-    "guidance",
-    "lint_gate",
-    "lint_version"
+    "lint_baseline"
   ],
   "trust_changes": {
     "development_checks": {
@@ -34,5 +72,7 @@
       "execute_source": false
     }
   },
-  "contract_changes": {}
+  "contract_changes": {
+    "cli": "compatible"
+  }
 }

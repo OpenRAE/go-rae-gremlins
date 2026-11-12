@@ -31,7 +31,6 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workdir"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
-	"github.com/OpenRAE/go-rae-gremlins/internal/log"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
@@ -41,7 +40,17 @@ const DefaultTimeoutCoefficient = 5
 
 // ExecutorDealer is the initializer for new workerpool.Executor.
 type ExecutorDealer interface {
-	NewExecutor(mut mutator.Mutator, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor
+	// NewExecutor returns the workerpool.Executor of mut. The executor sends
+	// one ExecutorResult to outCh and calls wg.Done when it completes.
+	NewExecutor(mut mutator.Mutator, outCh chan<- ExecutorResult, wg *sync.WaitGroup) workerpool.Executor
+}
+
+// ExecutorResult is the outcome of one workerpool.Executor. Each executor
+// sends exactly one result. Err is not nil when the executor could not
+// produce a valid status for Mutant.
+type ExecutorResult struct {
+	Mutant mutator.Mutator
+	Err    error
 }
 
 // MutantExecutorDealer is a ExecutorDealer for the initialisation of a mutantExecutor.
@@ -118,10 +127,10 @@ func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.D
 }
 
 // NewExecutor returns a new workerpool.Executor for the given mutator.Mutator.
-// It gets an output channel of mutator.Mutator and a sync.WaitGroup. The channel
-// will stream the results of the executor, and the wait group will be done when the
-// executor is complete.
-func (m MutantExecutorDealer) NewExecutor(mut mutator.Mutator, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor {
+// It gets an output channel of ExecutorResult and a sync.WaitGroup. The
+// executor sends one result to the channel, and the wait group will be done
+// when the executor is complete.
+func (m MutantExecutorDealer) NewExecutor(mut mutator.Mutator, outCh chan<- ExecutorResult, wg *sync.WaitGroup) workerpool.Executor {
 	mj := mutantExecutor{
 		mutant:            mut,
 		outCh:             outCh,
@@ -144,7 +153,7 @@ type execContext = func(ctx context.Context, name string, args ...string) *exec.
 type mutantExecutor struct {
 	mutant            mutator.Mutator
 	wdDealer          workdir.Dealer
-	outCh             chan<- mutator.Mutator
+	outCh             chan<- ExecutorResult
 	wg                *sync.WaitGroup
 	execContext       execContext
 	module            gomodule.GoModule
@@ -165,47 +174,65 @@ type mutantExecutor struct {
 // The timeout of the test is managed outside the run of the test, using
 // a context with timeout. This is done because the Go test command doesn't
 // make it easy to distinguish failures from timeouts.
+// Start always sends one ExecutorResult. A failure to get the working
+// directory, apply the mutation, run the tests, or restore the source is
+// sent as the result error.
 func (m *mutantExecutor) Start(w *workerpool.Worker) {
 	defer m.wg.Done()
 	workerName := fmt.Sprintf("%s-%d", w.Name, w.ID)
+	err := m.execute(workerName)
+	m.outCh <- ExecutorResult{Mutant: m.mutant, Err: err}
+}
+
+// execute applies the mutation, runs the tests, and restores the source as
+// one operation. When the apply or the restoration fails, the source in the
+// worker directory is unknown, so execute discards that directory. The next
+// executor of the worker then gets a new copy of the module.
+func (m *mutantExecutor) execute(workerName string) error {
 	rootDir, err := m.wdDealer.Get(workerName)
 	if err != nil {
-		log.Errorf("failed to get working directory for worker %s: %v", workerName, err)
-		panic(fmt.Sprintf("failed to get working directory for worker %s: %v", workerName, err))
+		return fmt.Errorf("get working directory for worker %s: %w", workerName, err)
 	}
 
 	workingDir := filepath.Join(rootDir, m.module.CallingDir)
 	m.mutant.SetWorkdir(workingDir)
 
 	if m.mutant.Status() == mutator.NotCovered || m.mutant.Status() == mutator.Skipped || m.dryRun {
-		m.outCh <- m.mutant
-
-		return
+		return nil
 	}
 
 	if err := m.mutant.Apply(); err != nil {
-		log.Errorf("failed to apply mutation at %s - %s\n\t%v", m.mutant.Position(), m.mutant.Status(), err)
-
-		return
+		return m.discard(workerName, fmt.Errorf("apply mutation at %s: %w", m.mutant.Position(), err))
 	}
 
 	status, runErr := m.runTests(rootDir, m.mutant.Pkg())
 	if runErr != nil {
-		log.Errorf("failed to run tests at %s - %s\n\t%v", m.mutant.Position(), m.mutant.Status(), runErr)
-	} else {
-		m.mutant.SetStatus(status)
+		runErr = fmt.Errorf("run tests of mutation at %s: %w", m.mutant.Position(), runErr)
 	}
 
 	if err := m.mutant.Rollback(); err != nil {
-		// What should we do now?
-		log.Errorf("failed to restore mutation at %s - %s\n\t%v", m.mutant.Position(), m.mutant.Status(), err)
+		restoreErr := fmt.Errorf("restore mutation at %s: %w", m.mutant.Position(), err)
+
+		return m.discard(workerName, errors.Join(runErr, restoreErr))
 	}
 
 	if runErr != nil {
-		return
+		return runErr
 	}
 
-	m.outCh <- m.mutant
+	m.mutant.SetStatus(status)
+
+	return nil
+}
+
+// discard removes the working directory of workerName and returns cause
+// joined with any discard error.
+func (m *mutantExecutor) discard(workerName string, cause error) error {
+	if err := m.wdDealer.Discard(workerName); err != nil {
+		return errors.Join(cause, fmt.Errorf("discard working directory of worker %s: %w", workerName, err))
+	}
+
+	return cause
 }
 
 // runTests runs the tests for pkg and classifies the mutant status from the

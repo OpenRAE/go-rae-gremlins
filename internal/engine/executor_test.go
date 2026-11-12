@@ -18,6 +18,7 @@ package engine_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -59,7 +60,7 @@ func TestApplyAndRollback(t *testing.T) {
 			mutType: mutator.ConditionalsBoundary,
 			pkg:     expectedModule,
 		}
-		outCh := make(chan mutator.Mutator)
+		outCh := make(chan engine.ExecutorResult)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.NewExecutor(mut, outCh, &wg)
@@ -77,54 +78,14 @@ func TestApplyAndRollback(t *testing.T) {
 		wg.Wait()
 
 		if !mut.applyCalled {
-			t.Errorf("expected apply to be called")
+			t.Error("expected apply to be called")
 		}
 
 		if !mut.rollbackCalled {
-			t.Errorf("expected rollback to be called")
+			t.Error("expected rollback to be called")
 		}
 	})
 
-	t.Run("does nothing if apply goes to error", func(t *testing.T) {
-		wdDealer := newWdDealerStub(t)
-		tmpDir, _ := wdDealer.Get("")
-		mod := gomodule.GoModule{
-			Name:       expectedModule,
-			Root:       tmpDir,
-			CallingDir: ".",
-		}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(fakeExecCommandSuccess))
-		mut := &mutantStub{
-			status:        mutator.Runnable,
-			mutType:       mutator.ConditionalsBoundary,
-			pkg:           expectedModule,
-			hasApplyError: true,
-		}
-		outCh := make(chan mutator.Mutator)
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		executor := mjd.NewExecutor(mut, outCh, &wg)
-		w := &workerpool.Worker{
-			Name: testWorkerName,
-			ID:   1,
-		}
-		go func() {
-			<-outCh
-			close(outCh)
-		}()
-
-		executor.Start(w)
-
-		wg.Wait()
-
-		if !mut.applyCalled {
-			t.Errorf("expected apply to be called")
-		}
-
-		if mut.rollbackCalled {
-			t.Errorf("expected rollback not to be called")
-		}
-	})
 }
 
 type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
@@ -175,7 +136,7 @@ func TestMutatorTestExecution(t *testing.T) {
 				mutType: mutator.ConditionalsBoundary,
 				pkg:     expectedModule,
 			}
-			outCh := make(chan mutator.Mutator)
+			outCh := make(chan engine.ExecutorResult)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			executor := mjd.NewExecutor(mut, outCh, &wg)
@@ -189,7 +150,7 @@ func TestMutatorTestExecution(t *testing.T) {
 			go func() {
 				mutex.Lock()
 				defer mutex.Unlock()
-				got = <-outCh
+				got = (<-outCh).Mutant
 				close(outCh)
 			}()
 			executor.Start(w)
@@ -260,7 +221,7 @@ func TestFeatureLabel(t *testing.T) {
 		mutType: mutator.ConditionalsBoundary,
 		pkg:     probeModule,
 	}
-	outCh := make(chan mutator.Mutator, 1)
+	outCh := make(chan engine.ExecutorResult, 1)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	executor := mjd.NewExecutor(mut, outCh, &wg)
@@ -272,56 +233,122 @@ func TestFeatureLabel(t *testing.T) {
 	executor.Start(w)
 	wg.Wait()
 
-	got := <-outCh
+	got := (<-outCh).Mutant
 	if got.Status() != mutator.NotViable {
 		t.Errorf("status = %v, want %v", got.Status(), mutator.NotViable)
 	}
 }
 
-// TestMutatorRunErrorIsNotReportedAsLived proves that an infrastructure
-// failure in running the test command (here, a missing executable) is never
-// folded into mutator.Lived: the mutant must not be reported as a kill the
-// suite survived when the suite never ran at all (issue #59).
-func TestRegressionMutatorRunErrorIsNotReportedAsLived(t *testing.T) {
-	viperSet(map[string]any{configuration.UnleashDryRunKey: false})
-	defer viperReset()
-
-	wdDealer := newWdDealerStub(t)
-	mod := gomodule.GoModule{
-		Name:       expectedModule,
-		Root:       ".",
-		CallingDir: ".",
-	}
-	missingExecutable := filepath.Join(t.TempDir(), "no-such-executable")
+// TestFeatureExecutorFailureIsReported proves that each executor failure
+// gives a result error instead of a panic or a missing result (issue #106).
+// After a failed apply or rollback, the source in the worker directory is
+// unknown, so the executor must discard that directory before the worker
+// takes the next mutant. A test run that cannot start is never folded into
+// mutator.Lived (issue #59).
+func TestFeatureExecutorFailureIsReported(t *testing.T) {
+	errWorkdir := errors.New("workdir stub error")
+	workerDir := fmt.Sprintf("%s-%d", testWorkerName, 1)
 	missingExec := func(ctx context.Context, _ string, _ ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, missingExecutable)
-	}
-	mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(missingExec))
-	mut := &mutantStub{
-		status:  mutator.Runnable,
-		mutType: mutator.ConditionalsBoundary,
-		pkg:     expectedModule,
-	}
-	outCh := make(chan mutator.Mutator, 1)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	executor := mjd.NewExecutor(mut, outCh, &wg)
-	w := &workerpool.Worker{
-		Name: testWorkerName,
-		ID:   1,
+		return exec.CommandContext(ctx, "gremlins-no-such-executable")
 	}
 
-	executor.Start(w)
-	wg.Wait()
-
-	select {
-	case got := <-outCh:
-		t.Fatalf("expected no mutant to be reported for a run error, got status %v", got.Status())
-	default:
+	testCases := []struct {
+		fnGet         func(idf string) (string, error)
+		testResult    execContext
+		wantErr       error
+		name          string
+		wantDiscarded []string
+		applyError    bool
+		rollbackError bool
+		wantApply     bool
+		wantRollback  bool
+	}{
+		{
+			name:       "workdir failure",
+			fnGet:      func(_ string) (string, error) { return "", errWorkdir },
+			testResult: fakeExecCommandSuccess,
+			wantErr:    errWorkdir,
+		},
+		{
+			name:          "apply failure discards the worker directory",
+			testResult:    fakeExecCommandSuccess,
+			applyError:    true,
+			wantErr:       errApplyStub,
+			wantApply:     true,
+			wantDiscarded: []string{workerDir},
+		},
+		{
+			name:          "rollback failure discards the worker directory",
+			testResult:    fakeExecCommandSuccess,
+			rollbackError: true,
+			wantErr:       errRollbackStub,
+			wantApply:     true,
+			wantRollback:  true,
+			wantDiscarded: []string{workerDir},
+		},
+		{
+			name:         "test run failure keeps the restored worker directory",
+			testResult:   missingExec,
+			wantErr:      exec.ErrNotFound,
+			wantApply:    true,
+			wantRollback: true,
+		},
 	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			viperSet(map[string]any{configuration.UnleashDryRunKey: false})
+			defer viperReset()
 
-	if !mut.rollbackCalled {
-		t.Error("expected rollback to be called even when the test run errors")
+			wdDealer := newWdDealerStub(t)
+			if tc.fnGet != nil {
+				wdDealer.fnGet = tc.fnGet
+			}
+			mod := gomodule.GoModule{
+				Name:       expectedModule,
+				Root:       ".",
+				CallingDir: ".",
+			}
+			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(tc.testResult))
+			mut := &mutantStub{
+				status:           mutator.Runnable,
+				mutType:          mutator.ConditionalsBoundary,
+				pkg:              expectedModule,
+				hasApplyError:    tc.applyError,
+				hasRollbackError: tc.rollbackError,
+			}
+			outCh := make(chan engine.ExecutorResult, 1)
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			executor := mjd.NewExecutor(mut, outCh, &wg)
+
+			executor.Start(&workerpool.Worker{Name: testWorkerName, ID: 1})
+			wg.Wait()
+
+			var got engine.ExecutorResult
+			select {
+			case got = <-outCh:
+			default:
+				t.Fatal("executor sent no result, want one result with an error")
+			}
+			if !errors.Is(got.Err, tc.wantErr) {
+				t.Errorf("result error = %v, want %v", got.Err, tc.wantErr)
+			}
+			if got.Mutant != mut {
+				t.Errorf("result mutant = %v, want the executed mutant", got.Mutant)
+			}
+			if mut.status != mutator.Runnable {
+				t.Errorf("mutant status = %v, want %v", mut.status, mutator.Runnable)
+			}
+			if mut.applyCalled != tc.wantApply {
+				t.Errorf("apply called = %t, want %t", mut.applyCalled, tc.wantApply)
+			}
+			if mut.rollbackCalled != tc.wantRollback {
+				t.Errorf("rollback called = %t, want %t", mut.rollbackCalled, tc.wantRollback)
+			}
+			if !cmp.Equal(wdDealer.discarded, tc.wantDiscarded) {
+				t.Errorf("discarded worker directories = %v, want %v", wdDealer.discarded, tc.wantDiscarded)
+			}
+		})
 	}
 }
 
@@ -410,7 +437,7 @@ func TestMutatorRun(t *testing.T) {
 				mutType: mutator.ConditionalsBoundary,
 				pkg:     tc.pkg,
 			}
-			outCh := make(chan mutator.Mutator)
+			outCh := make(chan engine.ExecutorResult)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			executor := mjd.NewExecutor(mut, outCh, &wg)
@@ -499,7 +526,7 @@ func TestCPU(t *testing.T) {
 				mutType: mutator.ConditionalsBoundary,
 				pkg:     "test",
 			}
-			outCh := make(chan mutator.Mutator)
+			outCh := make(chan engine.ExecutorResult)
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			executor := mjd.NewExecutor(mut, outCh, &wg)
@@ -573,7 +600,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 			mutType: mutator.ConditionalsBoundary,
 			pkg:     examplePackage,
 		}
-		outCh := make(chan mutator.Mutator)
+		outCh := make(chan engine.ExecutorResult)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.NewExecutor(mut, outCh, &wg)
@@ -619,7 +646,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 			mutType: mutator.ConditionalsBoundary,
 			pkg:     examplePackage,
 		}
-		outCh := make(chan mutator.Mutator)
+		outCh := make(chan engine.ExecutorResult)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		executor := mjd.NewExecutor(mut, outCh, &wg)
