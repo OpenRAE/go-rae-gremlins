@@ -29,12 +29,18 @@ import (
 	"testing/fstest"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
+	"github.com/OpenRAE/go-rae-gremlins/internal/engine"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
 var viperMutex sync.RWMutex
+
+var (
+	errApplyStub    = errors.New("apply stub error")
+	errRollbackStub = errors.New("rollback stub error")
+)
 
 func init() {
 	viperMutex.Lock()
@@ -82,8 +88,9 @@ func filenameFromFixture(fix string) string {
 }
 
 type dealerStub struct {
-	t     *testing.T
-	fnGet func(idf string) (string, error)
+	t         *testing.T
+	fnGet     func(idf string) (string, error)
+	discarded []string
 }
 
 func newWdDealerStub(t *testing.T) *dealerStub {
@@ -94,15 +101,22 @@ func newWdDealerStub(t *testing.T) *dealerStub {
 	}}
 }
 
-func (d dealerStub) Get(idf string) (string, error) {
+func (d *dealerStub) Get(idf string) (string, error) {
 	return d.fnGet(idf)
 }
 
-func (dealerStub) Clean() {}
+func (d *dealerStub) Discard(idf string) error {
+	d.discarded = append(d.discarded, idf)
 
-func (dealerStub) WorkDir() string { return "/tmp" }
+	return nil
+}
+
+func (*dealerStub) Clean() {}
+
+func (*dealerStub) WorkDir() string { return "/tmp" }
 
 type executorDealerStub struct {
+	errFor     func(mut mutator.Mutator) error
 	gotMutants []mutator.Mutator
 }
 
@@ -112,11 +126,18 @@ func newJobDealerStub(t *testing.T) *executorDealerStub {
 	return &executorDealerStub{}
 }
 
-func (j *executorDealerStub) NewExecutor(mut mutator.Mutator, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor {
+func (j *executorDealerStub) NewExecutor(
+	mut mutator.Mutator, outCh chan<- engine.ExecutorResult, wg *sync.WaitGroup,
+) workerpool.Executor {
 	j.gotMutants = append(j.gotMutants, mut)
+	var err error
+	if j.errFor != nil {
+		err = j.errFor(mut)
+	}
 
 	return &executorStub{
 		mut:   mut,
+		err:   err,
 		outCh: outCh,
 		wg:    wg,
 	}
@@ -124,12 +145,13 @@ func (j *executorDealerStub) NewExecutor(mut mutator.Mutator, outCh chan<- mutat
 
 type executorStub struct {
 	mut   mutator.Mutator
-	outCh chan<- mutator.Mutator
+	err   error
+	outCh chan<- engine.ExecutorResult
 	wg    *sync.WaitGroup
 }
 
 func (j *executorStub) Start(_ context.Context, _ *workerpool.Worker) {
-	j.outCh <- j.mut
+	j.outCh <- engine.ExecutorResult{Mutant: j.mut, Err: j.err}
 	j.wg.Done()
 }
 
@@ -142,7 +164,8 @@ type mutantStub struct {
 	applyCalled    bool
 	rollbackCalled bool
 
-	hasApplyError bool
+	hasApplyError    bool
+	hasRollbackError bool
 }
 
 func (m *mutantStub) Type() mutator.Type {
@@ -184,7 +207,7 @@ func (m *mutantStub) Workdir() string {
 func (m *mutantStub) Apply() error {
 	m.applyCalled = true
 	if m.hasApplyError {
-		return errors.New("test error")
+		return errApplyStub
 	}
 
 	return nil
@@ -192,6 +215,9 @@ func (m *mutantStub) Apply() error {
 
 func (m *mutantStub) Rollback() error {
 	m.rollbackCalled = true
+	if m.hasRollbackError {
+		return errRollbackStub
+	}
 
 	return nil
 }
@@ -211,7 +237,7 @@ type blockingDealerStub struct {
 }
 
 func (j *blockingDealerStub) NewExecutor(
-	_ mutator.Mutator, _ chan<- mutator.Mutator, wg *sync.WaitGroup,
+	_ mutator.Mutator, _ chan<- engine.ExecutorResult, wg *sync.WaitGroup,
 ) workerpool.Executor {
 	j.created.Add(1)
 

@@ -901,6 +901,38 @@ func TestFeatureEngineRunCancelReleasesBlockedSubmission(t *testing.T) {
 	})
 }
 
+// TestFeatureRunReturnsExecutorError proves that a failed executor fails
+// the run instead of leaving a missing mutant in successful results
+// (issue #106).
+func TestFeatureRunReturnsExecutorError(t *testing.T) {
+	mapFS, mod, c := loadFixture(defaultFixture, ".")
+	defer c()
+
+	errExecutor := errors.New("executor stub error")
+	var failed mutator.Mutator
+	jds := newJobDealerStub(t)
+	jds.errFor = func(mut mutator.Mutator) error {
+		if failed != nil {
+			return nil
+		}
+		failed = mut
+
+		return errExecutor
+	}
+	mut := engine.New(mod, testCodeData, jds, engine.WithDirFs(mapFS))
+
+	res, err := mut.Run(context.Background())
+
+	if !errors.Is(err, errExecutor) {
+		t.Fatalf("Run() error = %v, want %v", err, errExecutor)
+	}
+	for _, m := range res.Mutants {
+		if m == failed {
+			t.Errorf("Run() results contain the failed mutant at %s", m.Position())
+		}
+	}
+}
+
 func TestPackageDiscovery(t *testing.T) {
 	testCases := []struct {
 		name     string
