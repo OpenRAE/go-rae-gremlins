@@ -55,9 +55,11 @@ Changes to flags or configuration keys must also update the JSON schema and usag
 configuration, report, and exit-code contracts used by dependent repositories unless the issue authorizes a change.
 Keep `testdata` files byte-exact unless the fixture itself needs to change.
 
-Before coding, follow the [architecture design check](development/architecture.md). Update
-`.architecture/design.json` with the proposed packages, dependencies, affected contracts, trust boundaries,
-and unresolved conflicts. Run `make architecture-design` and record its model digest and result in the issue plan.
+Before coding, follow the [architecture design check](development/architecture.md). Write your design to
+`.architecture/designs/<issue>.json` with the proposed packages, dependencies, affected contracts, trust boundaries,
+and unresolved conflicts. Each change uses its own design file, so open pull requests do not conflict on the design
+input. Run `make architecture-design` and record its model digest and result in the issue plan.
+
 Resolve conflicts before implementation. Recheck when the design or model changes. CI requires an updated design
 for package, contract, and policy changes and checks every changed package against it.
 

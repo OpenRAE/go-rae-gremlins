@@ -56,7 +56,7 @@ func validateTrustModel(boundaries map[string]trustBoundary) error {
 }
 
 func proposalError(c *compiledModel, kind, subject string) error {
-	return fmt.Errorf("design: %s", formatFinding(finding{Rule: c.byKind[kind].ID, File: designFile, Subject: subject}, c))
+	return fmt.Errorf("design: %s", formatFinding(finding{Rule: c.byKind[kind].ID, File: designDir, Subject: subject}, c))
 }
 
 func checkProposals(c *compiledModel, d design) error {

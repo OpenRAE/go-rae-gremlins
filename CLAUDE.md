@@ -214,8 +214,10 @@ internal/
 
 ## Architecture design check
 
-Before coding, update `.architecture/design.json` and run `make architecture-design`.
+Before coding, write your design to `.architecture/designs/<issue>.json` and run `make architecture-design`.
+Each change uses its own design file, so open pull requests do not conflict on the design input.
 Record the model digest, affected rules, and result in the issue plan.
+
 Resolve conflicts before implementation. Repeat after model or design changes.
 See [the architecture model and design check](docs/development/architecture.md).
 CI runs `make architecture` and rejects baseline growth and missing design coverage.
