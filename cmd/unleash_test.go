@@ -373,6 +373,28 @@ func TestFeatureUnleashKeepsCallerDirectory(t *testing.T) {
 	}
 }
 
+func TestRegressionUnleashFailsWhenReportCannotBeWritten(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs the go command on a temporary module")
+	}
+	workspace := newUnleashWorkspace(t)
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	output := filepath.Join(t.TempDir(), "missing-parent", "result.json")
+	configuration.Set(configuration.UnleashDryRunKey, true)
+	configuration.Set(configuration.MutantTypeEnabledKey(mutator.ConditionalsBoundary), true)
+	configuration.Set(configuration.UnleashOutputKey, output)
+
+	modDir := filepath.Join(workspace, "mod")
+	err := runUnleash(context.Background())(nil, []string{modDir})
+	if err == nil || !strings.Contains(err.Error(), output) {
+		t.Errorf("runUnleash(%q) error = %v, want an error that names %q", modDir, err, output)
+	}
+}
+
 // newUnleashWorkspace returns a directory that contains the module mod with
 // one tested package in mod/pkg.
 func newUnleashWorkspace(t *testing.T) string {

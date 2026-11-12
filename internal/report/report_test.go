@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -569,26 +570,50 @@ func TestReportToFile(t *testing.T) {
 		//nolint:gosec // test code reading test output
 		_, err := os.ReadFile(output)
 		if err == nil {
-			t.Errorf("expected file not found")
+			t.Error("expected file not found")
 		}
 	})
 
-	// In this case we don't want to stop the execution with an error, but we just want to log the fact.
-	t.Run("it doesn't report error when file is not writeable, but doesn't write file", func(t *testing.T) {
-		outDir, cl := notWriteableDir(t)
-		defer cl()
-		output := filepath.Join(outDir, outFile)
-		viper.Set(configuration.UnleashOutputKey, output)
-		defer viper.Reset()
+	t.Run("it returns an error when the file cannot be created", func(t *testing.T) {
+		testCases := []struct {
+			outDir func(t *testing.T) string
+			name   string
+		}{
+			{
+				name: "missing parent directory",
+				outDir: func(t *testing.T) string {
+					t.Helper()
 
-		if err := report.Do(data); err != nil {
-			t.Fatal("error not expected")
+					return filepath.Join(t.TempDir(), "missing-parent")
+				},
+			},
+			{
+				name: "directory not writeable",
+				outDir: func(t *testing.T) string {
+					t.Helper()
+					outDir, cl := notWriteableDir(t)
+					t.Cleanup(cl)
+
+					return outDir
+				},
+			},
 		}
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				output := filepath.Join(tc.outDir(t), outFile)
+				viper.Set(configuration.UnleashOutputKey, output)
+				defer viper.Reset()
 
-		//nolint:gosec // test code reading test output
-		_, err := os.ReadFile(output)
-		if err == nil {
-			t.Errorf("expected file not found")
+				err := report.Do(data)
+				if err == nil || !strings.Contains(err.Error(), output) {
+					t.Errorf("report.Do error = %v, want an error that names %q", err, output)
+				}
+
+				//nolint:gosec // test code reading test output
+				if _, err := os.ReadFile(output); err == nil {
+					t.Errorf("report file %q exists, want no file", output)
+				}
+			})
 		}
 	})
 }

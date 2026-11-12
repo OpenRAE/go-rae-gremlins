@@ -165,18 +165,6 @@
     },
     {
       "linter": "errcheck",
-      "file": "internal/report/report.go",
-      "fingerprint": "0e96a8733394445a4b7c135a4920e9d8b94544734d611999e52003810da58347",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/report/report.go",
-      "fingerprint": "8c0ce07a509f5e81e749e7fb9ae332bbaa166ff052ffee63459d6be5be3db437",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
       "file": "internal/report/report_test.go",
       "fingerprint": "0b0bcb82db38ab38053cc3b63bc58bd36150bd55724a6546b6987b40f40c4f2e",
       "count": 1
@@ -466,19 +454,7 @@
     {
       "linter": "revive",
       "file": "internal/report/report_test.go",
-      "fingerprint": "30594642150e8182f9fe12ddd737dcfaa4a8cdcabd61319f443b05f6b81ab0d2",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/report/report_test.go",
       "fingerprint": "b081879c022bd491c6901f8fca1b4eca755cbf1ec112a549bdf4850c42b7ec4a",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/report/report_test.go",
-      "fingerprint": "dfd78197088e57315138f85496eb1878540e09bf2e9f11e20ddc56539d378144",
       "count": 1
     },
     {
