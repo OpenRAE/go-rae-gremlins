@@ -30,10 +30,11 @@ EOF
 }
 
 sha256_of() {
+  local file="$1"
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | cut -d' ' -f1
+    sha256sum "$file" | cut -d' ' -f1
   elif command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$1" | cut -d' ' -f1
+    shasum -a 256 "$file" | cut -d' ' -f1
   else
     echo 'No SHA-256 tool is available. The installation stops.' >&2
     exit 2
@@ -80,10 +81,11 @@ lint_paths() {
 # Repository rules: release-please writes CHANGELOG.md, the Code of Conduct is adopted
 # policy text, and testdata files are byte-exact test inputs.
 excluded() {
-  case "$1" in
+  local path="$1"
+  case "$path" in
     CHANGELOG.md | CODE_OF_CONDUCT.md | testdata/* | */testdata/*) return 0 ;;
+    *) return 1 ;;
   esac
-  return 1
 }
 
 lint_changed() {
@@ -108,8 +110,9 @@ lint_changed() {
 }
 
 expect_rule() {
-  if ! grep -qF "[$1]" "$2"; then
-    echo "The bad sample did not report $1." >&2
+  local rule="$1" output="$2"
+  if ! grep -qF "[$rule]" "$output"; then
+    echo "The bad sample did not report $rule." >&2
     exit 1
   fi
 }
