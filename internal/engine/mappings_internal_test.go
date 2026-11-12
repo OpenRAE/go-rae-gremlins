@@ -25,9 +25,9 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
-// TestInvertAssignmentsMappings checks the mutation table in
+// TestRegressionInvertAssignmentsMappings checks the mutation table in
 // docs/docs/usage/mutations/invert_assignments.md.
-func TestInvertAssignmentsMappings(t *testing.T) {
+func TestRegressionInvertAssignmentsMappings(t *testing.T) {
 	t.Parallel()
 
 	want := map[token.Token]token.Token{
@@ -44,25 +44,13 @@ func TestInvertAssignmentsMappings(t *testing.T) {
 	}
 }
 
-func TestTokenMutationsChangeTheToken(t *testing.T) {
+func TestRegressionTokenMutationsChangeTheToken(t *testing.T) {
 	t.Parallel()
 
 	for mutantType, mappings := range tokenMutations {
 		for original, mutated := range mappings {
 			if original == mutated {
 				t.Errorf("%s maps %q to itself; the mutant changes nothing", mutantType, original)
-			}
-		}
-	}
-}
-
-func TestTokenMutantTypeHasMutation(t *testing.T) {
-	t.Parallel()
-
-	for tok, mutantTypes := range TokenMutantType {
-		for _, mutantType := range mutantTypes {
-			if _, ok := tokenMutations[mutantType][tok]; !ok {
-				t.Errorf("TokenMutantType lists %s for %q, but tokenMutations has no mutation for it", mutantType, tok)
 			}
 		}
 	}

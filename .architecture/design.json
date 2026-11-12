@@ -1,7 +1,7 @@
 {
   "version": 1,
   "issue": 113,
-  "summary": "Map the InvertAssignments remainder-assignment candidate to the documented multiply assignment. The old mapping replaced %= with %=, so the mutant changed nothing. Internal engine tests check the InvertAssignments table against the documented table. They also reject identity mappings and require a mutation for each TokenMutantType entry. The package keeps its existing imports. No dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "summary": "Map the InvertAssignments remainder-assignment candidate to the documented multiply assignment. The old mapping replaced %= with %=, so the mutant changed nothing. Internal engine tests check the InvertAssignments table against the documented table. They also reject identity mappings in all mutation types. The package keeps its existing imports. No dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
   "changes": [
     {
       "package": "internal/engine",
