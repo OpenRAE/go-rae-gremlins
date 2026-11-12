@@ -89,7 +89,7 @@ func TestFeatureChangedDesignGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, designFile, string(data))
+	writeFile(t, root, proposalFile, string(data))
 	if err := checkChangedDesign(root, "HEAD", c); err == nil {
 		t.Fatal("uncovered package accepted")
 	}
@@ -98,7 +98,7 @@ func TestFeatureChangedDesignGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, designFile, string(data))
+	writeFile(t, root, proposalFile, string(data))
 	if err := checkChangedDesign(root, "HEAD", c); err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func writeDesign(t *testing.T, root string, d design) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, designFile, string(data))
+	writeFile(t, root, proposalFile, string(data))
 }
 
 func TestFeatureContractAndPolicyChangesNeedDesign(t *testing.T) {
@@ -179,7 +179,7 @@ func TestFeaturePreCodeDesignStep(t *testing.T) {
 		name, input, rule string
 		bad               bool
 	}{
-		{"valid", ".architecture/design.json", "", false},
+		{"valid", "tools/architecture/testdata/valid-design.json", "", false},
 		{"forbidden", "tools/architecture/testdata/invalid-design.json", "ARCH002", true},
 		{"breaking contract", "tools/architecture/testdata/invalid-contract.json", "ARCH003", true},
 		{"prohibited transfer", "tools/architecture/testdata/invalid-trust.json", "ARCH004", true},
@@ -200,7 +200,7 @@ func TestFeaturePreCodeDesignStep(t *testing.T) {
 
 func TestFeatureDesignOnlyChangeEvaluated(t *testing.T) {
 	root := gitFixture(t)
-	writeFile(t, root, designFile, `{
+	writeFile(t, root, proposalFile, `{
   "version": 1,
   "issue": 76,
   "summary": "proposal",
@@ -215,6 +215,31 @@ func TestFeatureDesignOnlyChangeEvaluated(t *testing.T) {
 }`)
 	if err := checkChangedDesign(root, "HEAD", testModel(t)); err == nil {
 		t.Fatal("incompatible design-only change was not checked")
+	}
+}
+
+func TestFeaturePreCodeDesignChange(t *testing.T) {
+	root := gitFixture(t)
+	data, err := json.Marshal(testModel(t).model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, modelFile, string(data))
+	writeDesign(t, root, design{
+		Version:         1,
+		Issue:           76,
+		Summary:         changeSummary,
+		TrustChanges:    localTrust(),
+		TrustBoundaries: localBoundary,
+		Changes:         []change{{Package: appPackage, Imports: []string{corePackage}}},
+	})
+	t.Chdir(root)
+	if err := run("HEAD", "", true); err != nil {
+		t.Fatalf("valid changed design rejected: %v", err)
+	}
+	writeFile(t, root, proposalFile, `{"version":2}`)
+	if err := run("HEAD", "", true); err == nil {
+		t.Fatal("invalid changed design accepted")
 	}
 }
 
@@ -249,7 +274,7 @@ func TestFeatureCLIContractSourcesRequireCompatibilityReview(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			writeFile(t, root, designFile, string(data))
+			writeFile(t, root, proposalFile, string(data))
 			if err := checkChangedDesign(root, "HEAD", c); err == nil {
 				t.Fatal("CLI source changed without compatibility review")
 			}
@@ -259,7 +284,7 @@ func TestFeatureCLIContractSourcesRequireCompatibilityReview(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			writeFile(t, root, designFile, string(data))
+			writeFile(t, root, proposalFile, string(data))
 			if err := checkChangedDesign(root, "HEAD", c); err != nil {
 				t.Fatal(err)
 			}

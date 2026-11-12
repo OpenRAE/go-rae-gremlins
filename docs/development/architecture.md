@@ -74,8 +74,8 @@ An initial branch push with no preceding commit compares with an empty baseline.
 ## Design before coding
 
 1. Read the model and the affected contract sources.
-2. Update `.architecture/design.json` with the planned packages, imports, contracts, trust boundaries, and rationale.
-3. Run `make architecture-design` before editing implementation files. This executes `scripts/check-design.sh`.
+2. Write your design to `.architecture/designs/<issue>.json` with the planned packages, imports, contracts, trust boundaries, and rationale. Each change uses its own design file, so open pull requests do not conflict on the design input.
+3. Run `make architecture-design` before editing implementation files. This executes `scripts/check-design.sh`, which checks the design files changed against the comparison branch.
 4. Record the model digest and rule results in the issue plan.
 5. Resolve every conflict before coding. Update the model only through a reviewed architecture decision.
 6. Repeat the check when the design or model changes.

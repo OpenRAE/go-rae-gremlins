@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "issue": 76,
+  "summary": "Accept a design that keeps the approved development-check and delivery boundaries.",
+  "trust_boundaries": "The checks read local files only and run no scanned source.",
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  }
+}

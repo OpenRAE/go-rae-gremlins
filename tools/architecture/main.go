@@ -30,24 +30,25 @@ import (
 
 const modelFile = ".architecture/model.json"
 const baselineFile = ".architecture/baseline.json"
-const designFile = ".architecture/design.json"
+const designDir = ".architecture/designs"
 
 func main() {
 	log.Init(os.Stdout, os.Stderr)
 	base := flag.String("base", "origin/dev", "Git comparison commit or ref (empty means first adoption)")
-	proposed := flag.String("design", "", "check a proposed design instead of source")
+	proposed := flag.String("design", "", "check a single proposed design file instead of source")
+	changed := flag.Bool("design-changed", false, "check the design files changed against -base, then exit")
 	flag.Parse()
 	if flag.NArg() != 0 {
-		log.Errorln("unexpected arguments; fix: use -base or -design")
+		log.Errorln("unexpected arguments; fix: use -base, -design, or -design-changed")
 		os.Exit(1)
 	}
-	if err := run(*base, *proposed); err != nil {
+	if err := run(*base, *proposed, *changed); err != nil {
 		log.Errorln(err)
 		os.Exit(1)
 	}
 }
 
-func run(base, proposed string) error {
+func run(base, proposed string, changed bool) error {
 	root, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get checkout: %w", err)
@@ -65,29 +66,69 @@ func run(base, proposed string) error {
 		return err
 	}
 	if proposed != "" {
+		return checkProposedFile(root, c, data, proposed)
+	}
+	if changed {
+		return checkProposedChanges(root, base, c, data)
+	}
+
+	return checkRepository(root, base, c)
+}
+
+func checkProposedFile(root string, c *compiledModel, modelData []byte, path string) error {
+	var d design
+	if err := loadJSON(root, path, &d); err != nil {
+		return err
+	}
+	if err := checkDesign(c, d); err != nil {
+		return err
+	}
+	logDesignPass(c, modelData, path, d.Issue)
+
+	return nil
+}
+
+func checkProposedChanges(root, base string, c *compiledModel, modelData []byte) error {
+	revision, err := resolveRevision(root, base)
+	if err != nil {
+		return err
+	}
+	designs, err := changedDesigns(root, revision)
+	if err != nil {
+		return err
+	}
+	if len(designs) == 0 {
+		log.Infof("No changed design under %s; add %s/<issue>.json before coding.\n", designDir, designDir)
+
+		return nil
+	}
+	for _, path := range designs {
 		var d design
-		if err := loadJSON(root, proposed, &d); err != nil {
+		if err := loadJSON(root, path, &d); err != nil {
 			return err
 		}
 		if err := checkDesign(c, d); err != nil {
 			return err
 		}
-		ids := make([]string, 0, len(c.byID))
-		for id := range c.byID {
-			ids = append(ids, id)
-		}
-		slices.Sort(ids)
-		log.Infof(
-			"Design #%d passed: model SHA256 %x; rules %q. Review contract and trust assertions against the implementation.\n",
-			d.Issue,
-			sha256.Sum256(data),
-			strings.Join(ids, ", "),
-		)
-
-		return nil
+		logDesignPass(c, modelData, path, d.Issue)
 	}
 
-	return checkRepository(root, base, c)
+	return nil
+}
+
+func logDesignPass(c *compiledModel, modelData []byte, path string, issue int) {
+	ids := make([]string, 0, len(c.byID))
+	for id := range c.byID {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	log.Infof(
+		"Design %s (#%d) passed: model SHA256 %x; rules %q. Review contract and trust assertions against the implementation.\n",
+		path,
+		issue,
+		sha256.Sum256(modelData),
+		strings.Join(ids, ", "),
+	)
 }
 
 func checkRepository(root, base string, c *compiledModel) error {

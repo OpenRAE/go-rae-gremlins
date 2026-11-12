@@ -31,6 +31,7 @@ const appFile = "app/a.go"
 const changeSummary = "change"
 const contractKind = "contract"
 const cliContract = "cli"
+const proposalFile = ".architecture/designs/76.json"
 
 func testModel(t *testing.T) *compiledModel {
 	t.Helper()
@@ -312,7 +313,7 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 		bad                  bool
 	}{
 		{name: "source", base: "HEAD"},
-		{name: "design", proposed: designFile},
+		{name: "design", proposed: proposalFile},
 		{name: "first adoption"},
 		{name: "missing history", base: "unavailable", bad: true},
 		{
@@ -340,14 +341,14 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 		{name: "broken source", edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, "core/a.go", "not Go") }, bad: true},
 		{
 			name:     "invalid design",
-			proposed: designFile,
-			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, designFile, `{"version":2}`) },
+			proposed: proposalFile,
+			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, proposalFile, `{"version":2}`) },
 			bad:      true,
 		},
 		{
 			name:     "malformed design",
-			proposed: designFile,
-			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, designFile, `{`) },
+			proposed: proposalFile,
+			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, proposalFile, `{`) },
 			bad:      true,
 		},
 	} {
@@ -360,7 +361,7 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 			}
 			writeFile(t, root, modelFile, string(data))
 			writeFile(t, root, baselineFile, `{"version":1,"findings":[]}`)
-			writeFile(t, root, designFile, `{
+			writeFile(t, root, proposalFile, `{
   "version": 1,
   "issue": 76,
   "summary": "planned",
@@ -392,7 +393,7 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 				tc.edit(t, root)
 			}
 			t.Chdir(root)
-			if err := run(tc.base, tc.proposed); (err != nil) != tc.bad {
+			if err := run(tc.base, tc.proposed, false); (err != nil) != tc.bad {
 				t.Fatalf("error=%v", err)
 			}
 		})
