@@ -1,18 +1,48 @@
 {
   "version": 1,
-  "issue": 157,
-  "summary": "Make the lint gate fail when the active Go is newer than the Go that built the pinned golangci-lint. With a newer Go, the linter loses type information, and revive skips its type-aware rules without an error. scripts/lint.py reads the linter's build Go and the Go that mise exec gives, and stops on a newer Go. mise.toml pins Go 1.26.11, the go.mod toolchain, so local lint uses the same Go as CI. The CI mise steps, the Makefile, and the guidance install that Go. No Go package, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
-  "changes": [],
-  "contracts": [],
-  "trust_boundaries": "The lint gate keeps its offline analysis environment. mise installs the pinned Go toolchain before analysis, as it installs the pinned linter. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "issue": 110,
+  "summary": "Run coverage without a change to the caller working directory. Coverage.Run no longer calls os.Chdir. It sets exec.Cmd.Dir to the module root for go mod download and go test, and it resolves the coverage profile path to an absolute path before the go command runs. The unleash command resolves a relative module argument to an absolute path when it composes the module. A relative --output path now resolves from the caller working directory, not from the module root. The unleash Output documentation states this. The profile read uses os.OpenInRoot and returns the close error. The lint baseline shrinks because the change fixes the findings in the changed coverage files. Tests prove that coverage and the command keep the caller working directory, with a relative module argument and with an invocation from a package subdirectory. No package import, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "cmd/internal/flags",
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    },
+    {
+      "package": "internal/coverage",
+      "imports": [
+        "internal/configuration",
+        "internal/gomodule",
+        "internal/log"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/gomodule"
+      ]
+    }
+  ],
+  "contracts": [
+    "cli"
+  ],
+  "trust_boundaries": "The change adds no data flow, network access, or source execution. The go command runs in the module root as before, through exec.Cmd.Dir instead of a process-wide directory change. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
   "conflicts": [],
   "policies": [
-    "build",
-    "ci",
-    "contributing",
-    "guidance",
-    "lint_gate",
-    "lint_version"
+    "lint_baseline"
   ],
   "trust_changes": {
     "development_checks": {
@@ -34,5 +64,7 @@
       "execute_source": false
     }
   },
-  "contract_changes": {}
+  "contract_changes": {
+    "cli": "compatible"
+  }
 }
