@@ -1,49 +1,8 @@
 {
   "version": 1,
-  "issue": 109,
-  "summary": "Own cancellation and shutdown for the complete run. cmd/gremlins uses signal.NotifyContext and its stop function, so later signals during the shutdown do not panic. cmd runs the mutation testing synchronously and returns an error when the run is cancelled. internal/coverage runs its commands with the run context. internal/engine stops discovery and submission on the run context, always stops its worker pool, and joins the discovery before it returns. internal/engine/workerpool passes the run context to each executor and makes a blocked submission end on cancellation. No new package import, dependency, CLI flag, configuration key, JSON report field, or exit code value. A cancelled run now reports an error and exits with the existing error code 1.",
+  "issue": 113,
+  "summary": "Map the InvertAssignments remainder-assignment candidate to the documented multiply assignment. The old mapping replaced %= with %=, so the mutant changed nothing. Internal engine tests check the InvertAssignments table against the documented table. They also reject identity mappings in all mutation types. The package keeps its existing imports. No dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
   "changes": [
-    {
-      "package": "cmd",
-      "imports": [
-        "cmd/internal/flags",
-        "internal/configuration",
-        "internal/coverage",
-        "internal/diff",
-        "internal/engine",
-        "internal/engine/workdir",
-        "internal/exclusion",
-        "internal/gomodule",
-        "internal/log",
-        "internal/mutator",
-        "internal/report"
-      ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/mutator"
-      ]
-    },
-    {
-      "package": "cmd/gremlins",
-      "imports": [
-        "cmd",
-        "internal/execution",
-        "internal/log"
-      ],
-      "test_imports": []
-    },
-    {
-      "package": "internal/coverage",
-      "imports": [
-        "internal/configuration",
-        "internal/gomodule",
-        "internal/log"
-      ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/gomodule"
-      ]
-    },
     {
       "package": "internal/engine",
       "imports": [
@@ -58,37 +17,13 @@
         "internal/mutator",
         "internal/report"
       ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/coverage",
-        "internal/diff",
-        "internal/engine/workdir",
-        "internal/engine/workerpool",
-        "internal/gomodule",
-        "internal/mutator",
-        "internal/report"
-      ]
-    },
-    {
-      "package": "internal/engine/workerpool",
-      "imports": [
-        "internal/configuration"
-      ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/mutator"
-      ]
+      "test_imports": []
     }
   ],
-  "contracts": [
-    "cli"
-  ],
-  "trust_boundaries": "The run keeps its existing local process boundary. Coverage and mutant test commands still run go in the module and its temporary copies. Cancellation now stops those commands. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "contracts": [],
+  "trust_boundaries": "The change adds no data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
   "conflicts": [],
-  "policies": [
-    "guidance",
-    "lint_baseline"
-  ],
+  "policies": [],
   "trust_changes": {
     "development_checks": {
       "destinations": [
@@ -109,7 +44,5 @@
       "execute_source": false
     }
   },
-  "contract_changes": {
-    "cli": "compatible"
-  }
+  "contract_changes": {}
 }
