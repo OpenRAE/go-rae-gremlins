@@ -154,52 +154,63 @@ func (*reportStatus) isDryRun() bool {
 	return configuration.Get[bool](configuration.UnleashDryRunKey)
 }
 
-func (r *reportStatus) reportFindings() {
+func (r *reportStatus) reportFindings() error {
 	if r.isDryRun() {
 		r.dryRunReport()
 	} else {
 		r.fullRunReport()
 	}
-	r.fileReport()
+
+	return r.fileReport()
 }
 
-func (r *reportStatus) fileReport() {
-	if output := configuration.Get[string](configuration.UnleashOutputKey); output != "" {
-		files := make([]internal.OutputFile, 0, len(r.files))
-		for fName, mutations := range r.files {
-			of := internal.OutputFile{Filename: fName}
-			of.Mutations = append(of.Mutations, mutations...)
-			files = append(files, of)
-		}
-
-		result := internal.OutputResult{
-			GoModule:          r.module,
-			TestEfficacy:      r.tEfficacy,
-			MutationsCoverage: r.mCovered,
-			MutantsTotal:      r.lived + r.killed + r.notViable,
-			MutantsKilled:     r.killed,
-			MutantsLived:      r.lived,
-			MutantsNotViable:  r.notViable,
-			MutantsNotCovered: r.notCovered,
-			ElapsedTime:       r.elapsed.Duration().Seconds(),
-			MutatorStatistics: r.mutatorStatistics,
-			Files:             files,
-		}
-
-		jsonResult, _ := json.Marshal(result)
-		//nolint:gosec // output path is from configuration, not arbitrary user input
-		f, err := os.Create(output)
-		if err != nil {
-			log.Errorf("impossible to write file: %s\n", err)
-		}
-		defer func(f *os.File) {
-			_ = f.Close()
-		}(f)
-		if _, err := f.Write(jsonResult); err != nil {
-			log.Errorf("impossible to write file: %s\n", err)
-		}
-
+// fileReport writes the JSON report to the configured output path.
+// It returns nil when no output path is configured.
+func (r *reportStatus) fileReport() (err error) {
+	output := configuration.Get[string](configuration.UnleashOutputKey)
+	if output == "" {
+		return nil
 	}
+	files := make([]internal.OutputFile, 0, len(r.files))
+	for fName, mutations := range r.files {
+		of := internal.OutputFile{Filename: fName}
+		of.Mutations = append(of.Mutations, mutations...)
+		files = append(files, of)
+	}
+
+	result := internal.OutputResult{
+		GoModule:          r.module,
+		TestEfficacy:      r.tEfficacy,
+		MutationsCoverage: r.mCovered,
+		MutantsTotal:      r.lived + r.killed + r.notViable,
+		MutantsKilled:     r.killed,
+		MutantsLived:      r.lived,
+		MutantsNotViable:  r.notViable,
+		MutantsNotCovered: r.notCovered,
+		ElapsedTime:       r.elapsed.Duration().Seconds(),
+		MutatorStatistics: r.mutatorStatistics,
+		Files:             files,
+	}
+
+	jsonResult, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("impossible to encode the report: %w", err)
+	}
+	//nolint:gosec // output path is from configuration, not arbitrary user input
+	f, err := os.Create(output)
+	if err != nil {
+		return fmt.Errorf("impossible to create the report file: %w", err)
+	}
+	defer func() {
+		if cErr := f.Close(); cErr != nil && err == nil {
+			err = fmt.Errorf("impossible to close the report file: %w", cErr)
+		}
+	}()
+	if _, err = f.Write(jsonResult); err != nil {
+		return fmt.Errorf("impossible to write the report file: %w", err)
+	}
+
+	return nil
 }
 
 func (r *reportStatus) dryRunReport() {
@@ -250,6 +261,9 @@ func (r *reportStatus) assess(tEfficacy, rCoverage float64) error {
 //
 // An empty Results skips the threshold assessment and always returns nil,
 // since there are no mutants to compute an efficacy or coverage percent from.
+//
+// Do returns an error when the configured JSON output file cannot be
+// created, written, or closed.
 func Do(results Results) error {
 	rep, ok := newReport(results)
 	if !ok {
@@ -257,7 +271,9 @@ func Do(results Results) error {
 
 		return nil
 	}
-	rep.reportFindings()
+	if err := rep.reportFindings(); err != nil {
+		return err
+	}
 	if rep.skipped == len(results.Mutants) {
 		return nil
 	}

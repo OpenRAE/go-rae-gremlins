@@ -307,6 +307,7 @@ gremlins unleash --invert_negatives=false
 
 When set, Gremlins will write the give output file with machine readable results.
 Gremlins resolves a relative path from the current directory.
+If Gremlins cannot create or write the file, the command fails with exit code 1.
 
 ```shell
 gremlins unleash --output=output.json
