@@ -81,12 +81,6 @@
     },
     {
       "linter": "errcheck",
-      "file": "internal/engine/executor_test.go",
-      "fingerprint": "8534c653874908f15dfd05e3dffb0dec6a530ba561fc88ee52572200949eeb16",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
       "file": "internal/engine/stubs_test.go",
       "fingerprint": "265aa6096179c7611f6c22ed2dfa55a860e9f3f0f5c71a8b1b288d4f8782dfa7",
       "count": 1
@@ -113,12 +107,6 @@
       "linter": "errcheck",
       "file": "internal/engine/workdir/workdir_test.go",
       "fingerprint": "66255ac24093378532ff6b512bd9d97fc342d174e1d7b9cbec973cbb34a68a7d",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/workdir/workdir_test.go",
-      "fingerprint": "e81b82a640640d3d4e7fab9fc6a31c56fe637fce2b60a79dccfbb95e748c8b9b",
       "count": 1
     },
     {
@@ -291,32 +279,8 @@
     },
     {
       "linter": "revive",
-      "file": "internal/engine/executor.go",
-      "fingerprint": "7d15ff0a6bda1364ec0489206408125b99c75cc8990232f2650eac498ac122c4",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "internal/engine/executor_test.go",
       "fingerprint": "0533434bad91b03447355e2c5c21c3b15d6f3d6b03fdaf03435b8966ac859ae1",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/workdir/workdir.go",
-      "fingerprint": "38b6a949ba389b754f655a02a8732c4703e1a21e7eaf4199ce8524be33c3cbdb",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/workdir/workdir.go",
-      "fingerprint": "ba31851a85ca4bc83b50dee99414ea567957a1d436d22f72fa5fcc2dfba22380",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/workdir/workdir.go",
-      "fingerprint": "fd55bc79f85870ac0aad0ed69509151cbe8f381e263994e5b46f919cc793ea65",
       "count": 1
     },
     {
