@@ -33,10 +33,12 @@ The separate Sonar job retains its current token boundary.
 Every Go package needs an exact model entry. New packages fail closed until a maintainer reviews their ownership.
 Production imports use explicit allowed internal dependencies. Tests can add separate dependencies and import their own package.
 Design changes use `imports` for production and `test_imports` for tests. Both use the same rules as source scanning.
+
 The scan includes generated Go files, platform files, custom build tags, and tests.
 It excludes `.git`, `vendor`, `testdata`, and build output under `dist`.
 These exclusions are fixed checker policy and require code review to change.
 A nested module outside those exclusions is an error; classify or relocate it before proceeding.
+
 Go's compiler retains responsibility for symbol resolution, package cycles, and `internal` visibility.
 The checker evaluates import paths, including aliases, without resolving symbols.
 Existing lint owns syntax, formatting, security analysis, and code style.
@@ -45,10 +47,12 @@ The model also names the canonical CLI, configuration, report, and exit-code con
 CLI ownership includes mutation-command flags, persistent flags, and shared flag binding.
 Each path must remain a regular file inside the checkout.
 This checks ownership locations. It does not duplicate their contents or prove compatibility.
+
 The model also owns canonical workflow, hook, lint, and design-step paths.
 CI requires explicit design review for changes to those policies.
 A design declares affected contracts and trust-boundary changes for explicit review.
 The model lists allowed contract-change kinds and development-check trust boundaries.
+
 Every affected contract needs a proposed change kind, such as `compatible`.
 Every design declares destinations, network use, and source execution for each modeled trust boundary.
 The evaluator rejects prohibited change kinds, destinations, network use, source execution, and unresolved conflicts.
@@ -59,14 +63,17 @@ Review evaluates prose assertions; the checker does not interpret prose as polic
 Each rule has a stable ID, explanation, and repair instruction.
 A finding identity contains its rule ID, relative file, and import path or other semantic subject.
 Line numbers do not form identity. Repeated identical imports fail parsing or compilation; they cannot buy baseline capacity.
+
 Diagnostics quote data fields to escape control characters.
 Analysis failures and malformed inputs fail the command. They cannot enter the baseline.
 
 The initial baseline is empty. The observed repository has no intended-boundary exception that needs suppression.
 The checker never creates or enlarges a baseline.
 Current findings must equal the candidate baseline identities. Remove stale entries when fixing a violation.
+
 The candidate baseline must be a subset of the baseline at the comparison commit.
 Equal-count replacements fail. Repeated baseline identities fail.
+
 A missing baseline at first adoption means an empty baseline. Missing Git history is an error.
 CI pins the PR base commit, the merge group base commit, or the preceding push commit. Manual runs compare with `origin/dev`.
 An initial branch push with no preceding commit compares with an empty baseline.
@@ -84,6 +91,7 @@ CI requires an updated design for package, contract, and policy changes.
 It verifies coverage of each changed package, canonical contract, and policy.
 CI checks declared relationships with the same compiler used by the source scan.
 CI cannot prove when a developer ran a command. The issue plan records the pre-code evidence.
+
 A new checker cannot execute before it exists. For #76, review the initial model and design manually before implementation.
 Then execute that same design as the bootstrap verification. Future changes use the executable pre-code command.
 

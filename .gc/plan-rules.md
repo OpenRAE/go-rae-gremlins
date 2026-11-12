@@ -5,7 +5,7 @@
 - When a change adds or changes a flag or a configuration key, update `docs/docs/schema/configuration.json` and the
   pages in `docs/docs/usage/` in the same change.
 - Keep the CLI flags, the configuration keys, the JSON report, and the exit codes stable unless the issue asks for a
-  change. autarchy-ai/coldlight and OpenRAE/env-packs depend on them.
+  change. Both autarchy-ai/coldlight and OpenRAE/env-packs depend on them.
 - Take upstream changes only as `docs/adr/0003-upstream-changes.md` describes.
 - Do not edit or reformat files in `testdata` directories unless the change is to the test fixture itself.
 - Before coding, write your design to `.architecture/designs/<issue>.json` and run `make architecture-design`. Each

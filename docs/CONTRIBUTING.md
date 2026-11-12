@@ -59,6 +59,7 @@ Before coding, follow the [architecture design check](development/architecture.m
 `.architecture/designs/<issue>.json` with the proposed packages, dependencies, affected contracts, trust boundaries,
 and unresolved conflicts. Each change uses its own design file, so open pull requests do not conflict on the design
 input. Run `make architecture-design` and record its model digest and result in the issue plan.
+
 Resolve conflicts before implementation. Recheck when the design or model changes. CI requires an updated design
 for package, contract, and policy changes and checks every changed package against it.
 
