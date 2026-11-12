@@ -345,12 +345,6 @@
     },
     {
       "linter": "revive",
-      "file": "internal/engine/workerpool/workerpool.go",
-      "fingerprint": "c75fec7a005458487c365f8407ababe7206a93ed1c51f562a1d214f7b840131b",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "internal/gomodule/gomodule.go",
       "fingerprint": "14402b9caacac2afbef6576c0fd3ba34c2a42f1fda5419e5689507f70379758f",
       "count": 1

@@ -17,12 +17,14 @@
 package engine_test
 
 import (
+	"context"
 	"errors"
 	"go/token"
 	"io"
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/fstest"
 
@@ -148,7 +150,7 @@ type executorStub struct {
 	wg    *sync.WaitGroup
 }
 
-func (j *executorStub) Start(_ *workerpool.Worker) {
+func (j *executorStub) Start(_ context.Context, _ *workerpool.Worker) {
 	j.outCh <- engine.ExecutorResult{Mutant: j.mut, Err: j.err}
 	j.wg.Done()
 }
@@ -226,4 +228,27 @@ func (*mutantStub) OrigSnippet() []byte {
 
 func (*mutantStub) MutatedSnippet() []byte {
 	return nil
+}
+
+// blockingDealerStub creates executors that hold their worker until the run
+// context is done, and then report nothing.
+type blockingDealerStub struct {
+	created atomic.Int32
+}
+
+func (j *blockingDealerStub) NewExecutor(
+	_ mutator.Mutator, _ chan<- engine.ExecutorResult, wg *sync.WaitGroup,
+) workerpool.Executor {
+	j.created.Add(1)
+
+	return &blockingExecutorStub{wg: wg}
+}
+
+type blockingExecutorStub struct {
+	wg *sync.WaitGroup
+}
+
+func (j *blockingExecutorStub) Start(ctx context.Context, _ *workerpool.Worker) {
+	<-ctx.Done()
+	j.wg.Done()
 }

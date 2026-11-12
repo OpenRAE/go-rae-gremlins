@@ -73,7 +73,7 @@ func TestApplyAndRollback(t *testing.T) {
 			close(outCh)
 		}()
 
-		executor.Start(w)
+		executor.Start(context.Background(), w)
 
 		wg.Wait()
 
@@ -85,7 +85,6 @@ func TestApplyAndRollback(t *testing.T) {
 			t.Error("expected rollback to be called")
 		}
 	})
-
 }
 
 type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
@@ -153,7 +152,7 @@ func TestMutatorTestExecution(t *testing.T) {
 				got = (<-outCh).Mutant
 				close(outCh)
 			}()
-			executor.Start(w)
+			executor.Start(context.Background(), w)
 			wg.Wait()
 
 			mutex.RLock()
@@ -230,7 +229,7 @@ func TestFeatureLabel(t *testing.T) {
 		ID:   1,
 	}
 
-	executor.Start(w)
+	executor.Start(context.Background(), w)
 	wg.Wait()
 
 	got := (<-outCh).Mutant
@@ -344,7 +343,7 @@ func runExecutorOnce(
 	wg.Add(1)
 	executor := mjd.NewExecutor(mut, outCh, &wg)
 
-	executor.Start(&workerpool.Worker{Name: testWorkerName, ID: 1})
+	executor.Start(context.Background(), &workerpool.Worker{Name: testWorkerName, ID: 1})
 	wg.Wait()
 
 	select {
@@ -469,7 +468,7 @@ func TestMutatorRun(t *testing.T) {
 				<-outCh
 				close(outCh)
 			}()
-			executor.Start(w)
+			executor.Start(context.Background(), w)
 			wg.Wait()
 
 			wantTimeout := 2*time.Second + expectedTimeout*engine.DefaultTimeoutCoefficient
@@ -558,7 +557,7 @@ func TestCPU(t *testing.T) {
 				<-outCh
 				close(outCh)
 			}()
-			executor.Start(w)
+			executor.Start(context.Background(), w)
 			wg.Wait()
 
 			for _, arg := range holder.args {
@@ -632,7 +631,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 			<-outCh
 			close(outCh)
 		}()
-		executor.Start(w)
+		executor.Start(context.Background(), w)
 		wg.Wait()
 
 		if mut.Workdir() != holder.cmd.Dir {
@@ -678,7 +677,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 			<-outCh
 			close(outCh)
 		}()
-		executor.Start(w)
+		executor.Start(context.Background(), w)
 		wg.Wait()
 
 		if wantRootDir != holder.cmd.Dir {
@@ -745,4 +744,66 @@ func getCmd(ctx context.Context, cs []string) *exec.Cmd {
 	cmd.Env = []string{"GO_TEST_PROCESS=1"}
 
 	return cmd
+}
+
+func TestFeatureExecutorCancellation(t *testing.T) {
+	testCases := []struct {
+		name         string
+		cancelOnExec bool
+		wantApply    bool
+	}{
+		{
+			name:      "cancelled before start does not apply the mutation",
+			wantApply: false,
+		},
+		{
+			name:         "cancelled during the test run rolls back and reports nothing",
+			cancelOnExec: true,
+			wantApply:    true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			viperSet(map[string]any{configuration.UnleashDryRunKey: false})
+			defer viperReset()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if !tc.cancelOnExec {
+				cancel()
+			}
+			cancelingExec := func(c context.Context, name string, args ...string) *exec.Cmd {
+				cancel()
+
+				return fakeExecCommandSuccess(c, name, args...)
+			}
+			wdDealer := newWdDealerStub(t)
+			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(cancelingExec))
+			mut := &mutantStub{
+				status:  mutator.Runnable,
+				mutType: mutator.ConditionalsBoundary,
+				pkg:     expectedModule,
+			}
+			outCh := make(chan engine.ExecutorResult, 1)
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			executor := mjd.NewExecutor(mut, outCh, &wg)
+
+			executor.Start(ctx, &workerpool.Worker{Name: testWorkerName, ID: 1})
+			wg.Wait()
+
+			select {
+			case got := <-outCh:
+				t.Errorf("cancelled executor reported a mutant with status %v, want none", got.Mutant.Status())
+			default:
+			}
+			if mut.applyCalled != tc.wantApply {
+				t.Errorf("apply called = %t, want %t", mut.applyCalled, tc.wantApply)
+			}
+			if mut.rollbackCalled != tc.wantApply {
+				t.Errorf("rollback called = %t, want %t", mut.rollbackCalled, tc.wantApply)
+			}
+		})
+	}
 }

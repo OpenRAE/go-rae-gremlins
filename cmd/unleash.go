@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
@@ -123,21 +122,17 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 		}
 		defer cleanUp(workDir)
 
-		wg := &sync.WaitGroup{}
-		wg.Add(1)
-		cancelled := false
-		var results report.Results
-		go runWithCancel(ctx, wg, func(c context.Context) {
-			results, err = run(c, mod, workDir)
-		}, func() {
-			cancelled = true
+		stopNotice := context.AfterFunc(ctx, func() {
+			log.Infof("\nShutting down gracefully...\n")
 		})
-		wg.Wait()
+		defer stopNotice()
+
+		results, err := run(ctx, mod, workDir)
+		if ctx.Err() != nil {
+			return fmt.Errorf("mutation testing cancelled: %w", context.Cause(ctx))
+		}
 		if err != nil {
 			return err
-		}
-		if cancelled {
-			return nil
 		}
 
 		return report.Do(results)
@@ -163,18 +158,6 @@ func modulePath(args []string) (string, error) {
 	return path, nil
 }
 
-func runWithCancel(ctx context.Context, wg *sync.WaitGroup, runner func(c context.Context), onCancel func()) {
-	c, cancel := context.WithCancel(ctx)
-	go func() {
-		<-ctx.Done()
-		log.Infof("\nShutting down gracefully...\n")
-		cancel()
-		onCancel()
-	}()
-	runner(c)
-	wg.Done()
-}
-
 func cleanUp(wd string) {
 	if err := os.RemoveAll(wd); err != nil {
 		log.Errorf("impossible to remove temporary folder: %s\n\t%s", err, wd)
@@ -194,7 +177,7 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 		return report.Results{}, err
 	}
 
-	cProfile, err := c.Run()
+	cProfile, err := c.Run(ctx)
 	if err != nil {
 		return report.Results{}, fmt.Errorf("failed to gather coverage: %w", err)
 	}

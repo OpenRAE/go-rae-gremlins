@@ -176,21 +176,29 @@ type mutantExecutor struct {
 // The timeout of the test is managed outside the run of the test, using
 // a context with timeout. This is done because the Go test command doesn't
 // make it easy to distinguish failures from timeouts.
-// Start always sends one ExecutorResult. A failure to get the working
-// directory, apply the mutation, run the tests, or restore the source is
-// sent as the result error.
-func (m *mutantExecutor) Start(w *workerpool.Worker) {
+// Start sends one ExecutorResult for the mutant, unless ctx is done. A failure
+// to get the working directory, apply the mutation, run the tests, or restore
+// the source is sent as the result error. When ctx is done, the executor stops
+// its test run, rolls back the mutation, and does not report the mutant.
+func (m *mutantExecutor) Start(ctx context.Context, w *workerpool.Worker) {
 	defer m.wg.Done()
+	if ctx.Err() != nil {
+		return
+	}
 	workerName := fmt.Sprintf("%s-%d", w.Name, w.ID)
-	err := m.execute(workerName)
+	err := m.execute(ctx, workerName)
+	if ctx.Err() != nil {
+		return
+	}
 	m.outCh <- ExecutorResult{Mutant: m.mutant, Err: err}
 }
 
 // execute applies the mutation, runs the tests, and restores the source as
 // one operation. When the apply or the restoration fails, the source in the
 // worker directory is unknown, so execute discards that directory. The next
-// executor of the worker then gets a new copy of the module.
-func (m *mutantExecutor) execute(workerName string) error {
+// executor of the worker then gets a new copy of the module. When ctx is done,
+// execute does not set the mutant status.
+func (m *mutantExecutor) execute(ctx context.Context, workerName string) error {
 	rootDir, err := m.wdDealer.Get(workerName)
 	if err != nil {
 		return fmt.Errorf("get working directory for worker %s: %w", workerName, err)
@@ -207,7 +215,7 @@ func (m *mutantExecutor) execute(workerName string) error {
 		return m.discard(workerName, fmt.Errorf("apply mutation at %s: %w", m.mutant.Position(), err))
 	}
 
-	status, runErr := m.runTests(rootDir, m.mutant.Pkg())
+	status, runErr := m.runTests(ctx, rootDir, m.mutant.Pkg())
 	if runErr != nil {
 		runErr = fmt.Errorf("run tests of mutation at %s: %w", m.mutant.Position(), runErr)
 	}
@@ -222,7 +230,9 @@ func (m *mutantExecutor) execute(workerName string) error {
 		return runErr
 	}
 
-	m.mutant.SetStatus(status)
+	if ctx.Err() == nil {
+		m.mutant.SetStatus(status)
+	}
 
 	return nil
 }
@@ -247,8 +257,8 @@ func (m *mutantExecutor) discard(workerName string, cause error) error {
 // An error not caused by the test run itself (for example a missing `go`
 // executable) is returned as an error rather than folded into a status, so
 // an infrastructure failure is never reported as a passing mutant.
-func (m *mutantExecutor) runTests(rootDir, pkg string) (mutator.Status, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), m.testExecutionTime)
+func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mutator.Status, error) {
+	ctx, cancel := context.WithTimeout(ctx, m.testExecutionTime)
 	defer cancel()
 
 	cmd := m.execContext(ctx, "go", m.getTestArgs(pkg)...)
