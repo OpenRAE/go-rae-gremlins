@@ -18,6 +18,8 @@ package engine
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"go/ast"
 	"go/printer"
 	"go/token"
@@ -104,32 +106,37 @@ func (m *TokenMutator) Pkg() string {
 // stores the original file in the TokenMutator in order to allow
 // Rollback to put it back later.
 //
-// Apply also puts back the original Token after the mutated file write.
-// This is done in order to facilitate the atomicity of the operation,
-// avoiding locking in a method and unlocking in another.
+// The AST is shared among mutants, so Apply puts back the original token on
+// every path before it returns. This also avoids locking in a method and
+// unlocking in another. When the mutated file cannot be written, Apply writes
+// back the original file and returns the error, joined with any restoration
+// error.
 func (m *TokenMutator) Apply() error {
-	fileLock(m.Position().Filename).Lock()
-	defer fileLock(m.Position().Filename).Unlock()
+	lock := fileLock(m.Position().Filename)
+	lock.Lock()
+	defer lock.Unlock()
 
 	filename := filepath.Join(m.workDir, m.Position().Filename)
-	var err error
 	//nolint:gosec // filename is internally constructed, not user input
-	m.origFile, err = os.ReadFile(filename)
+	origFile, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
-
+	m.origFile = origFile
 	m.origSnippet = extractSnippet(m.origFile, m.Position().Line, 3)
 
 	m.actualToken = m.tokenNode.Tok()
-	m.tokenNode.SetTok(tokenMutations[m.Type()][m.tokenNode.Tok()])
+	m.tokenNode.SetTok(tokenMutations[m.Type()][m.actualToken])
+	defer m.tokenNode.SetTok(m.actualToken)
 
 	if err = m.writeMutatedFile(filename); err != nil {
+		defer m.resetOrigFile()
+		if restoreErr := os.WriteFile(filename, m.origFile, 0o600); restoreErr != nil {
+			return errors.Join(err, fmt.Errorf("restore %s: %w", filename, restoreErr))
+		}
+
 		return err
 	}
-
-	// Rollback here to facilitate the atomicity of the operation.
-	m.tokenNode.SetTok(m.actualToken)
 
 	return nil
 }

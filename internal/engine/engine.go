@@ -99,29 +99,38 @@ func WithDirFs(dirFS fs.FS) Option {
 //
 // It walks the fs.FS provided and checks every .go file which is not a test.
 // For each file it will scan for tokenMutations and gather all the mutants found.
-// A walk, open, or parse failure stops the discovery. Run then returns the
-// error with the partial results, which the caller must not report as success.
-// When ctx is done, Run stops the discovery and the pending tests. Run
-// returns only after the discovery and the workers it started have exited.
+// A walk, open, or parse failure stops the discovery. When an executor fails,
+// Run stops the discovery and schedules no new mutants. Run then returns the
+// joined errors with the partial results, which the caller must not report as
+// success. The results do not contain the failed mutants.
+// When ctx is done, Run stops the discovery and the pending tests. Run returns
+// only after the discovery and the workers it started have exited.
 func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
+	runCtx, stop := context.WithCancel(ctx)
+	defer stop()
+
 	mu.mutantStream = make(chan mutator.Mutator)
 	discoverErr := make(chan error, 1)
 	go func() {
 		defer close(mu.mutantStream)
-		discoverErr <- mu.discover(ctx)
+		discoverErr <- mu.discover(runCtx)
 	}()
 
 	start := time.Now()
-	res := mu.executeTests(ctx)
+	res, execErr := mu.executeTests(runCtx, stop)
 	err := <-discoverErr
 	res.Elapsed = time.Since(start)
 	res.Module = mu.module.Name
 
+	var errs []error
 	if err != nil {
-		return res, fmt.Errorf("discovering mutants: %w", err)
+		errs = append(errs, fmt.Errorf("discovering mutants: %w", err))
+	}
+	if execErr != nil {
+		errs = append(errs, execErr)
 	}
 
-	return res, nil
+	return res, errors.Join(errs...)
 }
 
 // discover walks the module file system and sends the mutants of each Go
@@ -270,13 +279,16 @@ func (mu *Engine) mutationStatus(pos token.Position, covered bool) mutator.Statu
 
 // executeTests runs an executor for each mutant of the stream on a worker
 // pool. It stops the pool when the stream ends or ctx is done, and returns
-// after all the started executors have reported.
-func (mu *Engine) executeTests(ctx context.Context) report.Results {
+// after all the started executors have reported. When an executor fails,
+// executeTests calls stop, so the discovery ends and no new mutant is
+// scheduled. It returns the joined executor errors.
+func (mu *Engine) executeTests(ctx context.Context, stop context.CancelFunc) (report.Results, error) {
 	pool := workerpool.Initialize("mutator")
 	pool.Start(ctx)
 
 	var mutants []mutator.Mutator
-	outCh := make(chan mutator.Mutator)
+	var errs []error
+	outCh := make(chan ExecutorResult)
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -290,17 +302,27 @@ func (mu *Engine) executeTests(ctx context.Context) report.Results {
 		close(outCh)
 	}()
 
-	for m := range outCh {
-		mu.logger.Mutant(m)
-		mutants = append(mutants, m)
+	for r := range outCh {
+		if r.Err != nil {
+			errs = append(errs, r.Err)
+			stop()
+
+			continue
+		}
+		mu.logger.Mutant(r.Mutant)
+		mutants = append(mutants, r.Mutant)
 	}
 
-	return results(mutants)
+	if len(errs) > 0 {
+		return results(mutants), fmt.Errorf("mutation testing failed: %w", errors.Join(errs...))
+	}
+
+	return results(mutants), nil
 }
 
 // submit adds an executor to the pool for each mutant of the stream, until
 // the stream ends or ctx is done.
-func (mu *Engine) submit(ctx context.Context, pool *workerpool.Pool, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) {
+func (mu *Engine) submit(ctx context.Context, pool *workerpool.Pool, outCh chan<- ExecutorResult, wg *sync.WaitGroup) {
 	for {
 		var mut mutator.Mutator
 		select {
