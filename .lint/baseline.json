@@ -111,24 +111,6 @@
     },
     {
       "linter": "errcheck",
-      "file": "internal/gomodule/gomodule.go",
-      "fingerprint": "7c3b9d17a7d16a609aa9bdca90bd76c05c559013bd3671d6b262ceddd6aebc5c",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/gomodule/gomodule.go",
-      "fingerprint": "92e202bd7244225a30e5062b458736e2b2189ae2467660bfb51b9ba4d46212df",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/gomodule/gomodule_test.go",
-      "fingerprint": "fd791ae2fec45080e45f483cf314235b9f660fde14958bff86ebf97815872c2e",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
       "file": "internal/log/log.go",
       "fingerprint": "3300c24483c060dc3890ed3fdae373ebaed522f4bfcefc2bf4d22fc8fa02b50a",
       "count": 1
@@ -317,30 +299,6 @@
       "linter": "revive",
       "file": "internal/engine/workerpool/workerpool.go",
       "fingerprint": "1a2d971773b7c16a8cc1926f3c71f477f3eaa20c6f89fbc3f6aae215af660291",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/gomodule/gomodule.go",
-      "fingerprint": "14402b9caacac2afbef6576c0fd3ba34c2a42f1fda5419e5689507f70379758f",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/gomodule/gomodule_test.go",
-      "fingerprint": "3cd22cf3927ff879a2a121830bf1c2d7b3d615b355dd2a3eeebb1285e8470854",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/gomodule/gomodule_test.go",
-      "fingerprint": "b42b81be243ffe4e8fc3a007d187dec098e04d7e394fd15b84c3921be93e6f67",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/gomodule/gomodule_test.go",
-      "fingerprint": "d8b754d5a20eaa75ad45a6387f219cfc22d958a3872b6c95bdaccbc83e0ce0c7",
       "count": 1
     },
     {
