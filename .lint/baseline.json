@@ -190,20 +190,8 @@
     {
       "linter": "errcheck",
       "file": "internal/report/report_test.go",
-      "fingerprint": "859e0ac13723e14dd30c85919051c82427eaa16a8f0c9d5e0e133c4a5f09487e",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/report/report_test.go",
       "fingerprint": "b296f73b507db632f792eb605bbd5727ae18fee02f7d854d25f37ae768e63517",
       "count": 2
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/report/report_test.go",
-      "fingerprint": "bff0d9a2a1c4c5ccbc02f14bfaf6550c5fbf3790b7e813895920c6bb54a26a9e",
-      "count": 1
     },
     {
       "linter": "errcheck",

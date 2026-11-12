@@ -507,8 +507,8 @@ func TestMutantLog(t *testing.T) {
 	}
 }
 
-func TestReportToFile(t *testing.T) {
-	outFile := "findings.json"
+// reportToFileResults returns the results that testdata/normal_output.json describes.
+func reportToFileResults() report.Results {
 	mutants := []mutator.Mutator{
 		stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: newPosition("file1.go", 3, 10)},
 		stubMutant{status: mutator.Lived, mutantType: mutator.ArithmeticBase, position: newPosition("file1.go", 8, 20)},
@@ -523,14 +523,25 @@ func TestReportToFile(t *testing.T) {
 		stubMutant{status: mutator.NotViable, mutantType: mutator.InvertNegatives, position: newPosition("file3.go", 4, 200)},
 		stubMutant{status: mutator.Killed, mutantType: mutator.RemoveSelfAssignments, position: newPosition("file3.go", 4, 100)},
 	}
-	data := report.Results{
+
+	return report.Results{
 		Module:  "example.com/go/module",
 		Mutants: mutants,
 		Elapsed: (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 	}
-	f, _ := os.ReadFile("testdata/normal_output.json")
+}
+
+func TestReportToFile(t *testing.T) {
+	outFile := "findings.json"
+	data := reportToFileResults()
+	f, err := os.ReadFile("testdata/normal_output.json")
+	if err != nil {
+		t.Fatalf("os.ReadFile error = %v", err)
+	}
 	want := internal.OutputResult{}
-	_ = json.Unmarshal(f, &want)
+	if err := json.Unmarshal(f, &want); err != nil {
+		t.Fatalf("json.Unmarshal error = %v", err)
+	}
 
 	t.Run("it writes on file when output is set", func(t *testing.T) {
 		outDir := t.TempDir()
@@ -573,49 +584,51 @@ func TestReportToFile(t *testing.T) {
 			t.Error("expected file not found")
 		}
 	})
+}
 
-	t.Run("it returns an error when the file cannot be created", func(t *testing.T) {
-		testCases := []struct {
-			outDir func(t *testing.T) string
-			name   string
-		}{
-			{
-				name: "missing parent directory",
-				outDir: func(t *testing.T) string {
-					t.Helper()
+func TestRegressionReportToFileReturnsCreateErrors(t *testing.T) {
+	outFile := "findings.json"
+	data := reportToFileResults()
+	testCases := []struct {
+		outDir func(t *testing.T) string
+		name   string
+	}{
+		{
+			name: "missing parent directory",
+			outDir: func(t *testing.T) string {
+				t.Helper()
 
-					return filepath.Join(t.TempDir(), "missing-parent")
-				},
+				return filepath.Join(t.TempDir(), "missing-parent")
 			},
-			{
-				name: "directory not writeable",
-				outDir: func(t *testing.T) string {
-					t.Helper()
-					outDir, cl := notWriteableDir(t)
-					t.Cleanup(cl)
+		},
+		{
+			name: "directory not writeable",
+			outDir: func(t *testing.T) string {
+				t.Helper()
+				outDir, cl := notWriteableDir(t)
+				t.Cleanup(cl)
 
-					return outDir
-				},
+				return outDir
 			},
-		}
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				output := filepath.Join(tc.outDir(t), outFile)
-				viper.Set(configuration.UnleashOutputKey, output)
-				defer viper.Reset()
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			output := filepath.Join(tc.outDir(t), outFile)
+			viper.Set(configuration.UnleashOutputKey, output)
+			defer viper.Reset()
 
-				err := report.Do(data)
-				if err == nil || !strings.Contains(err.Error(), output) {
-					t.Errorf("report.Do error = %v, want an error that names %q", err, output)
-				}
+			err := report.Do(data)
+			if err == nil || !strings.Contains(err.Error(), output) {
+				t.Errorf("report.Do error = %v, want an error that names %q", err, output)
+			}
 
-				//nolint:gosec // test code reading test output
-				if _, err := os.ReadFile(output); err == nil {
-					t.Errorf("report file %q exists, want no file", output)
-				}
-			})
-		}
-	})
+			//nolint:gosec // test code reading test output
+			if _, err := os.ReadFile(output); err == nil {
+				t.Errorf("report file %q exists, want no file", output)
+			}
+		})
+	}
 }
 
 func notWriteableDir(t *testing.T) (string, func()) {

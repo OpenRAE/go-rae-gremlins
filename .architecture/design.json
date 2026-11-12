@@ -1,7 +1,7 @@
 {
   "version": 1,
   "issue": 111,
-  "summary": "Return errors when the requested JSON report cannot be written. fileReport, reportFindings, and report.Do now return encode, create, write, and close errors instead of only logging create and write failures. cmd/unleash.go already returns the report.Do error, so the command fails with exit code 1 through the existing error path. Report tests cover a missing parent directory and an unwritable directory, and the existing test checks the successful output fields. A command regression test runs unleash with a missing-parent output path and expects the error. The lint baseline shrinks because the change fixes two report errcheck findings and one report test finding. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
+  "summary": "Return errors when the requested JSON report cannot be written. fileReport, reportFindings, and report.Do now return encode, create, write, and close errors instead of only logging create and write failures. cmd/unleash.go already returns the report.Do error, so the command fails with exit code 1 through the existing error path. Report tests cover a missing parent directory and an unwritable directory, and the existing test checks the successful output fields. A command regression test runs unleash with a missing-parent output path and expects the error. The lint baseline shrinks because the change fixes two report errcheck findings and three report test findings. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
   "changes": [
     {
       "package": "cmd",
