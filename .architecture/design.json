@@ -1,54 +1,16 @@
 {
   "version": 1,
-  "issue": 111,
-  "summary": "Return errors when the requested JSON report cannot be written. fileReport, reportFindings, and report.Do now return encode, create, write, and close errors instead of only logging create and write failures. cmd/unleash.go already returns the report.Do error, so the command fails with exit code 1 through the existing error path. Report tests cover a missing parent directory and an unwritable directory, and the existing test checks the successful output fields. A command regression test runs unleash with a missing-parent output path and expects the error. The lint baseline shrinks because the change fixes two report errcheck findings and three report test findings. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
-  "changes": [
-    {
-      "package": "cmd",
-      "imports": [
-        "cmd/internal/flags",
-        "internal/configuration",
-        "internal/coverage",
-        "internal/diff",
-        "internal/engine",
-        "internal/engine/workdir",
-        "internal/exclusion",
-        "internal/gomodule",
-        "internal/log",
-        "internal/mutator",
-        "internal/report"
-      ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/mutator"
-      ]
-    },
-    {
-      "package": "internal/report",
-      "imports": [
-        "internal/configuration",
-        "internal/execution",
-        "internal/log",
-        "internal/mutator",
-        "internal/report/internal"
-      ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/execution",
-        "internal/log",
-        "internal/mutator",
-        "internal/report",
-        "internal/report/internal"
-      ]
-    }
-  ],
-  "contracts": [
-    "cli"
-  ],
-  "trust_boundaries": "The JSON report crosses out of the process at the file system boundary. The change makes a failed report write visible to the caller instead of a silent success. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "issue": 145,
+  "summary": "Use the doc-tools v0.1.0 release for documentation checks. scripts/doc-tools.sh pins the release version and archive SHA-256, verifies the archive before extraction, and installs it in the ignored .tools directory. The script runs the package ste-lint.sh wrapper on explicit Markdown paths. New Makefile targets install the package, check explicit paths, and check Markdown that changed since a base commit. A new CI Docs job runs the changed-Markdown check and proves that a bad prose sample fails and its corrected form passes. PR Gate requires the Docs job. The contributor guide, CLAUDE.md, and AGENTS.md describe the setup, the checks, and the shared documentation skill. No Go package, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The STE check reads local Markdown files and writes findings to the terminal or the existing CI log. It sends no file content to a network destination and does not execute scanned source. Tool provisioning downloads two pinned archives from GitHub releases: the doc-tools archive and the ste-cli archive. Each archive must match a pinned SHA-256 before extraction, and a mismatch stops the check. This is the same provisioning class as the existing pinned mise, pre-commit, and go run tool downloads. The CI job uses pinned actions, contents read, no secrets, and checkout without persisted credentials.",
   "conflicts": [],
   "policies": [
-    "lint_baseline"
+    "build",
+    "ci",
+    "contributing",
+    "guidance"
   ],
   "trust_changes": {
     "development_checks": {
@@ -70,7 +32,5 @@
       "execute_source": false
     }
   },
-  "contract_changes": {
-    "cli": "compatible"
-  }
+  "contract_changes": {}
 }

@@ -42,6 +42,19 @@ make goimports
 make fieldalignment
 ```
 
+### Documentation Checks
+
+```bash
+# Check explicit Markdown paths with the pinned doc-tools release
+bash scripts/doc-tools.sh lint docs/CONTRIBUTING.md
+
+# Check the Markdown that changed since the merge base with origin/dev
+make docs-changed
+```
+
+Use the shared `documentation` skill of doc-tools v0.1.0. See
+[Documentation](docs/CONTRIBUTING.md#documentation) for setup.
+
 ### Running Gremlins
 
 ```bash
@@ -98,8 +111,8 @@ make clean
 **Coverage (`internal/coverage/`)**
 
 - Determines which mutations are covered by tests
-- Only covered mutations are tested (uncovered mutations can't be
-  caught)
+- Only covered mutations are tested (tests cannot catch uncovered
+  mutations)
 
 **Executor (`internal/engine/executor.go`)**
 
