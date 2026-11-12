@@ -16,7 +16,8 @@ BASELINE = ".lint/baseline.json"
 GO_MOD = "go.mod"
 LINT_CONFIG = ".golangci.yml"
 LIMIT = 32 * 1024 * 1024
-LINTER = ["mise", "exec", "--", "golangci-lint"]
+MISE_EXEC = ["mise", "exec", "--"]
+LINTER = MISE_EXEC + ["golangci-lint"]
 CONTEXTS = ("linux", "darwin", "windows")
 CONTEXT_TOOL = "tools/lintcontext"
 REPOSITORY = Path(__file__).resolve().parent.parent
@@ -230,10 +231,30 @@ def check_source_file(root, directory, name):
             raise LintError("unexpected nested module outside fixture/vendor/output paths")
 
 
+def go_version(text):
+    match = re.fullmatch(r"go(\d+)\.(\d+)(?:\.(\d+))?", text.strip())
+    if match is None:
+        raise LintError(f"unrecognized Go version {text.strip()!r}")
+    return tuple(int(part or 0) for part in match.groups())
+
+
+def check_toolchain(root, env):
+    # The linter loses type information for a newer Go, and revive then skips its type-aware rules silently.
+    linter = decode(command(root, LINTER + ["version", "--json"], env))
+    built = linter.get("goVersion") if isinstance(linter, dict) else None
+    if not isinstance(built, str):
+        raise LintError("golangci-lint version output has no goVersion")
+    active = command(root, MISE_EXEC + ["go", "env", "GOVERSION"], env).decode()
+    if go_version(active) > go_version(built):
+        raise LintError(f"Go {active.strip()} is newer than {built}, which built golangci-lint; "
+                        "type-aware checks cannot run. Use the Go version that mise.toml pins")
+
+
 def analyze(root, diagnostics=None):
     env = analysis_env()
     validate_checkout(root)
     local_file(root, LINT_CONFIG)
+    check_toolchain(root, env)
     command(root, LINTER + ["config", "verify", "--config", LINT_CONFIG], env)
     # go mod edit reads module metadata without downloading or executing modules.
     module = decode(command(root, ["go", "mod", "edit", "-json"], env))

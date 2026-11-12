@@ -128,10 +128,10 @@ Unlisted default settings of retained linters stay unchanged.
 
 ## Working with lint debt
 
-Provision the pinned tool and Go modules separately before analysis:
+Provision the pinned tools and Go modules separately before analysis:
 
 ```shell
-mise install aqua:golangci/golangci-lint
+mise install
 go mod download
 make lint LINT_BASE=origin/dev
 ```
