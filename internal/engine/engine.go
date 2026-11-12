@@ -100,43 +100,57 @@ func WithDirFs(dirFS fs.FS) Option {
 //
 // It walks the fs.FS provided and checks every .go file which is not a test.
 // For each file it will scan for tokenMutations and gather all the mutants found.
+// When ctx is done, Run stops the discovery and the pending tests. Run
+// returns only after the discovery and the workers it started have exited.
 func (mu *Engine) Run(ctx context.Context) report.Results {
 	mu.mutantStream = make(chan mutator.Mutator)
+	discovered := make(chan struct{})
 	go func() {
+		defer close(discovered)
 		defer close(mu.mutantStream)
-		walkErr := fs.WalkDir(mu.fs, ".", func(walkPath string, d fs.DirEntry, err error) error {
-			if err != nil {
-				log.Errorf("skipping %s: %v\n", walkPath, err)
-
-				return nil
-			}
-			if d.IsDir() {
-				if walkPath != "." && mu.skipDir(walkPath, d.Name()) {
-					return fs.SkipDir
-				}
-
-				return nil
-			}
-
-			isGoCode := filepath.Ext(walkPath) == ".go" && !strings.HasSuffix(walkPath, "_test.go")
-
-			if isGoCode && !mu.codeData.Exclusion.IsFileExcluded(walkPath) {
-				mu.runOnFile(walkPath)
-			}
-
-			return nil
-		})
-		if walkErr != nil {
-			log.Errorf("walking module tree: %v\n", walkErr)
-		}
+		mu.discover(ctx)
 	}()
 
 	start := time.Now()
 	res := mu.executeTests(ctx)
+	<-discovered
 	res.Elapsed = time.Since(start)
 	res.Module = mu.module.Name
 
 	return res
+}
+
+// discover walks the module and sends the mutants it finds to the mutant
+// stream. It stops when ctx is done.
+func (mu *Engine) discover(ctx context.Context) {
+	walkErr := fs.WalkDir(mu.fs, ".", func(walkPath string, d fs.DirEntry, err error) error {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		if err != nil {
+			log.Errorf("skipping %s: %v\n", walkPath, err)
+
+			return nil
+		}
+		if d.IsDir() {
+			if walkPath != "." && mu.skipDir(walkPath, d.Name()) {
+				return fs.SkipDir
+			}
+
+			return nil
+		}
+
+		isGoCode := filepath.Ext(walkPath) == ".go" && !strings.HasSuffix(walkPath, "_test.go")
+
+		if isGoCode && !mu.codeData.Exclusion.IsFileExcluded(walkPath) {
+			mu.runOnFile(ctx, walkPath)
+		}
+
+		return nil
+	})
+	if walkErr != nil && ctx.Err() == nil {
+		log.Errorf("walking module tree: %v\n", walkErr)
+	}
 }
 
 // skipDir reports whether dirPath is a testdata tree, a vendor tree, or the
@@ -152,7 +166,7 @@ func (mu *Engine) skipDir(dirPath, name string) bool {
 	return err == nil
 }
 
-func (mu *Engine) runOnFile(fileName string) {
+func (mu *Engine) runOnFile(ctx context.Context, fileName string) {
 	set := token.NewFileSet()
 	file, err := mu.parseFile(set, fileName)
 	if err != nil {
@@ -167,9 +181,8 @@ func (mu *Engine) runOnFile(fileName string) {
 		if !ok {
 			return true
 		}
-		mu.findMutations(fileName, set, file, n, cov)
 
-		return true
+		return mu.findMutations(ctx, fileName, set, file, n, cov)
 	})
 }
 
@@ -190,12 +203,14 @@ func (mu *Engine) parseFile(set *token.FileSet, fileName string) (*ast.File, err
 	return file, nil
 }
 
+// findMutations sends the mutants of node to the mutant stream. It returns
+// false when ctx is done before a mutant is sent.
 func (mu *Engine) findMutations(
-	fileName string, set *token.FileSet, file *ast.File, node *NodeToken, cov fileCoverage,
-) {
+	ctx context.Context, fileName string, set *token.FileSet, file *ast.File, node *NodeToken, cov fileCoverage,
+) bool {
 	mutantTypes, ok := TokenMutantType[node.Tok()]
 	if !ok {
-		return
+		return true
 	}
 
 	pkg := mu.pkgName(fileName)
@@ -208,8 +223,14 @@ func (mu *Engine) findMutations(
 		tm.SetType(mutantType)
 		tm.SetStatus(mu.mutationStatus(set.Position(node.TokPos), cov.isCovered(node.TokPos)))
 
-		mu.mutantStream <- tm
+		select {
+		case mu.mutantStream <- tm:
+		case <-ctx.Done():
+			return false
+		}
 	}
+
+	return true
 }
 
 // pkgName returns the import path of the package that fileName belongs to.
@@ -240,9 +261,12 @@ func (mu *Engine) mutationStatus(pos token.Position, covered bool) mutator.Statu
 	return status
 }
 
+// executeTests runs an executor for each mutant of the stream on a worker
+// pool. It stops the pool when the stream ends or ctx is done, and returns
+// after all the started executors have reported.
 func (mu *Engine) executeTests(ctx context.Context) report.Results {
 	pool := workerpool.Initialize("mutator")
-	pool.Start()
+	pool.Start(ctx)
 
 	var mutants []mutator.Mutator
 	outCh := make(chan mutator.Mutator)
@@ -250,16 +274,8 @@ func (mu *Engine) executeTests(ctx context.Context) report.Results {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for mut := range mu.mutantStream {
-			ok := checkDone(ctx)
-			if !ok {
-				pool.Stop()
-
-				break
-			}
-			wg.Add(1)
-			pool.AppendExecutor(mu.jDealer.NewExecutor(mut, outCh, wg))
-		}
+		defer pool.Stop()
+		mu.submit(ctx, pool, outCh, wg)
 	}()
 
 	go func() {
@@ -275,12 +291,26 @@ func (mu *Engine) executeTests(ctx context.Context) report.Results {
 	return results(mutants)
 }
 
-func checkDone(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	default:
-		return true
+// submit adds an executor to the pool for each mutant of the stream, until
+// the stream ends or ctx is done.
+func (mu *Engine) submit(ctx context.Context, pool *workerpool.Pool, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) {
+	for {
+		var mut mutator.Mutator
+		select {
+		case <-ctx.Done():
+			return
+		case m, ok := <-mu.mutantStream:
+			if !ok {
+				return
+			}
+			mut = m
+		}
+		wg.Add(1)
+		if !pool.AppendExecutor(ctx, mu.jDealer.NewExecutor(mut, outCh, wg)) {
+			wg.Done()
+
+			return
+		}
 	}
 }
 

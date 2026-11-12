@@ -17,7 +17,10 @@
 package coverage_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"strings"
@@ -96,7 +99,11 @@ func TestCoverageRun(t *testing.T) {
 			}
 			cov := coverage.NewWithCmd(fakeExecCommandSuccess(holder), wantWorkdir, mod)
 
-			_, _ = cov.Run()
+			// The fake commands write no profile, so Run ends with an error
+			// after it runs both commands.
+			if _, err := cov.Run(context.Background()); !errors.Is(err, fs.ErrNotExist) {
+				t.Errorf("Run error = %v, want %v", err, fs.ErrNotExist)
+			}
 
 			firstWant := "go mod download"
 			secondWant := fmt.Sprintf("go test -tags tag1 tag2 -coverpkg %s -cover -coverprofile %v %s",
@@ -121,28 +128,52 @@ func TestCoverageRun(t *testing.T) {
 func TestCoverageRunFails(t *testing.T) {
 	mod := gomodule.GoModule{
 		Name:       exampleModule,
+		Root:       ".",
 		CallingDir: allPackages,
 	}
 
 	t.Run("failure of: go mod download", func(t *testing.T) {
 		cov := coverage.NewWithCmd(fakeExecCommandFailure(0), "workdir", mod)
-		if _, err := cov.Run(); err == nil {
+		if _, err := cov.Run(context.Background()); err == nil {
 			t.Error("expected run to report an error")
 		}
 	})
 
 	t.Run("failure of: go test", func(t *testing.T) {
 		cov := coverage.NewWithCmd(fakeExecCommandFailure(1), "workdir", mod)
-		if _, err := cov.Run(); err == nil {
+		if _, err := cov.Run(context.Background()); err == nil {
 			t.Error("expected run to report an error")
 		}
 	})
+}
+
+func TestCoverageRunStopsOnCancel(t *testing.T) {
+	t.Chdir(t.TempDir())
+	mod := gomodule.GoModule{
+		Name:       exampleModule,
+		Root:       ".",
+		CallingDir: ".",
+	}
+	holder := &commandHolder{}
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(holder), "workdir", mod)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := cov.Run(ctx)
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("Run(cancelled context) error = %v, want %v", err, context.Canceled)
+	}
+	if len(holder.events) != 1 {
+		t.Errorf("Run(cancelled context) built %d commands, want 1", len(holder.events))
+	}
 }
 
 func TestCoverageParsesOutput(t *testing.T) {
 	module := exampleModule
 	mod := gomodule.GoModule{
 		Name:       module,
+		Root:       ".",
 		CallingDir: "path",
 	}
 	cov := coverage.NewWithCmd(fakeExecCommandSuccess(nil), "testdata/valid", mod)
@@ -186,7 +217,7 @@ func TestCoverageParsesOutput(t *testing.T) {
 		Profile: profile,
 	}
 
-	got, err := cov.Run()
+	got, err := cov.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,12 +233,13 @@ func TestCoverageParsesOutput(t *testing.T) {
 func TestParseOutputFail(t *testing.T) {
 	mod := gomodule.GoModule{
 		Name:       exampleModule,
+		Root:       ".",
 		CallingDir: allPackages,
 	}
 	cov := coverage.NewWithCmd(fakeExecCommandSuccess(nil), "testdata/invalid", mod)
 
-	if _, err := cov.Run(); err == nil {
-		t.Errorf("espected an error")
+	if _, err := cov.Run(context.Background()); err == nil {
+		t.Error("expected an error")
 	}
 }
 
@@ -225,10 +257,10 @@ func TestCoverageProcessFailure(_ *testing.T) {
 	os.Exit(1) // skipcq: RVV-A0003
 }
 
-type execContext = func(name string, args ...string) *exec.Cmd
+type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 func fakeExecCommandSuccess(got *commandHolder) execContext {
-	return func(command string, args ...string) *exec.Cmd {
+	return func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if got != nil {
 			got.events = append(got.events, struct {
 				command string
@@ -238,7 +270,7 @@ func fakeExecCommandSuccess(got *commandHolder) execContext {
 		cs := []string{"-test.run=TestCoverageProcessSuccess", "--", command}
 		cs = append(cs, args...)
 		// #nosec G204 G702 - We are in tests, we don't care
-		cmd := exec.Command(os.Args[0], cs...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_TEST_PROCESS=1"}
 
 		return cmd
@@ -248,14 +280,14 @@ func fakeExecCommandSuccess(got *commandHolder) execContext {
 func fakeExecCommandFailure(run int) execContext {
 	var executed int
 
-	return func(command string, args ...string) *exec.Cmd {
+	return func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestCoverageProcessSuccess", "--", command}
 		if executed == run {
 			cs = []string{"-test.run=TestCoverageProcessFailure", "--", command}
 		}
 		cs = append(cs, args...)
 		// #nosec G204 G702 - We are in tests, we don't care
-		cmd := exec.Command(os.Args[0], cs...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_TEST_PROCESS=1"}
 		executed++
 

@@ -23,6 +23,7 @@ import (
 	"os"
 	"testing"
 	"testing/fstest"
+	"testing/synctest"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 	"github.com/OpenRAE/go-rae-gremlins/internal/coverage"
@@ -30,6 +31,7 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/report"
 )
 
 const (
@@ -721,19 +723,71 @@ func TestSkipNotDiffMutants(t *testing.T) {
 	}
 }
 
+// lifecycleFS is a module file with eight mutants: each comparison has a
+// conditionals-boundary and a conditionals-negation mutant.
+var lifecycleFS = fstest.MapFS{
+	"lifecycle.go": {Data: []byte("package lifecycle\n\nfunc f(a, b int) (bool, bool, bool, bool) { return a > b, a < b, a >= b, a <= b }\n")},
+}
+
+// The synctest bubbles below fail if Run leaves a goroutine of the engine,
+// the discovery, or the worker pool blocked after it returns.
+
+func TestEngineRunReleasesWorkersOnCompletion(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		viperSet(map[string]any{configuration.UnleashWorkersKey: 2})
+		defer viperReset()
+		mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+		mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(lifecycleFS))
+
+		res := mut.Run(context.Background())
+
+		if got, want := len(res.Mutants), 8; got != want {
+			t.Errorf("Run reported %d mutants, want %d", got, want)
+		}
+	})
+}
+
 func TestStopsOnCancel(t *testing.T) {
-	mapFS, mod, c := loadFixture(defaultFixture, ".")
-	defer c()
+	synctest.Test(t, func(t *testing.T) {
+		mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+		mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(lifecycleFS))
 
-	mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		res := mut.Run(ctx)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	res := mut.Run(ctx)
+		if len(res.Mutants) > 0 {
+			t.Errorf("expected to receive no mutants, got %d", len(res.Mutants))
+		}
+	})
+}
 
-	if len(res.Mutants) > 0 {
-		t.Errorf("expected to receive no mutants, got %d", len(res.Mutants))
-	}
+func TestEngineRunCancelReleasesBlockedSubmission(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		viperSet(map[string]any{configuration.UnleashWorkersKey: 1})
+		defer viperReset()
+		mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+		dealer := &blockingDealerStub{}
+		mut := engine.New(mod, engine.CodeData{}, dealer, engine.WithDirFs(lifecycleFS))
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		done := make(chan report.Results, 1)
+		go func() { done <- mut.Run(ctx) }()
+		synctest.Wait()
+
+		// The worker holds the first executor and the queue holds the second,
+		// so the third submission and the discovery are blocked.
+		if got, want := dealer.created.Load(), int32(3); got != want {
+			t.Fatalf("executors created before cancellation = %d, want %d", got, want)
+		}
+		cancel()
+		res := <-done
+
+		if len(res.Mutants) > 0 {
+			t.Errorf("Run after cancellation reported %d mutants, want 0", len(res.Mutants))
+		}
+	})
 }
 
 func TestPackageDiscovery(t *testing.T) {

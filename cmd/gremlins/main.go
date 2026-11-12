@@ -46,7 +46,8 @@ func main() {
 		os.Exit(exitCode)
 	}()
 	log.Init(color.Output, color.Error)
-	ctx := ctxDoneOnSignal()
+	ctx, stop := signalContext()
+	defer stop()
 	err := cmd.Execute(ctx, buildVersion(version))
 	if err != nil {
 		log.Errorln(err)
@@ -57,17 +58,11 @@ func main() {
 	}
 }
 
-func ctxDoneOnSignal() context.Context {
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		<-done
-		cancel()
-		close(done)
-	}()
-
-	return ctx
+// signalContext returns a context that is cancelled on the first interrupt
+// or termination signal. The signals stay registered until stop is called,
+// so later signals during the shutdown do not stop the process abruptly.
+func signalContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 }
 
 func buildVersion(version string) string {

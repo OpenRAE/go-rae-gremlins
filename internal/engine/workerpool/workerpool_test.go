@@ -17,6 +17,7 @@
 package workerpool_test
 
 import (
+	"context"
 	"go/token"
 	"runtime"
 	"strconv"
@@ -32,7 +33,7 @@ type ExecutorMock struct {
 	outCh  chan<- mutator.Mutator
 }
 
-func (tj *ExecutorMock) Start(w *workerpool.Worker) {
+func (tj *ExecutorMock) Start(_ context.Context, w *workerpool.Worker) {
 	fm := fakeMutant{
 		name: w.Name,
 		id:   w.ID,
@@ -45,7 +46,7 @@ func TestWorker(t *testing.T) {
 	outCh := make(chan mutator.Mutator)
 
 	worker := workerpool.NewWorker(1, "test")
-	worker.Start(executorQueue)
+	worker.Start(context.Background(), executorQueue)
 
 	tj := &ExecutorMock{
 		mutant: &fakeMutant{},
@@ -77,7 +78,7 @@ func TestPool(t *testing.T) {
 		outCh := make(chan mutator.Mutator)
 
 		pool := workerpool.Initialize("test")
-		pool.Start()
+		pool.Start(context.Background())
 		defer pool.Stop()
 
 		tj := &ExecutorMock{
@@ -85,7 +86,9 @@ func TestPool(t *testing.T) {
 			outCh:  outCh,
 		}
 
-		pool.AppendExecutor(tj)
+		if !pool.AppendExecutor(context.Background(), tj) {
+			t.Fatal("AppendExecutor = false, want true")
+		}
 
 		m := <-outCh
 		got, ok := m.(fakeMutant)
@@ -101,12 +104,40 @@ func TestPool(t *testing.T) {
 		}
 	})
 
+	t.Run("cancelled submission returns while the queue is full", func(t *testing.T) {
+		configuration.Set(configuration.UnleashWorkersKey, 1)
+		defer configuration.Reset()
+
+		outCh := make(chan mutator.Mutator)
+		pool := workerpool.Initialize("test")
+		pool.Start(context.Background())
+		defer pool.Stop()
+		tj := &ExecutorMock{mutant: &fakeMutant{}, outCh: outCh}
+
+		// The worker blocks on outCh with the first executor. The second
+		// fills the queue, so the third submission can only end by cancellation.
+		for i := range 2 {
+			if !pool.AppendExecutor(context.Background(), tj) {
+				t.Fatalf("AppendExecutor #%d = false, want true", i)
+			}
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if pool.AppendExecutor(ctx, tj) {
+			t.Error("AppendExecutor(cancelled context) = true, want false")
+		}
+
+		for range 2 {
+			<-outCh
+		}
+	})
+
 	t.Run("default uses runtime CPUs as number of workers", func(t *testing.T) {
 		configuration.Set(configuration.UnleashWorkersKey, 0)
 		defer configuration.Reset()
 
 		pool := workerpool.Initialize("test")
-		pool.Start()
+		pool.Start(context.Background())
 		defer pool.Stop()
 
 		if pool.ActiveWorkers() != runtime.NumCPU() {
@@ -120,7 +151,7 @@ func TestPool(t *testing.T) {
 		defer configuration.Reset()
 
 		pool := workerpool.Initialize("test")
-		pool.Start()
+		pool.Start(context.Background())
 		defer pool.Stop()
 
 		if pool.ActiveWorkers() != runtime.NumCPU()/2 {
@@ -133,7 +164,7 @@ func TestPool(t *testing.T) {
 		defer configuration.Reset()
 
 		pool := workerpool.Initialize("test")
-		pool.Start()
+		pool.Start(context.Background())
 		defer pool.Stop()
 
 		if pool.ActiveWorkers() != 3 {
@@ -147,7 +178,7 @@ func TestPool(t *testing.T) {
 		defer configuration.Reset()
 
 		pool := workerpool.Initialize("test")
-		pool.Start()
+		pool.Start(context.Background())
 		defer pool.Stop()
 
 		if pool.ActiveWorkers() != 1 {
@@ -163,7 +194,7 @@ func TestRegressionPoolReadsEnvironmentSettings(t *testing.T) {
 		t.Setenv("GREMLINS_UNLEASH_WORKERS", strconv.Itoa(want))
 
 		pool := workerpool.Initialize("test")
-		pool.Start()
+		pool.Start(context.Background())
 		defer pool.Stop()
 
 		if got := pool.ActiveWorkers(); got != want {
@@ -177,7 +208,7 @@ func TestRegressionPoolReadsEnvironmentSettings(t *testing.T) {
 		t.Setenv("GREMLINS_UNLEASH_INTEGRATION", "true")
 
 		pool := workerpool.Initialize("test")
-		pool.Start()
+		pool.Start(context.Background())
 		defer pool.Stop()
 
 		if got := pool.ActiveWorkers(); got != 1 {

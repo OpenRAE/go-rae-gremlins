@@ -160,8 +160,9 @@ make clean
   parallelism
 - **Configuration cascade**: Flags override config file, which
   overrides defaults
-- **Context cancellation**: Graceful shutdown on SIGINT/SIGTERM via
-  `ctxDoneOnSignal()`
+- **Context cancellation**: `signalContext()` in `cmd/gremlins/main.go`
+  cancels the run context on SIGINT/SIGTERM. Coverage, scheduling, and
+  mutant execution stop on it, and a cancelled run returns an error
 
 ## Testing Conventions
 
