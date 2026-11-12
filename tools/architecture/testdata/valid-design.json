@@ -21,6 +21,14 @@
       ],
       "network": true,
       "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
     }
   }
 }

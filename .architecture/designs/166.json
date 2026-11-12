@@ -11,7 +11,7 @@
     }
   ],
   "contracts": [],
-  "trust_boundaries": "The design tool reads model and design JSON from the local checkout and reads Git history with fixed commands. It starts no network call, downloads nothing, and runs no scanned source. The change keeps the development-check boundary local and in existing CI, and keeps the delivery-finalization boundary unchanged.",
+  "trust_boundaries": "The design tool reads model and design JSON from the local checkout and reads Git history with fixed commands. It starts no network call, downloads nothing, and runs no scanned source. The change keeps the development-check boundary local and in existing CI, and keeps the delivery-finalization and merge-queue-policy boundaries unchanged.",
   "policies": [
     "design_step",
     "guidance",
@@ -33,6 +33,14 @@
         "github-api",
         "ground-control-release",
         "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
       ],
       "network": true,
       "execute_source": false
