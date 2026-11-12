@@ -210,7 +210,9 @@ type blockingDealerStub struct {
 	created atomic.Int32
 }
 
-func (j *blockingDealerStub) NewExecutor(_ mutator.Mutator, _ chan<- mutator.Mutator, wg *sync.WaitGroup) workerpool.Executor {
+func (j *blockingDealerStub) NewExecutor(
+	_ mutator.Mutator, _ chan<- mutator.Mutator, wg *sync.WaitGroup,
+) workerpool.Executor {
 	j.created.Add(1)
 
 	return &blockingExecutorStub{wg: wg}

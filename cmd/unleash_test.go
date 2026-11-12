@@ -244,7 +244,8 @@ func TestFeatureUnleashReportsCancellation(t *testing.T) {
 		t.Fatalf("configuration.Init error = %v, want nil", err)
 	}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/cancel\n\ngo 1.25\n"), 0o600); err != nil {
+	goMod := []byte("module example.com/cancel\n\ngo 1.25\n")
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), goMod, 0o600); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
 	// The coverage step changes the working directory to the module root.

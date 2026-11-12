@@ -48,7 +48,7 @@ func TestFeatureSignalContextSurvivesRepeatedSignals(t *testing.T) {
 	case <-time.After(signalWait):
 		t.Fatalf("context not done %s after SIGINT", signalWait)
 	}
-	if got := context.Cause(ctx); got == nil {
+	if context.Cause(ctx) == nil {
 		t.Error("context.Cause after SIGINT = nil, want the signal cause")
 	}
 

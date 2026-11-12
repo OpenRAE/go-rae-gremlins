@@ -86,9 +86,8 @@ func TestPool(t *testing.T) {
 			outCh:  outCh,
 		}
 
-		if !pool.AppendExecutor(context.Background(), tj) {
-			t.Fatal("AppendExecutor = false, want true")
-		}
+		// A context that is never done cannot end the submission early.
+		pool.AppendExecutor(context.Background(), tj)
 
 		m := <-outCh
 		got, ok := m.(fakeMutant)

@@ -726,7 +726,8 @@ func TestSkipNotDiffMutants(t *testing.T) {
 // lifecycleFS is a module file with eight mutants: each comparison has a
 // conditionals-boundary and a conditionals-negation mutant.
 var lifecycleFS = fstest.MapFS{
-	"lifecycle.go": {Data: []byte("package lifecycle\n\nfunc f(a, b int) (bool, bool, bool, bool) { return a > b, a < b, a >= b, a <= b }\n")},
+	"lifecycle.go": {Data: []byte("package lifecycle\n\n" +
+		"func f(a, b int) (bool, bool, bool, bool) { return a > b, a < b, a >= b, a <= b }\n")},
 }
 
 // The synctest bubbles below fail if Run leaves a goroutine of the engine,
