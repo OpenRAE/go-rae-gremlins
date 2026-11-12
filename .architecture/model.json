@@ -223,7 +223,20 @@
       "execute_source": false
     },
     "delivery_finalization": {
-      "destinations": ["existing-ci", "github-api", "ground-control-release", "npm-registry"],
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
       "network": true,
       "execute_source": false
     }

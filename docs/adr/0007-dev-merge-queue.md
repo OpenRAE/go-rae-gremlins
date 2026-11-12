@@ -28,6 +28,8 @@ SonarCloud has no merge queue support.
 - The `Policy` job runs `.github/scripts/merge_queue_policy.py` against the live branch rules. It fails when a
   required `dev` check has no `merge_group` producer. It accepts non-strict `dev` checks only when `dev` has a merge
   queue.
+- The architecture model adds the `merge_queue_policy` trust boundary. The policy check reads the GitHub API from
+  existing CI, and it executes no candidate source.
 
 ## Consequences
 
