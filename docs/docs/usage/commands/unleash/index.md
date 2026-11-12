@@ -15,6 +15,13 @@ If the module build requires tags
 gremlins unleash --tags "tag1,tag2"
 ```
 
+## Cancellation
+
+An interrupt (`SIGINT`) or a termination signal (`SIGTERM`) stops the run.
+Gremlins stops the coverage step and the running tests, and removes its temporary files.
+It does not write a report. It reports the cancellation as an error and exits with code 1.
+More signals during the shutdown do not stop it abruptly.
+
 ## Flags
 
 `unleash` supports several flags to fine tune its behaviour.

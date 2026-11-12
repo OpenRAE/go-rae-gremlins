@@ -101,6 +101,8 @@ func WithDirFs(dirFS fs.FS) Option {
 // For each file it will scan for tokenMutations and gather all the mutants found.
 // A walk, open, or parse failure stops the discovery. Run then returns the
 // error with the partial results, which the caller must not report as success.
+// When ctx is done, Run stops the discovery and the pending tests. Run
+// returns only after the discovery and the workers it started have exited.
 func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
 	mu.mutantStream = make(chan mutator.Mutator)
 	discoverErr := make(chan error, 1)
@@ -111,10 +113,11 @@ func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
 
 	start := time.Now()
 	res := mu.executeTests(ctx)
+	err := <-discoverErr
 	res.Elapsed = time.Since(start)
 	res.Module = mu.module.Name
 
-	if err := <-discoverErr; err != nil {
+	if err != nil {
 		return res, fmt.Errorf("discovering mutants: %w", err)
 	}
 
@@ -126,6 +129,9 @@ func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
 // error. It stops without an error when ctx is done.
 func (mu *Engine) discover(ctx context.Context) error {
 	return fs.WalkDir(mu.fs, ".", func(walkPath string, d fs.DirEntry, err error) error {
+		if ctx.Err() != nil {
+			return fs.SkipAll
+		}
 		if err != nil {
 			return err
 		}
@@ -262,9 +268,12 @@ func (mu *Engine) mutationStatus(pos token.Position, covered bool) mutator.Statu
 	return status
 }
 
+// executeTests runs an executor for each mutant of the stream on a worker
+// pool. It stops the pool when the stream ends or ctx is done, and returns
+// after all the started executors have reported.
 func (mu *Engine) executeTests(ctx context.Context) report.Results {
 	pool := workerpool.Initialize("mutator")
-	pool.Start()
+	pool.Start(ctx)
 
 	var mutants []mutator.Mutator
 	outCh := make(chan mutator.Mutator)
@@ -272,16 +281,8 @@ func (mu *Engine) executeTests(ctx context.Context) report.Results {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for mut := range mu.mutantStream {
-			ok := checkDone(ctx)
-			if !ok {
-				pool.Stop()
-
-				break
-			}
-			wg.Add(1)
-			pool.AppendExecutor(mu.jDealer.NewExecutor(mut, outCh, wg))
-		}
+		defer pool.Stop()
+		mu.submit(ctx, pool, outCh, wg)
 	}()
 
 	go func() {
@@ -297,12 +298,26 @@ func (mu *Engine) executeTests(ctx context.Context) report.Results {
 	return results(mutants)
 }
 
-func checkDone(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	default:
-		return true
+// submit adds an executor to the pool for each mutant of the stream, until
+// the stream ends or ctx is done.
+func (mu *Engine) submit(ctx context.Context, pool *workerpool.Pool, outCh chan<- mutator.Mutator, wg *sync.WaitGroup) {
+	for {
+		var mut mutator.Mutator
+		select {
+		case <-ctx.Done():
+			return
+		case m, ok := <-mu.mutantStream:
+			if !ok {
+				return
+			}
+			mut = m
+		}
+		wg.Add(1)
+		if !pool.AppendExecutor(ctx, mu.jDealer.NewExecutor(mut, outCh, wg)) {
+			wg.Done()
+
+			return
+		}
 	}
 }
 

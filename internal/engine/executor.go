@@ -165,8 +165,13 @@ type mutantExecutor struct {
 // The timeout of the test is managed outside the run of the test, using
 // a context with timeout. This is done because the Go test command doesn't
 // make it easy to distinguish failures from timeouts.
-func (m *mutantExecutor) Start(w *workerpool.Worker) {
+// When ctx is done, the executor stops its test run, rolls back the mutation,
+// and does not report the mutant.
+func (m *mutantExecutor) Start(ctx context.Context, w *workerpool.Worker) {
 	defer m.wg.Done()
+	if ctx.Err() != nil {
+		return
+	}
 	workerName := fmt.Sprintf("%s-%d", w.Name, w.ID)
 	rootDir, err := m.wdDealer.Get(workerName)
 	if err != nil {
@@ -189,10 +194,13 @@ func (m *mutantExecutor) Start(w *workerpool.Worker) {
 		return
 	}
 
-	status, runErr := m.runTests(rootDir, m.mutant.Pkg())
-	if runErr != nil {
+	status, runErr := m.runTests(ctx, rootDir, m.mutant.Pkg())
+	cancelled := ctx.Err() != nil
+	switch {
+	case cancelled:
+	case runErr != nil:
 		log.Errorf("failed to run tests at %s - %s\n\t%v", m.mutant.Position(), m.mutant.Status(), runErr)
-	} else {
+	default:
 		m.mutant.SetStatus(status)
 	}
 
@@ -201,7 +209,7 @@ func (m *mutantExecutor) Start(w *workerpool.Worker) {
 		log.Errorf("failed to restore mutation at %s - %s\n\t%v", m.mutant.Position(), m.mutant.Status(), err)
 	}
 
-	if runErr != nil {
+	if runErr != nil || cancelled {
 		return
 	}
 
@@ -218,8 +226,8 @@ func (m *mutantExecutor) Start(w *workerpool.Worker) {
 // An error not caused by the test run itself (for example a missing `go`
 // executable) is returned as an error rather than folded into a status, so
 // an infrastructure failure is never reported as a passing mutant.
-func (m *mutantExecutor) runTests(rootDir, pkg string) (mutator.Status, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), m.testExecutionTime)
+func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mutator.Status, error) {
+	ctx, cancel := context.WithTimeout(ctx, m.testExecutionTime)
 	defer cancel()
 
 	cmd := m.execContext(ctx, "go", m.getTestArgs(pkg)...)
