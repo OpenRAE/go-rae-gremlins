@@ -1,35 +1,30 @@
 {
   "version": 1,
-  "issue": 106,
-  "summary": "Stop a failed mutation from contaminating later results. TokenMutator.Apply puts back the shared AST token on every path, and it writes back the original file when the mutated write fails. Each executor sends one result for each mutant, with the mutant or an error. A failed workdir, apply, test run, or rollback gives an error, not a panic or a missing result. After a failed apply or rollback, the executor discards the worker directory, so the next mutant gets a new copy. Engine.Run joins the executor errors with the discovery error of issue 107. After the first executor error, Run cancels the discovery and schedules no new mutant. The unleash command already returns the Run error, so a run with a failed mutant exits with the existing general error code 1 and writes no report. internal/engine no longer imports internal/log. The lint baseline drops the fixed findings of the changed engine and workdir files. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
+  "issue": 35,
+  "summary": "Parse the module declaration of go.mod with golang.org/x/mod. gomodule.Init reads the nearest go.mod as bytes, parses it with modfile.ParseLax, rejects a parser error and a missing or empty module path, and validates the path with module.CheckImportPath. It returns an error when no go.mod exists instead of opening /go.mod. ParseLax keeps directives from a newer Go release from stopping a run; the go command validates the full file during coverage. go.mod adds a direct golang.org/x/mod v0.38.0 requirement, the version that x/tools v0.48.0 already selects. .golangci.yml depguard allows exactly x/mod/modfile and x/mod/module. gomodule and coverage regression tests cover comments, blank lines, quoted and block paths, malformed and missing declarations, and the coverage match. The lint baseline shrinks for the fixed gomodule findings. Configuration keeps its root search because the model does not allow configuration to import gomodule. No internal dependency, CLI flag, configuration key, JSON report field, or exit code changes. Design record: docs/development/module-declaration-preflight.md.",
   "changes": [
     {
-      "package": "internal/engine",
-      "imports": [
-        "internal/configuration",
-        "internal/coverage",
-        "internal/diff",
-        "internal/engine/workdir",
-        "internal/engine/workerpool",
-        "internal/exclusion",
-        "internal/gomodule",
-        "internal/mutator",
-        "internal/report"
-      ],
+      "package": "internal/gomodule",
+      "imports": [],
       "test_imports": []
     },
     {
-      "package": "internal/engine/workdir",
+      "package": "internal/coverage",
       "imports": [
+        "internal/configuration",
+        "internal/gomodule",
         "internal/log"
       ],
-      "test_imports": []
+      "test_imports": [
+        "internal/gomodule"
+      ]
     }
   ],
   "contracts": [],
-  "trust_boundaries": "The change adds no data flow, network access, or source execution. The executor removes only the temporary worker directory that the work directory dealer created. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "trust_boundaries": "The target go.mod bytes cross from the local file system into the process. Detection reads the file only. Syntax, module presence, and import-path checks run before Gremlins uses the metadata. Detection starts no subprocess, download, or version fixer, and writes no file. Errors keep the parser cause and name go.mod without the file contents. Development checks stay local or in existing CI. The delivery_finalization entry restates the modeled boundary.",
   "conflicts": [],
   "policies": [
+    "lint",
     "lint_baseline"
   ],
   "trust_changes": {

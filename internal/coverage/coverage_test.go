@@ -248,6 +248,34 @@ func TestCoverageParsesOutput(t *testing.T) {
 	}
 }
 
+func TestRegressionCoverageMatchesModuleAfterComment(t *testing.T) {
+	root := t.TempDir()
+	goMod := filepath.Join(root, "go.mod")
+	if err := os.WriteFile(goMod, []byte("// license\nmodule example.com/m\n\ngo 1.25.0\n"), 0o600); err != nil {
+		t.Fatalf("write %s: %v", goMod, err)
+	}
+	workdir := t.TempDir()
+	profilePath := filepath.Join(workdir, "coverage")
+	if err := os.WriteFile(profilePath, []byte("mode: set\nexample.com/m/m.go:3.2,5.3 1 1\n"), 0o600); err != nil {
+		t.Fatalf("write %s: %v", profilePath, err)
+	}
+	mod, err := gomodule.Init(root)
+	if err != nil {
+		t.Fatalf("gomodule.Init(%q) error = %v, want nil", root, err)
+	}
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), workdir, mod)
+
+	got, err := cov.Run(t.Context())
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	want := coverage.Profile{"m.go": {{StartLine: 3, StartCol: 2, EndLine: 5, EndCol: 3}}}
+	if diff := cmp.Diff(want, got.Profile); diff != "" {
+		t.Errorf("Run() profile mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestParseOutputFail(t *testing.T) {
 	mod := gomodule.GoModule{
 		Name:       exampleModule,
