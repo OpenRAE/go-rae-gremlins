@@ -1,54 +1,16 @@
 {
   "version": 1,
-  "issue": 111,
-  "summary": "Return errors when the requested JSON report cannot be written. fileReport, reportFindings, and report.Do now return encode, create, write, and close errors instead of only logging create and write failures. cmd/unleash.go already returns the report.Do error, so the command fails with exit code 1 through the existing error path. Report tests cover a missing parent directory and an unwritable directory, and the existing test checks the successful output fields. A command regression test runs unleash with a missing-parent output path and expects the error. The lint baseline shrinks because the change fixes two report errcheck findings and three report test findings. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
-  "changes": [
-    {
-      "package": "cmd",
-      "imports": [
-        "cmd/internal/flags",
-        "internal/configuration",
-        "internal/coverage",
-        "internal/diff",
-        "internal/engine",
-        "internal/engine/workdir",
-        "internal/exclusion",
-        "internal/gomodule",
-        "internal/log",
-        "internal/mutator",
-        "internal/report"
-      ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/mutator"
-      ]
-    },
-    {
-      "package": "internal/report",
-      "imports": [
-        "internal/configuration",
-        "internal/execution",
-        "internal/log",
-        "internal/mutator",
-        "internal/report/internal"
-      ],
-      "test_imports": [
-        "internal/configuration",
-        "internal/execution",
-        "internal/log",
-        "internal/mutator",
-        "internal/report",
-        "internal/report/internal"
-      ]
-    }
-  ],
-  "contracts": [
-    "cli"
-  ],
-  "trust_boundaries": "The JSON report crosses out of the process at the file system boundary. The change makes a failed report write visible to the caller instead of a silent success. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "issue": 151,
+  "summary": "Gate the dev merge queue. The CI Policy job runs make merge-queue-policy, which runs .github/scripts/merge_queue_policy.py. The script reads the live dev and main branch rules with gh api and the workflow files. It fails when dev has no merge queue, main has a merge queue, dev has classic required checks, dev has non-strict checks without a queue, or a required dev check has no merge_group producer. The lint job installs PyYAML and make lint-cover runs the new Python tests. A new ggshield workflow produces the required GitGuardian check on pull requests and merge groups. ADR 0007 and docs/CONTRIBUTING.md describe the queue. No Go package, import, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The merge queue policy check is a new CI data flow. It reads the public branch rules of this repository from the GitHub API with the read-only workflow token. It sends no repository content and executes no candidate source beyond the checked-in script. ADR 0007 records the new merge_queue_policy boundary in the model. The ggshield workflow is not a modeled policy path. It sends the new commits to the GitGuardian API with the GITGUARDIAN_API_KEY secret. The other trust_changes entries restate the existing boundaries.",
   "conflicts": [],
   "policies": [
-    "lint_baseline"
+    "model",
+    "ci",
+    "build",
+    "contributing"
   ],
   "trust_changes": {
     "development_checks": {
@@ -68,9 +30,15 @@
       ],
       "network": true,
       "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
     }
   },
-  "contract_changes": {
-    "cli": "compatible"
-  }
+  "contract_changes": {}
 }
