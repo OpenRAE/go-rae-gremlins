@@ -1,4 +1,6 @@
 dist/
+# Pinned tools that scripts/doc-tools.sh installs.
+/.tools/
 /docs/site/
 out
 .idea

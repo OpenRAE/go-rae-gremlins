@@ -141,6 +141,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: make merge-queue-policy
 
+  # STE checks on changed Markdown with the pinned doc-tools release.
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the verified documentation tools
+        run: make docs-tools
+      - name: Show that a bad sample fails and its corrected form passes
+        run: make docs-samples
+      - name: Check the changed Markdown
+        env:
+          COMPARISON: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
+        run: |
+          if [ "$COMPARISON" = 0000000000000000000000000000000000000000 ]; then
+            COMPARISON=origin/dev
+          fi
+          make docs-changed DOCS_BASE="$COMPARISON"
+
   # Proves the cgroup-v2 memory budget stops a runaway allocator. The job fails
   # when the runner lacks an effective memory controller; it never runs unbounded.
   memory:
@@ -275,13 +297,14 @@ jobs:
   gate:
     name: PR Gate
     if: always()
-    needs: [architecture, lint, test, policy, memory, sonar]
+    needs: [architecture, lint, docs, test, policy, memory, sonar]
     runs-on: ubuntu-latest
     steps:
-      - name: Require architecture, lint, tests, policy, memory, and SonarCloud
+      - name: Require architecture, lint, docs, tests, policy, memory, and SonarCloud
         env:
           ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
           LINT_RESULT: ${{ needs.lint.result }}
+          DOCS_RESULT: ${{ needs.docs.result }}
           TEST_RESULT: ${{ needs.test.result }}
           POLICY_RESULT: ${{ needs.policy.result }}
           MEMORY_RESULT: ${{ needs.memory.result }}
@@ -290,6 +313,7 @@ jobs:
         run: |
           test "$ARCHITECTURE_RESULT" = success
           test "$LINT_RESULT" = success
+          test "$DOCS_RESULT" = success
           test "$TEST_RESULT" = success
           test "$POLICY_RESULT" = success
           test "$MEMORY_RESULT" = success
