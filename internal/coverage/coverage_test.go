@@ -17,6 +17,8 @@
 package coverage_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -104,7 +106,7 @@ func TestCoverageRun(t *testing.T) {
 			}
 			cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, holder), wantWorkdir, mod)
 
-			if _, err := cov.Run(); err != nil {
+			if _, err := cov.Run(t.Context()); err != nil {
 				t.Fatalf("Run error = %v, want nil", err)
 			}
 
@@ -152,17 +154,38 @@ func TestCoverageRunFails(t *testing.T) {
 
 	t.Run("failure of: go mod download", func(t *testing.T) {
 		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 0), "workdir", mod)
-		if _, err := cov.Run(); err == nil {
+		if _, err := cov.Run(t.Context()); err == nil {
 			t.Error("expected run to report an error")
 		}
 	})
 
 	t.Run("failure of: go test", func(t *testing.T) {
 		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 1), "workdir", mod)
-		if _, err := cov.Run(); err == nil {
+		if _, err := cov.Run(t.Context()); err == nil {
 			t.Error("expected run to report an error")
 		}
 	})
+}
+
+func TestFeatureCoverageRunStopsOnCancel(t *testing.T) {
+	mod := gomodule.GoModule{
+		Name:       exampleModule,
+		Root:       ".",
+		CallingDir: ".",
+	}
+	holder := &commandHolder{}
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, holder), "workdir", mod)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := cov.Run(ctx)
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("Run(cancelled context) error = %v, want %v", err, context.Canceled)
+	}
+	if len(holder.events) != 1 {
+		t.Errorf("Run(cancelled context) built %d commands, want 1", len(holder.events))
+	}
 }
 
 func TestCoverageParsesOutput(t *testing.T) {
@@ -212,7 +235,7 @@ func TestCoverageParsesOutput(t *testing.T) {
 		Profile: profile,
 	}
 
-	got, err := cov.Run()
+	got, err := cov.Run(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +255,7 @@ func TestParseOutputFail(t *testing.T) {
 	}
 	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), "testdata/invalid", mod)
 
-	if _, err := cov.Run(); err == nil {
+	if _, err := cov.Run(t.Context()); err == nil {
 		t.Error("expected an error")
 	}
 }
@@ -251,16 +274,16 @@ func TestCoverageProcessFailure(_ *testing.T) {
 	os.Exit(1) // skipcq: RVV-A0003
 }
 
-type execContext = func(name string, args ...string) *exec.Cmd
+type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 func fakeExecCommandSuccess(t *testing.T, got *commandHolder) execContext {
 	t.Helper()
 
-	return func(command string, args ...string) *exec.Cmd {
+	return func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestCoverageProcessSuccess", "--", command}
 		cs = append(cs, args...)
 		// #nosec G204 G702 - We are in tests, we don't care
-		cmd := exec.CommandContext(t.Context(), os.Args[0], cs...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_TEST_PROCESS=1"}
 		if got != nil {
 			got.events = append(got.events, struct {
@@ -278,14 +301,14 @@ func fakeExecCommandFailure(t *testing.T, run int) execContext {
 	t.Helper()
 	var executed int
 
-	return func(command string, args ...string) *exec.Cmd {
+	return func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestCoverageProcessSuccess", "--", command}
 		if executed == run {
 			cs = []string{"-test.run=TestCoverageProcessFailure", "--", command}
 		}
 		cs = append(cs, args...)
 		// #nosec G204 G702 - We are in tests, we don't care
-		cmd := exec.CommandContext(t.Context(), os.Args[0], cs...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_TEST_PROCESS=1"}
 		executed++
 

@@ -18,6 +18,7 @@
 package coverage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -59,12 +60,12 @@ type Coverage struct {
 // Option for the Coverage initialization.
 type Option func(c *Coverage) *Coverage
 
-type execContext = func(name string, args ...string) *exec.Cmd
+type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
-// New instantiates a Coverage element using exec.Command as execContext,
+// New instantiates a Coverage element using exec.CommandContext as execContext,
 // actually running the command on the OS.
 func New(workdir string, mod gomodule.GoModule, opts ...Option) *Coverage {
-	return NewWithCmd(exec.Command, workdir, mod, opts...)
+	return NewWithCmd(exec.CommandContext, workdir, mod, opts...)
 }
 
 // NewWithCmd instantiates a Coverage element given a custom execContext.
@@ -95,7 +96,8 @@ func NewWithCmd(cmdContext execContext, workdir string, mod gomodule.GoModule, o
 // Before executing the coverage, it downloads the go modules in a separate step.
 // This is done to avoid that the download phase impacts the execution time which
 // is later used as timeout for the mutant testing execution.
-func (c *Coverage) Run() (Result, error) {
+// The cancellation of ctx stops the running command.
+func (c *Coverage) Run(ctx context.Context) (Result, error) {
 	log.Infof("Gathering coverage... ")
 	// The go command runs in the module root, so the profile path must not
 	// depend on the directory that resolves it.
@@ -103,10 +105,10 @@ func (c *Coverage) Run() (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("impossible to resolve the coverage profile path: %w", err)
 	}
-	if err := c.downloadModules(); err != nil {
+	if err := c.downloadModules(ctx); err != nil {
 		return Result{}, fmt.Errorf("impossible to download modules: %w", err)
 	}
-	elapsed, err := c.executeCoverage(profilePath)
+	elapsed, err := c.executeCoverage(ctx, profilePath)
 	if err != nil {
 		return Result{}, fmt.Errorf("impossible to executeCoverage coverage: %w", err)
 	}
@@ -135,8 +137,8 @@ func (c *Coverage) filePath() string {
 	return fmt.Sprintf("%v/%v", c.workDir, c.fileName)
 }
 
-func (c *Coverage) downloadModules() error {
-	cmd := c.cmdContext("go", "mod", "download")
+func (c *Coverage) downloadModules(ctx context.Context) error {
+	cmd := c.cmdContext(ctx, "go", "mod", "download")
 	cmd.Dir = c.mod.Root
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -144,7 +146,7 @@ func (c *Coverage) downloadModules() error {
 	return cmd.Run()
 }
 
-func (c *Coverage) executeCoverage(profilePath string) (time.Duration, error) {
+func (c *Coverage) executeCoverage(ctx context.Context, profilePath string) (time.Duration, error) {
 	args := []string{"test"}
 	if c.buildTags != "" {
 		args = append(args, "-tags", c.buildTags)
@@ -154,7 +156,7 @@ func (c *Coverage) executeCoverage(profilePath string) (time.Duration, error) {
 	}
 
 	args = append(args, "-cover", "-coverprofile", profilePath, c.scanPath())
-	cmd := c.cmdContext("go", args...)
+	cmd := c.cmdContext(ctx, "go", args...)
 	cmd.Dir = c.mod.Root
 
 	start := time.Now()

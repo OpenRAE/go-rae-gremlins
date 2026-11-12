@@ -18,6 +18,7 @@
 package workerpool
 
 import (
+	"context"
 	"runtime"
 	"sync"
 
@@ -26,7 +27,8 @@ import (
 
 // Executor is the unit of work that executes a task.
 type Executor interface {
-	Start(worker *Worker)
+	// Start executes the task on worker. It stops the task when ctx is done.
+	Start(ctx context.Context, worker *Worker)
 }
 
 // Worker takes an executor and starts the actual executor.
@@ -44,18 +46,14 @@ func NewWorker(id int, name string) *Worker {
 	}
 }
 
-// Start gets an executor queue and starts working on it.
-func (w *Worker) Start(executorQueue <-chan Executor) {
+// Start gets an executor queue and starts working on it. It passes ctx to
+// each executor. The worker exits when the queue is closed and drained.
+func (w *Worker) Start(ctx context.Context, executorQueue <-chan Executor) {
 	w.stopCh = make(chan struct{})
 	go func() {
-		for {
-			executor, ok := <-executorQueue
-			if !ok {
-				w.stopCh <- struct{}{}
-
-				break
-			}
-			executor.Start(w)
+		defer close(w.stopCh)
+		for executor := range executorQueue {
+			executor.Start(ctx, w)
 		}
 	}()
 }
@@ -104,18 +102,26 @@ func size(wNum int, intMode bool) int {
 }
 
 // AppendExecutor adds a new Executor to the queue of Executor to be processed.
-func (p *Pool) AppendExecutor(executor Executor) {
-	p.queue <- executor
+// It waits for a free place in the queue and returns false without adding
+// the Executor when ctx is done first.
+func (p *Pool) AppendExecutor(ctx context.Context, executor Executor) bool {
+	select {
+	case p.queue <- executor:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
-// Start the Pool.
-func (p *Pool) Start() {
+// Start the Pool. The workers pass ctx to each executor.
+func (p *Pool) Start(ctx context.Context) {
 	for _, w := range p.workers {
-		w.Start(p.queue)
+		w.Start(ctx, p.queue)
 	}
 }
 
 // Stop the Pool and wait for all the pending Worker to complete.
+// Call Stop once, after the last AppendExecutor.
 func (p *Pool) Stop() {
 	close(p.queue)
 	var wg sync.WaitGroup
