@@ -303,12 +303,6 @@ func TestFeatureExecutorFailureIsReported(t *testing.T) {
 			if tc.fnGet != nil {
 				wdDealer.fnGet = tc.fnGet
 			}
-			mod := gomodule.GoModule{
-				Name:       expectedModule,
-				Root:       ".",
-				CallingDir: ".",
-			}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(tc.testResult))
 			mut := &mutantStub{
 				status:           mutator.Runnable,
 				mutType:          mutator.ConditionalsBoundary,
@@ -316,39 +310,65 @@ func TestFeatureExecutorFailureIsReported(t *testing.T) {
 				hasApplyError:    tc.applyError,
 				hasRollbackError: tc.rollbackError,
 			}
-			outCh := make(chan engine.ExecutorResult, 1)
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-			executor := mjd.NewExecutor(mut, outCh, &wg)
 
-			executor.Start(&workerpool.Worker{Name: testWorkerName, ID: 1})
-			wg.Wait()
+			got := runExecutorOnce(t, wdDealer, tc.testResult, mut)
 
-			var got engine.ExecutorResult
-			select {
-			case got = <-outCh:
-			default:
-				t.Fatal("executor sent no result, want one result with an error")
-			}
 			if !errors.Is(got.Err, tc.wantErr) {
 				t.Errorf("result error = %v, want %v", got.Err, tc.wantErr)
 			}
 			if got.Mutant != mut {
 				t.Errorf("result mutant = %v, want the executed mutant", got.Mutant)
 			}
-			if mut.status != mutator.Runnable {
-				t.Errorf("mutant status = %v, want %v", mut.status, mutator.Runnable)
-			}
-			if mut.applyCalled != tc.wantApply {
-				t.Errorf("apply called = %t, want %t", mut.applyCalled, tc.wantApply)
-			}
-			if mut.rollbackCalled != tc.wantRollback {
-				t.Errorf("rollback called = %t, want %t", mut.rollbackCalled, tc.wantRollback)
-			}
+			checkFailedMutant(t, mut, tc.wantApply, tc.wantRollback)
 			if !cmp.Equal(wdDealer.discarded, tc.wantDiscarded) {
 				t.Errorf("discarded worker directories = %v, want %v", wdDealer.discarded, tc.wantDiscarded)
 			}
 		})
+	}
+}
+
+// runExecutorOnce starts one executor of mut on worker 1 and returns its
+// single result.
+func runExecutorOnce(
+	t *testing.T, wdDealer *dealerStub, testResult execContext, mut *mutantStub,
+) engine.ExecutorResult {
+	t.Helper()
+	mod := gomodule.GoModule{
+		Name:       expectedModule,
+		Root:       ".",
+		CallingDir: ".",
+	}
+	mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(testResult))
+	outCh := make(chan engine.ExecutorResult, 1)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	executor := mjd.NewExecutor(mut, outCh, &wg)
+
+	executor.Start(&workerpool.Worker{Name: testWorkerName, ID: 1})
+	wg.Wait()
+
+	select {
+	case got := <-outCh:
+		return got
+	default:
+		t.Fatal("executor sent no result, want one result")
+	}
+
+	return engine.ExecutorResult{}
+}
+
+// checkFailedMutant checks that a failed execution left mut without a new
+// status and called Apply and Rollback as expected.
+func checkFailedMutant(t *testing.T, mut *mutantStub, wantApply, wantRollback bool) {
+	t.Helper()
+	if mut.status != mutator.Runnable {
+		t.Errorf("mutant status = %v, want %v", mut.status, mutator.Runnable)
+	}
+	if mut.applyCalled != wantApply {
+		t.Errorf("apply called = %t, want %t", mut.applyCalled, wantApply)
+	}
+	if mut.rollbackCalled != wantRollback {
+		t.Errorf("rollback called = %t, want %t", mut.rollbackCalled, wantRollback)
 	}
 }
 

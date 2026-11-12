@@ -130,7 +130,9 @@ func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.D
 // It gets an output channel of ExecutorResult and a sync.WaitGroup. The
 // executor sends one result to the channel, and the wait group will be done
 // when the executor is complete.
-func (m MutantExecutorDealer) NewExecutor(mut mutator.Mutator, outCh chan<- ExecutorResult, wg *sync.WaitGroup) workerpool.Executor {
+func (m MutantExecutorDealer) NewExecutor(
+	mut mutator.Mutator, outCh chan<- ExecutorResult, wg *sync.WaitGroup,
+) workerpool.Executor {
 	mj := mutantExecutor{
 		mutant:            mut,
 		outCh:             outCh,

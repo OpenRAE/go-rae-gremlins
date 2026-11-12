@@ -124,7 +124,9 @@ func newJobDealerStub(t *testing.T) *executorDealerStub {
 	return &executorDealerStub{}
 }
 
-func (j *executorDealerStub) NewExecutor(mut mutator.Mutator, outCh chan<- engine.ExecutorResult, wg *sync.WaitGroup) workerpool.Executor {
+func (j *executorDealerStub) NewExecutor(
+	mut mutator.Mutator, outCh chan<- engine.ExecutorResult, wg *sync.WaitGroup,
+) workerpool.Executor {
 	j.gotMutants = append(j.gotMutants, mut)
 	var err error
 	if j.errFor != nil {
