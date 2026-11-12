@@ -1,18 +1,49 @@
 {
   "version": 1,
-  "issue": 157,
-  "summary": "Make the lint gate fail when the active Go is newer than the Go that built the pinned golangci-lint. With a newer Go, the linter loses type information, and revive skips its type-aware rules without an error. scripts/lint.py reads the linter's build Go and the Go that mise exec gives, and stops on a newer Go. mise.toml pins Go 1.26.11, the go.mod toolchain, so local lint uses the same Go as CI. The CI mise steps, the Makefile, and the guidance install that Go. No Go package, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
-  "changes": [],
-  "contracts": [],
-  "trust_boundaries": "The lint gate keeps its offline analysis environment. mise installs the pinned Go toolchain before analysis, as it installs the pinned linter. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "issue": 107,
+  "summary": "Return source discovery errors instead of partial success. Engine.Run now returns its results and an error. A walk, open, or parse failure stops the discovery, and Run returns the error after the running mutants finish. The discovery stops without an error when the context is done, and the mutant send no longer blocks after a cancel. cmd/unleash.go returns the Run error through the existing command error path, so the run does not write a report. Focused tests cover a malformed source, a failed file open, a failed directory read, and a directory named directory.go. The lint baseline shrinks because the change fixes two engine test findings. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "cmd/internal/flags",
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": []
+    },
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": []
+    }
+  ],
+  "contracts": [
+    "cli"
+  ],
+  "trust_boundaries": "The module source crosses into the process at the file system boundary. The change rejects a source tree that the process cannot walk, open, or parse, instead of a silent partial result. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
   "conflicts": [],
   "policies": [
-    "build",
-    "ci",
-    "contributing",
-    "guidance",
-    "lint_gate",
-    "lint_version"
+    "lint_baseline"
   ],
   "trust_changes": {
     "development_checks": {
@@ -34,5 +65,7 @@
       "execute_source": false
     }
   },
-  "contract_changes": {}
+  "contract_changes": {
+    "cli": "compatible"
+  }
 }

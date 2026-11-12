@@ -18,9 +18,12 @@ package engine_test
 
 import (
 	"context"
+	"errors"
 	"go/token"
 	"io"
+	"io/fs"
 	"os"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -30,6 +33,7 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/report"
 )
 
 const (
@@ -483,7 +487,7 @@ var mutationsTests = []mutationsTest{
 		mutStatus:  mutator.NotCovered,
 	},
 	{
-		name:       "it skips illegal tokens",
+		name:       "it fails on illegal tokens",
 		fixture:    "testdata/fixtures/illegal_go",
 		mutantType: mutator.ConditionalsBoundary,
 		token:      token.ILLEGAL,
@@ -504,19 +508,19 @@ func TestMutations(t *testing.T) {
 			defer c()
 
 			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := mut.Run(context.Background())
+			if tc.token == token.ILLEGAL {
+				if _, err := mut.Run(context.Background()); err == nil {
+					t.Error("Run() error = nil, want a parse error")
+				}
+
+				return
+			}
+
+			res := runEngine(t, mut)
 			got := res.Mutants
 
 			if res.Module != expectedModule {
 				t.Errorf("expected module to be %q, got %q", expectedModule, res.Module)
-			}
-
-			if tc.token == token.ILLEGAL {
-				if len(got) != 0 {
-					t.Errorf("expected no mutator found")
-				}
-
-				return
 			}
 
 			for _, g := range got {
@@ -548,7 +552,7 @@ func TestMutantSkipDisabled(t *testing.T) {
 			defer viperReset()
 
 			mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := mut.Run(context.Background())
+			res := runEngine(t, mut)
 			got := res.Mutants
 
 			for _, m := range got {
@@ -573,7 +577,7 @@ func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 	defer viperReset()
 
 	mut := engine.New(mod, testCodeData, newJobDealerStub(t), engine.WithDirFs(mapFS))
-	res := mut.Run(context.Background())
+	res := runEngine(t, mut)
 
 	var hasNegation, hasBoundary bool
 	for _, m := range res.Mutants {
@@ -609,7 +613,7 @@ func TestSkipTestAndNonGoFiles(t *testing.T) {
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()
 	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res := runEngine(t, mut)
 
 	if got := res.Mutants; len(got) != 0 {
 		t.Error("should not receive results")
@@ -638,7 +642,7 @@ func TestFeatureSkipTestdataVendorAndNestedModuleTrees(t *testing.T) {
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()
 	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res := runEngine(t, mut)
 
 	files := make(map[string]int)
 	for _, m := range res.Mutants {
@@ -654,7 +658,98 @@ func TestFeatureSkipTestdataVendorAndNestedModuleTrees(t *testing.T) {
 	}
 }
 
-func TestFeatureSkipUnparsableFiles(t *testing.T) {
+const (
+	goodFile   = "good.go"
+	lockedFile = "locked.go"
+)
+
+// errInjected is the failure that failingFS returns.
+var errInjected = errors.New("injected failure")
+
+// failingFS is a fstest.MapFS that fails to open the file failOpen and to
+// read the directory failReadDir.
+type failingFS struct {
+	fstest.MapFS
+	failOpen    string
+	failReadDir string
+}
+
+func (f failingFS) Open(name string) (fs.File, error) {
+	if name == f.failOpen {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: errInjected}
+	}
+
+	return f.MapFS.Open(name)
+}
+
+func (f failingFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if name == f.failReadDir {
+		return nil, &fs.PathError{Op: "readdir", Path: name, Err: errInjected}
+	}
+
+	return f.MapFS.ReadDir(name)
+}
+
+func TestRunReturnsDiscoveryErrors(t *testing.T) {
+	src, err := os.ReadFile("testdata/fixtures/geq_go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	broken := []byte("package main\n\nfunc main() {\n  if 1 >= 2 {\n")
+
+	testCases := []struct {
+		name     string
+		fsys     fs.FS
+		wantIs   error
+		wantPath string
+	}{
+		{
+			name:     "malformed Go source",
+			fsys:     fstest.MapFS{goodFile: {Data: src}, "broken.go": {Data: broken}},
+			wantPath: "broken.go",
+		},
+		{
+			name: "file open failure",
+			fsys: failingFS{
+				MapFS:    fstest.MapFS{goodFile: {Data: src}, lockedFile: {Data: src}},
+				failOpen: lockedFile,
+			},
+			wantIs:   errInjected,
+			wantPath: lockedFile,
+		},
+		{
+			name: "directory read failure",
+			fsys: failingFS{
+				MapFS:       fstest.MapFS{goodFile: {Data: src}, "pkg/file.go": {Data: src}},
+				failReadDir: "pkg",
+			},
+			wantIs:   errInjected,
+			wantPath: "pkg",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+			viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+			defer viperReset()
+			mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(tc.fsys))
+
+			_, err := mut.Run(context.Background())
+
+			if err == nil {
+				t.Fatal("Run() error = nil, want a discovery error")
+			}
+			if tc.wantIs != nil && !errors.Is(err, tc.wantIs) {
+				t.Errorf("Run() error = %v, want it to wrap %v", err, tc.wantIs)
+			}
+			if !strings.Contains(err.Error(), tc.wantPath) {
+				t.Errorf("Run() error = %v, want it to name %q", err, tc.wantPath)
+			}
+		})
+	}
+}
+
+func TestRunWalksDirectoryNamedAsGoFile(t *testing.T) {
 	t.Parallel()
 	src, err := os.ReadFile("testdata/fixtures/geq_go")
 	if err != nil {
@@ -662,30 +757,36 @@ func TestFeatureSkipUnparsableFiles(t *testing.T) {
 	}
 
 	sys := fstest.MapFS{
-		"good.go":           {Data: src},
-		"broken.go":         {Data: []byte("package main\n\nfunc main() {\n  if 1 >= 2 {\n")},
+		goodFile:            {Data: src},
 		"directory.go/x.go": {Data: src},
 	}
-	mod := gomodule.GoModule{
-		Name:       expectedModule,
-		Root:       ".",
-		CallingDir: ".",
-	}
+	mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()
 	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res := runEngine(t, mut)
 
 	files := make(map[string]int)
 	for _, m := range res.Mutants {
 		files[m.Position().Filename]++
 	}
-	if files["good.go"] == 0 {
-		t.Errorf("got no mutants of good.go, want mutants; mutants by file: %v", files)
+	if files[goodFile] == 0 || files["directory.go/x.go"] == 0 {
+		t.Errorf("got no mutants of good.go or directory.go/x.go, want mutants; mutants by file: %v", files)
 	}
-	if files["broken.go"] != 0 || files["directory.go"] != 0 {
-		t.Errorf("got mutants of an unparsable file, want none; mutants by file: %v", files)
+	if files["directory.go"] != 0 {
+		t.Errorf("got mutants of the directory directory.go, want none; mutants by file: %v", files)
 	}
+}
+
+// runEngine runs mut and fails the test when Run returns an error.
+func runEngine(t *testing.T, mut engine.Engine) report.Results {
+	t.Helper()
+	res, err := mut.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	return res
 }
 
 func TestSkipNotDiffMutants(t *testing.T) {
@@ -708,10 +809,10 @@ func TestSkipNotDiffMutants(t *testing.T) {
 		"file.go": nil,
 	}}
 	mut := engine.New(mod, codeData, newJobDealerStub(t), engine.WithDirFs(sys))
-	res := mut.Run(context.Background())
+	res := runEngine(t, mut)
 
 	if got := res.Mutants; len(got) == 0 {
-		t.Errorf("should receive mutants")
+		t.Error("should receive mutants")
 	}
 
 	for _, mutant := range res.Mutants {
@@ -729,7 +830,10 @@ func TestStopsOnCancel(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	res := mut.Run(ctx)
+	res, err := mut.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
 
 	if len(res.Mutants) > 0 {
 		t.Errorf("expected to receive no mutants, got %d", len(res.Mutants))
@@ -770,7 +874,7 @@ func TestPackageDiscovery(t *testing.T) {
 			jds := newJobDealerStub(t)
 			mut := engine.New(mod, testCodeData, jds, engine.WithDirFs(mapFS))
 
-			_ = mut.Run(context.Background())
+			runEngine(t, mut)
 
 			got := jds.gotMutants[0].Pkg()
 
