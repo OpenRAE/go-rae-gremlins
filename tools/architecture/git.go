@@ -199,17 +199,26 @@ func checkChangedDesign(root, revision string, c *compiledModel) error {
 func checkDesignCoverage(d design, packages, contracts, policies []string) error {
 	for _, name := range contracts {
 		if !slices.Contains(d.Contracts, name) {
-			return fmt.Errorf("contract %q lacks design coverage; fix: declare its compatibility review in %s/<issue>.json", name, designDir)
+			return fmt.Errorf(
+				"contract %q lacks design coverage; fix: declare its compatibility review in %s/<issue>.json",
+				name, designDir,
+			)
 		}
 	}
 	for _, name := range policies {
 		if !slices.Contains(d.Policies, name) {
-			return fmt.Errorf("policy %q lacks design coverage; fix: declare its control review in %s/<issue>.json", name, designDir)
+			return fmt.Errorf(
+				"policy %q lacks design coverage; fix: declare its control review in %s/<issue>.json",
+				name, designDir,
+			)
 		}
 	}
 	for _, pkg := range packages {
 		if !slices.ContainsFunc(d.Changes, func(item change) bool { return item.Package == pkg }) {
-			return fmt.Errorf("changed package %q lacks design coverage; fix: declare it in %s/<issue>.json before coding", pkg, designDir)
+			return fmt.Errorf(
+				"changed package %q lacks design coverage; fix: declare it in %s/<issue>.json before coding",
+				pkg, designDir,
+			)
 		}
 	}
 

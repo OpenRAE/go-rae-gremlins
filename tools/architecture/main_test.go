@@ -342,14 +342,20 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 		{
 			name:     "invalid design",
 			proposed: proposalFile,
-			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, proposalFile, `{"version":2}`) },
-			bad:      true,
+			edit: func(t *testing.T, r string) {
+				t.Helper()
+				writeFile(t, r, proposalFile, `{"version":2}`)
+			},
+			bad: true,
 		},
 		{
 			name:     "malformed design",
 			proposed: proposalFile,
-			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, proposalFile, `{`) },
-			bad:      true,
+			edit: func(t *testing.T, r string) {
+				t.Helper()
+				writeFile(t, r, proposalFile, `{`)
+			},
+			bad: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

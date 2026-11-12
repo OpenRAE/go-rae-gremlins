@@ -123,7 +123,7 @@ func logDesignPass(c *compiledModel, modelData []byte, path string, issue int) {
 	}
 	slices.Sort(ids)
 	log.Infof(
-		"Design %s (#%d) passed: model SHA256 %x; rules %q. Review contract and trust assertions against the implementation.\n",
+		"Design %s (#%d) passed: model SHA256 %x; rules %q. Review the contract and trust assertions against the code.\n",
 		path,
 		issue,
 		sha256.Sum256(modelData),
