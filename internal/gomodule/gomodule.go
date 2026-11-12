@@ -18,11 +18,13 @@
 package gomodule
 
 import (
-	"bufio"
-	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 )
 
 // GoModule represents the current execution context in Gremlins.
@@ -40,39 +42,53 @@ type GoModule struct {
 // of the module, then returns a GoModule struct.
 func Init(path string) (GoModule, error) {
 	if path == "" {
-		return GoModule{}, fmt.Errorf("path is not set")
+		return GoModule{}, errors.New("path is not set")
 	}
-	mod, root, err := modPkg(path)
+	root := findModuleRoot(path)
+	if root == "" {
+		return GoModule{}, fmt.Errorf("no go.mod file in %q or a parent directory", path)
+	}
+	name, err := moduleName(root)
 	if err != nil {
 		return GoModule{}, err
 	}
-	path, _ = filepath.Rel(root, path)
+	callingDir, err := filepath.Rel(root, path)
+	if err != nil {
+		return GoModule{}, fmt.Errorf("resolve %q relative to module root %q: %w", path, root, err)
+	}
 
 	return GoModule{
-		Name:       mod,
+		Name:       name,
 		Root:       root,
-		CallingDir: path,
+		CallingDir: callingDir,
 	}, nil
 }
 
-func modPkg(path string) (string, string, error) {
-	root := findModuleRoot(path)
-	//nolint:gosec // root is internally determined, not user input
-	file, err := os.Open(root + "/go.mod")
-	defer func(file *os.File) {
-		_ = file.Close()
-	}(file)
+// moduleName returns the module path that the go.mod file in root declares.
+// ParseLax ignores directives that this version of x/mod does not know, so a
+// go.mod file from a newer Go release still gives its module path.
+func moduleName(root string) (string, error) {
+	goMod := filepath.Join(root, "go.mod")
+	// G304 reports a file path from input. The operator selects this module, and
+	// the process reads its go.mod with the operator's own permissions. The read
+	// follows symbolic links, as the go command does.
+	data, err := os.ReadFile(goMod) //nolint:gosec // Operator-selected module file; no privilege boundary.
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	r := bufio.NewReader(file)
-	line, _, err := r.ReadLine()
+	file, err := modfile.ParseLax(goMod, data, nil)
 	if err != nil {
-		return "", "", err
+		return "", fmt.Errorf("parse module file: %w", err)
 	}
-	packageName := bytes.TrimPrefix(line, []byte("module "))
+	if file.Module == nil || file.Module.Mod.Path == "" {
+		return "", fmt.Errorf("%s: no module declaration", goMod)
+	}
+	name := file.Module.Mod.Path
+	if err := module.CheckImportPath(name); err != nil {
+		return "", fmt.Errorf("%s: invalid module path: %w", goMod, err)
+	}
 
-	return string(packageName), root, nil
+	return name, nil
 }
 
 func findModuleRoot(path string) string {
