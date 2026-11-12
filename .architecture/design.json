@@ -1,7 +1,7 @@
 {
   "version": 1,
   "issue": 107,
-  "summary": "Return source discovery errors instead of partial success. Engine.Run now returns its results and an error. A walk, open, or parse failure stops the discovery, and Run returns the error after the running mutants finish. The discovery stops without an error when the context is done, and the mutant send no longer blocks after a cancel. cmd/unleash.go returns the Run error through the existing command error path, so the run does not write a report. Focused tests cover a malformed source, a failed file open, a failed directory read, and a directory named directory.go. The lint baseline shrinks because the change fixes two engine test findings. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
+  "summary": "Return source discovery errors instead of partial success. Engine.Run now returns its results and an error. A walk, open, or parse failure stops the discovery, and Run returns the error after the running mutants finish. The discovery stops without an error when the context is done, and the mutant send no longer blocks after a cancel. cmd/unleash.go returns the Run error through the existing command error path, so the run does not write a report. Engine feature tests cover a malformed source, an illegal token, a failed file open, a failed directory read, and a directory named directory.go. A command regression test runs unleash on a module with an unparsable file outside the build and expects the parse error. The lint baseline shrinks because the change fixes two engine test findings. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
   "changes": [
     {
       "package": "cmd",

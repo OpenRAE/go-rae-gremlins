@@ -486,13 +486,6 @@ var mutationsTests = []mutationsTest{
 		covResult:  notCoveredPosition("testdata/fixtures/geq_go"),
 		mutStatus:  mutator.NotCovered,
 	},
-	{
-		name:       "it fails on illegal tokens",
-		fixture:    "testdata/fixtures/illegal_go",
-		mutantType: mutator.ConditionalsBoundary,
-		token:      token.ILLEGAL,
-		covResult:  notCoveredPosition("testdata/fixtures/illegal_go"),
-	},
 }
 
 func TestMutations(t *testing.T) {
@@ -508,14 +501,6 @@ func TestMutations(t *testing.T) {
 			defer c()
 
 			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			if tc.token == token.ILLEGAL {
-				if _, err := mut.Run(context.Background()); err == nil {
-					t.Error("Run() error = nil, want a parse error")
-				}
-
-				return
-			}
-
 			res := runEngine(t, mut)
 			got := res.Mutants
 
@@ -690,12 +675,16 @@ func (f failingFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return f.MapFS.ReadDir(name)
 }
 
-func TestRunReturnsDiscoveryErrors(t *testing.T) {
+func TestFeatureRunReturnsDiscoveryErrors(t *testing.T) {
 	src, err := os.ReadFile("testdata/fixtures/geq_go")
 	if err != nil {
 		t.Fatal(err)
 	}
 	broken := []byte("package main\n\nfunc main() {\n  if 1 >= 2 {\n")
+	illegal, err := os.ReadFile("testdata/fixtures/illegal_go")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testCases := []struct {
 		name     string
@@ -707,6 +696,11 @@ func TestRunReturnsDiscoveryErrors(t *testing.T) {
 			name:     "malformed Go source",
 			fsys:     fstest.MapFS{goodFile: {Data: src}, "broken.go": {Data: broken}},
 			wantPath: "broken.go",
+		},
+		{
+			name:     "illegal token",
+			fsys:     fstest.MapFS{"illegal.go": {Data: illegal}},
+			wantPath: "illegal.go",
 		},
 		{
 			name: "file open failure",
@@ -749,7 +743,7 @@ func TestRunReturnsDiscoveryErrors(t *testing.T) {
 	}
 }
 
-func TestRunWalksDirectoryNamedAsGoFile(t *testing.T) {
+func TestFeatureRunWalksDirectoryNamedAsGoFile(t *testing.T) {
 	t.Parallel()
 	src, err := os.ReadFile("testdata/fixtures/geq_go")
 	if err != nil {

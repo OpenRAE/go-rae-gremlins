@@ -278,3 +278,32 @@ func TestFeatureModulePath(t *testing.T) {
 		}
 	})
 }
+
+func TestRegressionUnleashFailsOnUnparsableSource(t *testing.T) {
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	configuration.Set(configuration.UnleashDryRunKey, true)
+
+	// The build constraint keeps broken.go out of the coverage run, so only
+	// the mutant discovery reads and parses it.
+	dir := t.TempDir()
+	files := map[string]string{
+		"go.mod":       "module example.com/broken\n\ngo 1.25\n",
+		"pass.go":      "package broken\n\nfunc Pass(a int) bool { return a > 0 }\n",
+		"pass_test.go": "package broken\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {\n\tif !Pass(1) {\n\t\tt.Fail()\n\t}\n}\n",
+		"broken.go":    "//go:build ignore\n\npackage broken\n\nfunc broken() {\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := runUnleash(context.Background())(nil, []string{dir})
+	if err == nil || !strings.Contains(err.Error(), "broken.go") {
+		t.Errorf("runUnleash(%q) error = %v, want a parse error that names broken.go", dir, err)
+	}
+}
