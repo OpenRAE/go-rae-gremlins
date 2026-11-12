@@ -108,14 +108,7 @@ func TestCoverageRun(t *testing.T) {
 				t.Fatalf("Run error = %v, want nil", err)
 			}
 
-			if got, err := os.Getwd(); err != nil || got != callerDir {
-				t.Errorf("working directory after Run = %q, %v; want %q, nil", got, err, callerDir)
-			}
-			for _, e := range holder.events {
-				if e.cmd.Dir != mod.Root {
-					t.Errorf("%s %v ran in %q, want module root %q", e.command, e.args, e.cmd.Dir, mod.Root)
-				}
-			}
+			assertCallerDirKept(t, callerDir, holder, mod.Root)
 
 			firstWant := "go mod download"
 			secondWant := fmt.Sprintf("go test -tags tag1 tag2 -coverpkg %s -cover -coverprofile %v %s",
@@ -134,6 +127,20 @@ func TestCoverageRun(t *testing.T) {
 				t.Error(cmp.Diff(secondGot, secondWant))
 			}
 		})
+	}
+}
+
+// assertCallerDirKept checks that the working directory is still callerDir
+// and that each recorded command ran in root.
+func assertCallerDirKept(t *testing.T, callerDir string, holder *commandHolder, root string) {
+	t.Helper()
+	if got, err := os.Getwd(); err != nil || got != callerDir {
+		t.Errorf("working directory after Run = %q, %v; want %q, nil", got, err, callerDir)
+	}
+	for _, e := range holder.events {
+		if e.cmd.Dir != root {
+			t.Errorf("%s %v ran in %q, want module root %q", e.command, e.args, e.cmd.Dir, root)
+		}
 	}
 }
 

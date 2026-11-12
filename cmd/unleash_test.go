@@ -348,10 +348,13 @@ func TestFeatureUnleashKeepsCallerDirectory(t *testing.T) {
 func newUnleashWorkspace(t *testing.T) string {
 	t.Helper()
 	workspace := t.TempDir()
+	pkgTest := "package pkg\n\nimport \"testing\"\n\n" +
+		"func TestLess(t *testing.T) {\n" +
+		"\tif !Less(1, 2) {\n\t\tt.Error(\"Less(1, 2) = false\")\n\t}\n}\n"
 	files := map[string]string{
 		filepath.Join("mod", "go.mod"):             "module example.com/mod\n\ngo 1.21\n",
 		filepath.Join("mod", "pkg", "pkg.go"):      "package pkg\n\nfunc Less(a, b int) bool { return a < b }\n",
-		filepath.Join("mod", "pkg", "pkg_test.go"): "package pkg\n\nimport \"testing\"\n\nfunc TestLess(t *testing.T) {\n\tif !Less(1, 2) {\n\t\tt.Error(\"Less(1, 2) = false\")\n\t}\n}\n",
+		filepath.Join("mod", "pkg", "pkg_test.go"): pkgTest,
 	}
 	for name, content := range files {
 		path := filepath.Join(workspace, name)
