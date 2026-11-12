@@ -58,7 +58,7 @@ jobs:
           python-version: '3.12'
       - name: Provision Go modules before offline analysis
         run: go mod download
-      - run: "python -m pip install --only-binary :all: 'coverage==7.16.0'"
+      - run: "python -m pip install --only-binary :all: 'coverage==7.16.0' 'pyyaml==6.0.3'"
       - run: make lint-cover
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -122,7 +122,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
-      - run: "python -m pip install --only-binary :all: 'pre-commit==4.3.0'"
+      - run: "python -m pip install --only-binary :all: 'pre-commit==4.3.0' 'pyyaml==6.0.3'"
       - name: Provision Go modules before offline analysis
         run: go mod download
       - name: Check policy with the pinned lint comparison
@@ -135,6 +135,11 @@ jobs:
           fi
           export LINT_BASE="$COMPARISON"
           make policy
+      # The live dev and main rules must keep every required dev check on the merge queue.
+      - name: Check the dev merge queue policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make merge-queue-policy
 
   # STE checks on changed Markdown with the pinned doc-tools release.
   docs:

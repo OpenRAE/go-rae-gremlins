@@ -161,9 +161,18 @@ The current hosted checks are defined in the repository:
 | [CI](../.github/workflows/ci.yml) | Architecture model and design checks, shrink-only baselines, and lint. STE checks on changed Markdown. Python line and branch coverage. Race tests and Go coverage on Linux, macOS, and Windows. Policy hooks, the memory budget, Sonar admission, and SonarCloud. `PR Gate` combines the architecture, lint, docs, test, policy, memory, and Sonar results. |
 | [Gremlins](../.github/workflows/gremlins.yml) | Mutation testing with the Gremlins source from the candidate commit. |
 | [PR title](../.github/workflows/pr-title.yml) | A Conventional Commit PR title with a lowercase subject. |
+| [GitGuardian](../.github/workflows/ggshield.yml) | A `ggshield` secret scan of the new commits of the PR or merge group. |
+| [Maintainer gate](../.github/workflows/maintainer-gate.yml) | The maintainer wrote or approved the PR. |
 
-The `dev` merge queue requires `PR Gate`, `Mutation testing`, and `Conventional PR title` on each merge group commit.
-These workflows also run on merge groups. They compare with the merge group base commit and read the queued PR.
+Pull requests to `dev` merge through a GitHub merge queue ([ADR 0007](adr/0007-dev-merge-queue.md)).
+The queue requires `PR Gate`, `Mutation testing`, `Conventional PR title`, `ggshield`, and `maintainer-gate` on each
+merge group commit. These workflows run on merge groups. They compare with the merge group base commit and read the
+queued PR. A failed check removes the PR from the queue. `main` has no merge queue.
+
+The `Policy` job of CI runs `make merge-queue-policy`. This check reads the live branch rules of `dev` and `main`.
+It fails when `dev` has no merge queue, when `main` has a merge queue, or when `dev` has required checks in classic
+branch protection. It also fails when `dev` has non-strict checks and no merge queue. It fails when a required `dev`
+check has no workflow job that runs on `merge_group`.
 
 CI deliberately skips the Sonar jobs for PRs from other repositories because they have no access to the token;
 `PR Gate` accepts that specific skip. Ground Control readiness still requires the configured Sonar result.
@@ -213,9 +222,10 @@ Contributors working manually still follow the branch, hook, verification, revie
 3. Let the workflow publish the change. It stages the diff, scans for sensitive content, runs configured pre-commit
    checks, commits, pushes, and synchronizes with current `dev`. Repair a failed gate and retry through the workflow.
 4. Let the workflow render and create the synchronized PR, observe CI and Sonar, and record readiness for the
-   checked head. A later head change requires a new readiness check. Readiness hands the PR to the maintainer for
-   merge; it does not close the issue.
-5. After the maintainer merges, the [Phase E workflow](../.github/workflows/ground-control-phase-e.yml) calls the
+   checked head. A later head change requires a new readiness check. For a PR that targets `dev`, readiness adds
+   the PR to the merge queue. The queue merges the PR when every required check passes on the merge group. For
+   other bases, readiness hands the PR to the maintainer for merge. Readiness does not close the issue.
+5. After the PR merges, the [Phase E workflow](../.github/workflows/ground-control-phase-e.yml) calls the
    existing finalizer. The finalizer posts the final report and closes the issue. Follow [setup and recovery](development/phase-e.md)
    for release access, first installation, restricted fork events, or a failed run. When readiness reports
    `finalization: reentry`, re-invoke the same `/implement <issue>` or `/quickfix <issue>` after merge.
