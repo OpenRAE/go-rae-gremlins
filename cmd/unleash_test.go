@@ -291,10 +291,11 @@ func TestRegressionUnleashFailsOnUnparsableSource(t *testing.T) {
 	// the mutant discovery reads and parses it.
 	dir := t.TempDir()
 	files := map[string]string{
-		"go.mod":       "module example.com/broken\n\ngo 1.25\n",
-		"pass.go":      "package broken\n\nfunc Pass(a int) bool { return a > 0 }\n",
-		"pass_test.go": "package broken\n\nimport \"testing\"\n\nfunc TestPass(t *testing.T) {\n\tif !Pass(1) {\n\t\tt.Fail()\n\t}\n}\n",
-		"broken.go":    "//go:build ignore\n\npackage broken\n\nfunc broken() {\n",
+		"go.mod":  "module example.com/broken\n\ngo 1.25\n",
+		"pass.go": "package broken\n\nfunc Pass(a int) bool { return a > 0 }\n",
+		"pass_test.go": "package broken\n\nimport \"testing\"\n\n" +
+			"func TestPass(t *testing.T) {\n\tif !Pass(1) {\n\t\tt.Fail()\n\t}\n}\n",
+		"broken.go": "//go:build ignore\n\npackage broken\n\nfunc broken() {\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
