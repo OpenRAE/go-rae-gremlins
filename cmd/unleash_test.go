@@ -237,10 +237,18 @@ func TestFeatureUnleashRequiresGoModule(t *testing.T) {
 }
 
 func TestFeatureModulePath(t *testing.T) {
-	t.Run("argument", func(t *testing.T) {
-		got, err := modulePath([]string{"some/path"})
-		if err != nil || got != "some/path" {
-			t.Errorf("modulePath([some/path]) = %q, %v; want %q, nil", got, err, "some/path")
+	t.Run("relative argument", func(t *testing.T) {
+		dir := t.TempDir()
+		t.Chdir(dir)
+		cwd, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("os.Getwd error = %v", err)
+		}
+		want := filepath.Join(cwd, "some", "path")
+
+		got, err := modulePath([]string{filepath.Join("some", "path")})
+		if err != nil || got != want {
+			t.Errorf("modulePath([some/path]) = %q, %v; want %q, nil", got, err, want)
 		}
 	})
 
@@ -303,12 +311,90 @@ func TestRegressionUnleashFailsOnUnparsableSource(t *testing.T) {
 		}
 	}
 
-	// The coverage run changes the process directory to the module root. Restore
-	// it before the TempDir cleanup, which cannot remove a current directory on Windows.
-	t.Chdir(dir)
-
 	err := runUnleash(context.Background())(nil, []string{dir})
 	if err == nil || !strings.Contains(err.Error(), "broken.go") {
 		t.Errorf("runUnleash(%q) error = %v, want a parse error that names broken.go", dir, err)
 	}
+}
+
+func TestFeatureUnleashKeepsCallerDirectory(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs the go command on a temporary module")
+	}
+	testCases := []struct {
+		name string
+		// callerDir and args are relative to the workspace.
+		callerDir string
+		args      []string
+	}{
+		{
+			name:      "relative module argument",
+			callerDir: ".",
+			args:      []string{"mod"},
+		},
+		{
+			name:      "subdirectory invocation",
+			callerDir: filepath.Join("mod", "pkg"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			workspace := newUnleashWorkspace(t)
+			t.Chdir(filepath.Join(workspace, tc.callerDir))
+			callerDir, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("os.Getwd error = %v", err)
+			}
+			configuration.Reset()
+			t.Cleanup(configuration.Reset)
+			if err := configuration.Init([]string{t.TempDir()}); err != nil {
+				t.Fatalf("configuration.Init error = %v, want nil", err)
+			}
+			configuration.Set(configuration.UnleashDryRunKey, true)
+			configuration.Set(configuration.MutantTypeEnabledKey(mutator.ConditionalsBoundary), true)
+			configuration.Set(configuration.UnleashOutputKey, "report.json")
+
+			if err := runUnleash(context.Background())(nil, tc.args); err != nil {
+				t.Fatalf("runUnleash(%v) error = %v, want nil", tc.args, err)
+			}
+
+			if got, err := os.Getwd(); err != nil || got != callerDir {
+				t.Errorf("working directory after runUnleash = %q, %v; want %q, nil", got, err, callerDir)
+			}
+			if _, err := os.Stat(filepath.Join(callerDir, "report.json")); err != nil {
+				t.Errorf("report in the caller directory: %v", err)
+			}
+			if callerDir != filepath.Join(workspace, "mod") {
+				if _, err := os.Stat(filepath.Join(workspace, "mod", "report.json")); err == nil {
+					t.Error("report written to the module root, want the caller directory")
+				}
+			}
+		})
+	}
+}
+
+// newUnleashWorkspace returns a directory that contains the module mod with
+// one tested package in mod/pkg.
+func newUnleashWorkspace(t *testing.T) string {
+	t.Helper()
+	workspace := t.TempDir()
+	pkgTest := "package pkg\n\nimport \"testing\"\n\n" +
+		"func TestLess(t *testing.T) {\n" +
+		"\tif !Less(1, 2) {\n\t\tt.Error(\"Less(1, 2) = false\")\n\t}\n}\n"
+	files := map[string]string{
+		filepath.Join("mod", "go.mod"):             "module example.com/mod\n\ngo 1.21\n",
+		filepath.Join("mod", "pkg", "pkg.go"):      "package pkg\n\nfunc Less(a, b int) bool { return a < b }\n",
+		filepath.Join("mod", "pkg", "pkg_test.go"): pkgTest,
+	}
+	for name, content := range files {
+		path := filepath.Join(workspace, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatalf("os.MkdirAll error = %v", err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatalf("os.WriteFile error = %v", err)
+		}
+	}
+
+	return workspace
 }

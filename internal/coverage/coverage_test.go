@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -39,6 +40,7 @@ const (
 
 type commandHolder struct {
 	events []struct {
+		cmd     *exec.Cmd
 		command string
 		args    []string
 	}
@@ -85,18 +87,28 @@ func TestCoverageRun(t *testing.T) {
 			viper.Set(configuration.UnleashIntegrationMode, tc.intMode)
 			defer viper.Reset()
 
-			wantWorkdir := "workdir"
-			wantFilename := "coverage"
-			wantFilePath := wantWorkdir + "/" + wantFilename
+			wantWorkdir := filepath.Join("testdata", "valid")
+			wantFilePath, err := filepath.Abs(filepath.Join(wantWorkdir, "coverage"))
+			if err != nil {
+				t.Fatal(err)
+			}
 			holder := &commandHolder{}
 			mod := gomodule.GoModule{
 				Name:       exampleModule,
-				Root:       ".",
+				Root:       t.TempDir(),
 				CallingDir: tc.callPath,
 			}
-			cov := coverage.NewWithCmd(fakeExecCommandSuccess(holder), wantWorkdir, mod)
+			callerDir, err := os.Getwd()
+			if err != nil {
+				t.Fatal(err)
+			}
+			cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, holder), wantWorkdir, mod)
 
-			_, _ = cov.Run()
+			if _, err := cov.Run(); err != nil {
+				t.Fatalf("Run error = %v, want nil", err)
+			}
+
+			assertCallerDirKept(t, callerDir, holder, mod.Root)
 
 			firstWant := "go mod download"
 			secondWant := fmt.Sprintf("go test -tags tag1 tag2 -coverpkg %s -cover -coverprofile %v %s",
@@ -118,6 +130,20 @@ func TestCoverageRun(t *testing.T) {
 	}
 }
 
+// assertCallerDirKept checks that the working directory is still callerDir
+// and that each recorded command ran in root.
+func assertCallerDirKept(t *testing.T, callerDir string, holder *commandHolder, root string) {
+	t.Helper()
+	if got, err := os.Getwd(); err != nil || got != callerDir {
+		t.Errorf("working directory after Run = %q, %v; want %q, nil", got, err, callerDir)
+	}
+	for _, e := range holder.events {
+		if e.cmd.Dir != root {
+			t.Errorf("%s %v ran in %q, want module root %q", e.command, e.args, e.cmd.Dir, root)
+		}
+	}
+}
+
 func TestCoverageRunFails(t *testing.T) {
 	mod := gomodule.GoModule{
 		Name:       exampleModule,
@@ -125,14 +151,14 @@ func TestCoverageRunFails(t *testing.T) {
 	}
 
 	t.Run("failure of: go mod download", func(t *testing.T) {
-		cov := coverage.NewWithCmd(fakeExecCommandFailure(0), "workdir", mod)
+		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 0), "workdir", mod)
 		if _, err := cov.Run(); err == nil {
 			t.Error("expected run to report an error")
 		}
 	})
 
 	t.Run("failure of: go test", func(t *testing.T) {
-		cov := coverage.NewWithCmd(fakeExecCommandFailure(1), "workdir", mod)
+		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 1), "workdir", mod)
 		if _, err := cov.Run(); err == nil {
 			t.Error("expected run to report an error")
 		}
@@ -145,7 +171,7 @@ func TestCoverageParsesOutput(t *testing.T) {
 		Name:       module,
 		CallingDir: "path",
 	}
-	cov := coverage.NewWithCmd(fakeExecCommandSuccess(nil), "testdata/valid", mod)
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), "testdata/valid", mod)
 	profile := coverage.Profile{
 		"file1.go": {
 			{
@@ -195,7 +221,7 @@ func TestCoverageParsesOutput(t *testing.T) {
 		t.Error(cmp.Diff(got, want))
 	}
 	if got.Elapsed == 0 {
-		t.Errorf("expected elapsed time to be greater than 0")
+		t.Error("expected elapsed time to be greater than 0")
 	}
 }
 
@@ -204,10 +230,10 @@ func TestParseOutputFail(t *testing.T) {
 		Name:       exampleModule,
 		CallingDir: allPackages,
 	}
-	cov := coverage.NewWithCmd(fakeExecCommandSuccess(nil), "testdata/invalid", mod)
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), "testdata/invalid", mod)
 
 	if _, err := cov.Run(); err == nil {
-		t.Errorf("espected an error")
+		t.Error("expected an error")
 	}
 }
 
@@ -227,25 +253,29 @@ func TestCoverageProcessFailure(_ *testing.T) {
 
 type execContext = func(name string, args ...string) *exec.Cmd
 
-func fakeExecCommandSuccess(got *commandHolder) execContext {
+func fakeExecCommandSuccess(t *testing.T, got *commandHolder) execContext {
+	t.Helper()
+
 	return func(command string, args ...string) *exec.Cmd {
-		if got != nil {
-			got.events = append(got.events, struct {
-				command string
-				args    []string
-			}{command: command, args: args})
-		}
 		cs := []string{"-test.run=TestCoverageProcessSuccess", "--", command}
 		cs = append(cs, args...)
 		// #nosec G204 G702 - We are in tests, we don't care
-		cmd := exec.Command(os.Args[0], cs...)
+		cmd := exec.CommandContext(t.Context(), os.Args[0], cs...)
 		cmd.Env = []string{"GO_TEST_PROCESS=1"}
+		if got != nil {
+			got.events = append(got.events, struct {
+				cmd     *exec.Cmd
+				command string
+				args    []string
+			}{cmd: cmd, command: command, args: args})
+		}
 
 		return cmd
 	}
 }
 
-func fakeExecCommandFailure(run int) execContext {
+func fakeExecCommandFailure(t *testing.T, run int) execContext {
+	t.Helper()
 	var executed int
 
 	return func(command string, args ...string) *exec.Cmd {
@@ -255,7 +285,7 @@ func fakeExecCommandFailure(run int) execContext {
 		}
 		cs = append(cs, args...)
 		// #nosec G204 G702 - We are in tests, we don't care
-		cmd := exec.Command(os.Args[0], cs...)
+		cmd := exec.CommandContext(t.Context(), os.Args[0], cs...)
 		cmd.Env = []string{"GO_TEST_PROCESS=1"}
 		executed++
 

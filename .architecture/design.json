@@ -18,7 +18,10 @@
         "internal/mutator",
         "internal/report"
       ],
-      "test_imports": []
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
     },
     {
       "package": "internal/engine",

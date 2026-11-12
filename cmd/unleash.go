@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -143,10 +144,16 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 	}
 }
 
-// modulePath returns the path in args, or the current directory when args is empty.
+// modulePath returns the absolute path in args, or the current directory when
+// args is empty.
 func modulePath(args []string) (string, error) {
 	if len(args) > 0 {
-		return args[0], nil
+		path, err := filepath.Abs(args[0])
+		if err != nil {
+			return "", fmt.Errorf("impossible to resolve the module path: %w", err)
+		}
+
+		return path, nil
 	}
 	path, err := os.Getwd()
 	if err != nil {
