@@ -22,25 +22,7 @@
     {
       "linter": "errcheck",
       "file": "internal/coverage/coverage.go",
-      "fingerprint": "50aa115f427407dfe434c1e80a49d66dc028d3924a814e1e5a3a087275d15678",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/coverage/coverage.go",
-      "fingerprint": "b0e1b9ad8fa5b5eb0e9334d342bb180240c5edee3758b514145b387d04ef2f0c",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/coverage/coverage.go",
       "fingerprint": "b5da5d3dadce2da6e85534e721621da6dc5920c07f9ea75763332a4bbc7d33e0",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/coverage/coverage_test.go",
-      "fingerprint": "4824de273874b047f126d977c826d18cf9a5d9137b233dcf40c43d4322fa240f",
       "count": 1
     },
     {
@@ -243,18 +225,6 @@
     },
     {
       "linter": "noctx",
-      "file": "internal/coverage/coverage_test.go",
-      "fingerprint": "90b8d8823c2292e1c9042fcb01b385a663a7bb59e5b9a98ab7c7252a0acbc9b2",
-      "count": 1
-    },
-    {
-      "linter": "noctx",
-      "file": "internal/coverage/coverage_test.go",
-      "fingerprint": "d0de500e7d87cad0dc788be7e9bbbf71da012a1ba699be34d35264f9fbbbcaeb",
-      "count": 1
-    },
-    {
-      "linter": "noctx",
       "file": "tools/architecture/git.go",
       "fingerprint": "0ff040d58d52fdafc7a18fdbf5ee6da2918ed486fd40511afe75b1f66e42d0bf",
       "count": 1
@@ -309,18 +279,6 @@
     },
     {
       "linter": "revive",
-      "file": "internal/coverage/coverage_test.go",
-      "fingerprint": "93462b83d4f63a9ad013cd967892092b391594d1656a8647209d94280416c9ff",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/coverage/coverage_test.go",
-      "fingerprint": "ccd71bb2b1458b1a46f55d7a86b9926b0244844cf6b9bd008f03e5cf5c4e71b3",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "internal/diff/diff_test.go",
       "fingerprint": "79b1c6945f7411f72d4677684139c4afae18ca28122eb9030c834fa8de87a90a",
       "count": 1
@@ -341,12 +299,6 @@
       "linter": "revive",
       "file": "internal/engine/engine_test.go",
       "fingerprint": "6af2652e58f9aeb00eb051a7aab74258ff0d188bd9a04058e279901b60c47a16",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/engine_test.go",
-      "fingerprint": "f0ea09b3c8a97f89b6392067d1517d807e5f47cf9e2755c22bba2d6766d8ca55",
       "count": 1
     },
     {
