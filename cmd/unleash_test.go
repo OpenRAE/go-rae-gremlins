@@ -302,6 +302,10 @@ func TestRegressionUnleashFailsOnUnparsableSource(t *testing.T) {
 		}
 	}
 
+	// The coverage run changes the process directory to the module root. Restore
+	// it before the TempDir cleanup, which cannot remove a current directory on Windows.
+	t.Chdir(dir)
+
 	err := runUnleash(context.Background())(nil, []string{dir})
 	if err == nil || !strings.Contains(err.Error(), "broken.go") {
 		t.Errorf("runUnleash(%q) error = %v, want a parse error that names broken.go", dir, err)
