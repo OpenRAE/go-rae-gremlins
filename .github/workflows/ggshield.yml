@@ -1,0 +1,36 @@
+name: GitGuardian
+
+# The GitGuardian App posts its check only on pull request commits. A merge group
+# commit has no pull request, so this job produces the required ggshield check on
+# pull requests and on each merge group of the dev merge queue.
+on:
+  pull_request:
+    branches: [main, dev]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  ggshield:
+    name: ggshield
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'ggshield==1.56.1'
+      # Pull requests from other repositories get no secrets, so the scan fails
+      # for them. The maintainer gate blocks those pull requests until approval.
+      - name: Scan the new commits for secrets
+        env:
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha }}
+        run: ggshield secret scan commit-range "$BASE_SHA..$HEAD_SHA"
