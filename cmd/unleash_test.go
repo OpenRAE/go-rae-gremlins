@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -233,6 +234,30 @@ func TestFeatureUnleashRequiresGoModule(t *testing.T) {
 	err := runUnleash(context.Background())(nil, []string{dir})
 	if err == nil || !strings.Contains(err.Error(), "not in a Go module") {
 		t.Errorf("runUnleash(%q) error = %v, want a not-in-a-Go-module error", dir, err)
+	}
+}
+
+func TestFeatureUnleashReportsCancellation(t *testing.T) {
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	dir := t.TempDir()
+	goMod := []byte("module example.com/cancel\n\ngo 1.25\n")
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), goMod, 0o600); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := runUnleash(ctx)(nil, []string{dir})
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("runUnleash(cancelled context) error = %v, want %v", err, context.Canceled)
+	}
+	if err != nil && !strings.Contains(err.Error(), "mutation testing cancelled") {
+		t.Errorf("runUnleash(cancelled context) error = %q, want it to report the cancellation", err)
 	}
 }
 
