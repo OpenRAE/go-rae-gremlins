@@ -315,18 +315,6 @@
     },
     {
       "linter": "revive",
-      "file": "internal/engine/engine_test.go",
-      "fingerprint": "b15c00ea78766f3420bcbbb13b28b5d3abfed429a0463ae4062c78cb0e9ef25e",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/engine_test.go",
-      "fingerprint": "f0ea09b3c8a97f89b6392067d1517d807e5f47cf9e2755c22bba2d6766d8ca55",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "internal/engine/executor.go",
       "fingerprint": "7d15ff0a6bda1364ec0489206408125b99c75cc8990232f2650eac498ac122c4",
       "count": 1
