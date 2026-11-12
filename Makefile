@@ -33,7 +33,7 @@ ${COVER_OUT}:
 
 .PHONY: requirements
 requirements:
-	mise install aqua:golangci/golangci-lint
+	mise install
 	go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
 
 .PHONY: lint

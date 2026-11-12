@@ -22,11 +22,11 @@ Copied upstream issues and PRs need a keep, rework, or close decision under
 
 ## Prepare the clone
 
-Install Go as specified by `go.mod`, [mise](https://mise.jdx.dev), and
-[pre-commit](https://pre-commit.com). Install the pinned linter from `mise.toml`:
+Install [mise](https://mise.jdx.dev) and [pre-commit](https://pre-commit.com).
+Install the pinned linter and the `go.mod` Go toolchain from `mise.toml`:
 
 ```shell
-mise install aqua:golangci/golangci-lint
+mise install
 make hooks
 ```
 
@@ -67,7 +67,9 @@ Remove stale baseline entries when fixing violations. Never regenerate or enlarg
 policy changes need maintainer review. CI runs this check without secrets and requires it in `PR Gate`.
 
 Follow the [Go coding standard and upstream comparison](development/coding-standards.md).
-Provision the pinned linter with mise and download Go modules before analysis.
+Provision the pinned linter and Go with mise and download Go modules before analysis.
+`make lint` fails when the Go version is newer than the Go that built golangci-lint,
+because the linter then cannot run its type-aware checks.
 `make lint` checks formatting and analyzes Linux, Darwin, and Windows with tests.
 It compares lint identities and counts against the fetched target baseline.
 CI passes the event's comparison commit to both lint and policy checks.

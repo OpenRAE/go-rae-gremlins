@@ -26,7 +26,7 @@ jobs:
       - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195
         with:
           version: 2026.10.25
-          install_args: aqua:golangci/golangci-lint
+          install_args: aqua:golangci/golangci-lint go
           cache: false
       - name: Provision Go modules
         run: go mod download
