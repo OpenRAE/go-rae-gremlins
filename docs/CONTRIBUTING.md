@@ -63,6 +63,7 @@ for package, contract, and policy changes and checks every changed package again
 
 Run `make architecture ARCHITECTURE_BASE=origin/dev` to scan all packages and compare baseline identities against
 a fetched target commit. Tests and platform files are included. Each finding gives a repair instruction.
+
 Remove stale baseline entries when fixing violations. Never regenerate or enlarge the baseline. Architecture
 policy changes need maintainer review. CI runs this check without secrets and requires it in `PR Gate`.
 
@@ -71,16 +72,62 @@ Provision the pinned linter and Go with mise and download Go modules before anal
 `make lint` fails when the Go version is newer than the Go that built golangci-lint,
 because the linter then cannot run its type-aware checks.
 `make lint` checks formatting and analyzes Linux, Darwin, and Windows with tests.
-It compares lint identities and counts against the fetched target baseline.
+
+`make lint` compares lint identities and counts against the fetched target baseline.
 CI passes the event's comparison commit to both lint and policy checks.
 The first `main` promotion adopts the reviewed `dev` baseline, and rejects any additions to it.
 For local checks, use `make lint LINT_BASE=origin/dev` or another fetched target commit.
+
 Repair findings and run `make lint-shrink` to remove stale allowances.
 The shrink command cannot add or replace debt. Do not regenerate the baseline.
 Changes to rules, suppressions, contexts, and tool versions need explicit review.
 
 For upstream commits, follow [ADR 0003](adr/0003-upstream-changes.md): cherry-pick with `-x`, retain the original
 author, adapt the module path, and open a PR to `dev`. Do not merge an upstream branch into this fork.
+
+## Documentation
+
+Write documentation in ASD-STE100 Simplified Technical English. The checks use the
+[doc-tools v0.1.0](https://github.com/OpenRAE/doc-tools/releases/tag/v0.1.0) release.
+[`scripts/doc-tools.sh`](../scripts/doc-tools.sh) records the release version and the archive SHA-256.
+The script verifies the archive before extraction and installs it in `.tools/`, which Git ignores.
+The package installer verifies the ste-cli archive in the same way. A checksum mismatch stops the check.
+
+Check the Markdown files that you change. Give explicit paths:
+
+```shell
+bash scripts/doc-tools.sh lint docs/CONTRIBUTING.md README.md
+```
+
+To check all Markdown files that changed since the merge base with `origin/dev`, run this command:
+
+```shell
+make docs-changed
+```
+
+The check examines each changed file completely. When you edit a page, correct its existing findings too.
+The check does not examine `CHANGELOG.md`, `CODE_OF_CONDUCT.md`, or files in `testdata` directories.
+A passing check does not prove full ASD-STE100 conformance. Also review the accuracy, the links, and the diff.
+
+For agent-assisted writing, use the shared `documentation` skill of the same release.
+Remove an older personal skill named `documentation` first, because two skills with the same name can both show.
+In Claude Code, run these commands:
+
+```text
+/plugin marketplace add OpenRAE/doc-tools#v0.1.0
+/plugin install doc-tools@openrae-doc-tools
+```
+
+In Codex, run the preinstalled `skill-installer` script:
+
+```shell
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
+  --repo OpenRAE/doc-tools --path skills/documentation --ref v0.1.0
+```
+
+To upgrade or roll back, follow the package's
+[installation and upgrade guide](https://github.com/OpenRAE/doc-tools/blob/v0.1.0/docs/how-to-install.md).
+Change `VERSION` and `SHA256` in `scripts/doc-tools.sh` to the values in the release `SHA256SUMS` file.
 
 ## Verify the change
 
@@ -95,7 +142,7 @@ go test -race ./internal/coverage -run '^TestCoverageParsesOutput$'
 ```
 
 Choose the package and test names that exercise your change. Check mutation results where applicable to test
-effectiveness. For documentation-only changes, check accuracy, links, and the diff; no new Go test is needed.
+effectiveness. For documentation-only changes, run the [documentation checks](#documentation); no new Go test is needed.
 Format changed Go files with the pinned formatter:
 
 ```shell
@@ -111,7 +158,7 @@ The current hosted checks are defined in the repository:
 
 | Workflow | Verification |
 | --- | --- |
-| [CI](../.github/workflows/ci.yml) | Architecture model/design checks, shrink-only baselines, lint, Python line/branch coverage, race tests and Go coverage on Linux/macOS/Windows, policy hooks, Sonar admission, and SonarCloud. `PR Gate` combines architecture, lint, tests, policy, and Sonar results. |
+| [CI](../.github/workflows/ci.yml) | Architecture model and design checks, shrink-only baselines, and lint. STE checks on changed Markdown. Python line and branch coverage. Race tests and Go coverage on Linux, macOS, and Windows. Policy hooks, the memory budget, Sonar admission, and SonarCloud. `PR Gate` combines the architecture, lint, docs, test, policy, memory, and Sonar results. |
 | [Gremlins](../.github/workflows/gremlins.yml) | Mutation testing with the Gremlins source from the candidate commit. |
 | [PR title](../.github/workflows/pr-title.yml) | A Conventional Commit PR title with a lowercase subject. |
 | [GitGuardian](../.github/workflows/ggshield.yml) | A `ggshield` secret scan of the new commits of the PR or merge group. |
@@ -168,7 +215,7 @@ Contributors working manually still follow the branch, hook, verification, revie
 
 1. Invoke `/implement <issue>` for the normal issue workflow, or `/quickfix <issue>` for a small, settled change.
    The issue branch and pickup record identify the work. The normal workflow adds design, planning, and pre-push
-   review; quickfix omits those heavier steps and runs no pre-push review unless `--review` is supplied.
+   review. Quickfix omits those steps. It runs no pre-push review unless you supply `--review`.
 2. Implement the issue's acceptance criteria and run targeted verification. Record significant decisions and any
    required review findings on the issue. A quickfix with `--review` runs one pre-push review cycle; act on its
    findings and follow the returned stop conditions.
@@ -176,10 +223,10 @@ Contributors working manually still follow the branch, hook, verification, revie
    checks, commits, pushes, and synchronizes with current `dev`. Repair a failed gate and retry through the workflow.
 4. Let the workflow render and create the synchronized PR, observe CI and Sonar, and record readiness for the
    checked head. A later head change requires a new readiness check. For a PR that targets `dev`, readiness adds
-   the PR to the merge queue, and the queue merges it when every required check passes on the merge group. For
+   the PR to the merge queue. The queue merges the PR when every required check passes on the merge group. For
    other bases, readiness hands the PR to the maintainer for merge. Readiness does not close the issue.
 5. After the PR merges, the [Phase E workflow](../.github/workflows/ground-control-phase-e.yml) calls the
-   existing finalizer to post the final report and close the issue. Follow [setup and recovery](development/phase-e.md)
+   existing finalizer. The finalizer posts the final report and closes the issue. Follow [setup and recovery](development/phase-e.md)
    for release access, first installation, restricted fork events, or a failed run. When readiness reports
    `finalization: reentry`, re-invoke the same `/implement <issue>` or `/quickfix <issue>` after merge.
 
@@ -212,11 +259,13 @@ new subtests under an unclassified historical test fail CI too.
 Name each new Go regression test `TestRegression` followed by its behavior,
 for example `TestRegressionDiffSeparatedAdditions`. Give each regression a
 distinct test or `t.Run` name; unnamed table rows cannot prove separate
-regressions. CI runs the head and base suites to discover test and subtest names,
-then proves each new regression leaf separately with race detection and caching
-disabled. A failing sibling cannot establish proof for a passing case.
-Each case must pass on the PR head and fail an assertion against the merge base
-with the PR's test files, `testdata` fixtures, and Go dependency files overlaid.
+regressions. CI runs the head and base suites to discover test and subtest names.
+
+CI then proves each new regression leaf separately, with the race detector on
+and the test cache off. A failing sibling cannot establish proof for a passing case.
+Each case must pass on the PR head. It must also fail an assertion against the
+merge base, with the PR's test files, `testdata` fixtures, and Go dependency files overlaid.
+
 A case that passes on base, fails to compile, panics, times out, skips, or does
 not run fails the proof check. An existing regression name is not treated as a
 new case; give each new regression its own name. `TestFeature...` cases run

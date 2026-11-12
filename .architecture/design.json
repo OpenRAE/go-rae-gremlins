@@ -1,16 +1,16 @@
 {
   "version": 1,
-  "issue": 151,
-  "summary": "Gate the dev merge queue. The CI Policy job runs make merge-queue-policy, which runs .github/scripts/merge_queue_policy.py. The script reads the live dev and main branch rules with gh api and the workflow files. It fails when dev has no merge queue, main has a merge queue, dev has classic required checks, dev has non-strict checks without a queue, or a required dev check has no merge_group producer. The lint job installs PyYAML and make lint-cover runs the new Python tests. A new ggshield workflow produces the required GitGuardian check on pull requests and merge groups. ADR 0007 and docs/CONTRIBUTING.md describe the queue. No Go package, import, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "issue": 145,
+  "summary": "Use the doc-tools v0.1.0 release for documentation checks. scripts/doc-tools.sh pins the release version and archive SHA-256, verifies the archive before extraction, and installs it in the ignored .tools directory. The script runs the package ste-lint.sh wrapper on explicit Markdown paths. New Makefile targets install the package, check explicit paths, and check Markdown that changed since a base commit. A new CI Docs job runs the changed-Markdown check and proves that a bad prose sample fails and its corrected form passes. PR Gate requires the Docs job. The contributor guide, CLAUDE.md, and AGENTS.md describe the setup, the checks, and the shared documentation skill. No Go package, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
   "changes": [],
   "contracts": [],
-  "trust_boundaries": "The merge queue policy check is a new CI data flow. It reads the public branch rules of this repository from the GitHub API with the read-only workflow token. It sends no repository content and executes no candidate source beyond the checked-in script. ADR 0007 records the new merge_queue_policy boundary in the model. The ggshield workflow is not a modeled policy path. It sends the new commits to the GitGuardian API with the GITGUARDIAN_API_KEY secret. The other trust_changes entries restate the existing boundaries.",
+  "trust_boundaries": "The STE check reads local Markdown files and writes findings to the terminal or the existing CI log. It sends no file content to a network destination and does not execute scanned source. Tool provisioning downloads two pinned archives from GitHub releases: the doc-tools archive and the ste-cli archive. Each archive must match a pinned SHA-256 before extraction, and a mismatch stops the check. This is the same provisioning class as the existing pinned mise, pre-commit, and go run tool downloads. The CI job uses pinned actions, contents read, no secrets, and checkout without persisted credentials.",
   "conflicts": [],
   "policies": [
-    "model",
-    "ci",
     "build",
-    "contributing"
+    "ci",
+    "contributing",
+    "guidance"
   ],
   "trust_changes": {
     "development_checks": {

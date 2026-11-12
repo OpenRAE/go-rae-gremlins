@@ -69,6 +69,18 @@ merge-queue-policy:
 hooks:
 	bash scripts/install-hooks.sh
 
+# Documentation checks use the pinned doc-tools release. See docs/CONTRIBUTING.md.
+DOCS_BASE ?= origin/dev
+.PHONY: docs-tools docs-changed docs-samples
+docs-tools:
+	bash scripts/doc-tools.sh install
+
+docs-changed:
+	bash scripts/doc-tools.sh changed "${DOCS_BASE}"
+
+docs-samples:
+	bash scripts/doc-tools.sh samples
+
 .PHONY: goimports
 goimports:
 	${LINTER_CMD} fmt ./...
