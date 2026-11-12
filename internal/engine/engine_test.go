@@ -732,7 +732,7 @@ var lifecycleFS = fstest.MapFS{
 // The synctest bubbles below fail if Run leaves a goroutine of the engine,
 // the discovery, or the worker pool blocked after it returns.
 
-func TestEngineRunReleasesWorkersOnCompletion(t *testing.T) {
+func TestFeatureEngineRunReleasesWorkersOnCompletion(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		viperSet(map[string]any{configuration.UnleashWorkersKey: 2})
 		defer viperReset()
@@ -762,7 +762,7 @@ func TestStopsOnCancel(t *testing.T) {
 	})
 }
 
-func TestEngineRunCancelReleasesBlockedSubmission(t *testing.T) {
+func TestFeatureEngineRunCancelReleasesBlockedSubmission(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		viperSet(map[string]any{configuration.UnleashWorkersKey: 1})
 		defer viperReset()

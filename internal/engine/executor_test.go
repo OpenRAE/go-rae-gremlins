@@ -700,7 +700,7 @@ func getCmd(ctx context.Context, cs []string) *exec.Cmd {
 	return cmd
 }
 
-func TestExecutorCancellation(t *testing.T) {
+func TestFeatureExecutorCancellation(t *testing.T) {
 	testCases := []struct {
 		name         string
 		cancelOnExec bool

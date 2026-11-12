@@ -147,7 +147,7 @@ func TestCoverageRunFails(t *testing.T) {
 	})
 }
 
-func TestCoverageRunStopsOnCancel(t *testing.T) {
+func TestFeatureCoverageRunStopsOnCancel(t *testing.T) {
 	t.Chdir(t.TempDir())
 	mod := gomodule.GoModule{
 		Name:       exampleModule,

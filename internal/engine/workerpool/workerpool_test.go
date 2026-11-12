@@ -104,34 +104,6 @@ func TestPool(t *testing.T) {
 		}
 	})
 
-	t.Run("cancelled submission returns while the queue is full", func(t *testing.T) {
-		configuration.Set(configuration.UnleashWorkersKey, 1)
-		defer configuration.Reset()
-
-		outCh := make(chan mutator.Mutator)
-		pool := workerpool.Initialize("test")
-		pool.Start(context.Background())
-		defer pool.Stop()
-		tj := &ExecutorMock{mutant: &fakeMutant{}, outCh: outCh}
-
-		// The worker blocks on outCh with the first executor. The second
-		// fills the queue, so the third submission can only end by cancellation.
-		for i := range 2 {
-			if !pool.AppendExecutor(context.Background(), tj) {
-				t.Fatalf("AppendExecutor #%d = false, want true", i)
-			}
-		}
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		if pool.AppendExecutor(ctx, tj) {
-			t.Error("AppendExecutor(cancelled context) = true, want false")
-		}
-
-		for range 2 {
-			<-outCh
-		}
-	})
-
 	t.Run("default uses runtime CPUs as number of workers", func(t *testing.T) {
 		configuration.Set(configuration.UnleashWorkersKey, 0)
 		defer configuration.Reset()
@@ -283,4 +255,32 @@ func (fakeMutant) OrigSnippet() []byte {
 
 func (fakeMutant) MutatedSnippet() []byte {
 	panic("not used in test")
+}
+
+func TestFeaturePoolCancelledSubmissionReturnsWhileQueueIsFull(t *testing.T) {
+	configuration.Set(configuration.UnleashWorkersKey, 1)
+	defer configuration.Reset()
+
+	outCh := make(chan mutator.Mutator)
+	pool := workerpool.Initialize("test")
+	pool.Start(context.Background())
+	defer pool.Stop()
+	tj := &ExecutorMock{mutant: &fakeMutant{}, outCh: outCh}
+
+	// The worker blocks on outCh with the first executor. The second
+	// fills the queue, so the third submission can only end by cancellation.
+	for i := range 2 {
+		if !pool.AppendExecutor(context.Background(), tj) {
+			t.Fatalf("AppendExecutor #%d = false, want true", i)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if pool.AppendExecutor(ctx, tj) {
+		t.Error("AppendExecutor(cancelled context) = true, want false")
+	}
+
+	for range 2 {
+		<-outCh
+	}
 }
