@@ -18,6 +18,8 @@ package log_test
 
 import (
 	"bytes"
+	"errors"
+	"os"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -27,18 +29,83 @@ import (
 )
 
 func TestUninitialised(t *testing.T) {
+	// Bind buffers first, so that Reset must detach them.
 	out := &bytes.Buffer{}
-	defer out.Reset()
+	eOut := &bytes.Buffer{}
+	log.Init(out, eOut)
 	log.Reset()
 
-	log.Infof("%s", "test")
-	log.Infoln("test")
-	log.Errorf("%s", "test")
-	log.Errorln("test")
+	stdout, stderr := captureStdio(t, func() {
+		log.Infof("%s", "test")
+		log.Infoln("test")
+		log.Errorf("%s", "test")
+		log.Errorln("test")
+	})
 
-	if out.String() != "" {
-		t.Errorf("expected empty string")
+	if got := out.String(); got != "" {
+		t.Errorf("out after Reset: want empty, got %q", got)
 	}
+	if got := eOut.String(); got != "" {
+		t.Errorf("eOut after Reset: want empty, got %q", got)
+	}
+	if stdout != "" {
+		t.Errorf("os.Stdout of uninitialised logger: want empty, got %q", stdout)
+	}
+	if stderr != "" {
+		t.Errorf("os.Stderr of uninitialised logger: want empty, got %q", stderr)
+	}
+}
+
+// captureStdio runs fn with os.Stdout and os.Stderr redirected to temporary
+// files and returns what fn wrote to each.
+func captureStdio(t *testing.T, fn func()) (stdout, stderr string) {
+	t.Helper()
+
+	dir := t.TempDir()
+	outFile := createFile(t, dir, "stdout")
+	errFile := createFile(t, dir, "stderr")
+
+	origOut, origErr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = outFile, errFile
+	func() {
+		defer func() { os.Stdout, os.Stderr = origOut, origErr }()
+		fn()
+	}()
+
+	return readClosed(t, outFile), readClosed(t, errFile)
+}
+
+// createFile creates a temporary file in dir and closes it at test cleanup
+// if readClosed has not closed it.
+func createFile(t *testing.T, dir, pattern string) *os.File {
+	t.Helper()
+
+	f, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		t.Fatalf("create %s file: %v", pattern, err)
+	}
+	t.Cleanup(func() {
+		if err := f.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			t.Errorf("close %s: %v", f.Name(), err)
+		}
+	})
+
+	return f
+}
+
+// readClosed closes f and returns its content.
+func readClosed(t *testing.T, f *os.File) string {
+	t.Helper()
+
+	if err := f.Close(); err != nil {
+		t.Fatalf("close %s: %v", f.Name(), err)
+	}
+	data, err := os.ReadFile(f.Name())
+	if err != nil {
+		t.Fatalf("read %s: %v", f.Name(), err)
+	}
+
+	return string(data)
 }
 
 func TestLogInfo(t *testing.T) {

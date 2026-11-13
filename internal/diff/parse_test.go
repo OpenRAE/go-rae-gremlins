@@ -28,12 +28,21 @@ import (
 
 func TestNewWithCmd(t *testing.T) {
 	t.Run("must return nil on empty flag", func(t *testing.T) {
+		viper.Set(configuration.UnleashDiffRef, "")
+		t.Cleanup(viper.Reset)
+
 		m := &mock{}
 
 		d, err := NewWithCmd(m.call)
 
-		if d != nil && err != nil {
-			t.Fatal("incorrect result")
+		if err != nil {
+			t.Errorf("NewWithCmd() with empty diff ref: want nil error, got %v", err)
+		}
+		if d != nil {
+			t.Errorf("NewWithCmd() with empty diff ref: want nil Diff, got %#v", d)
+		}
+		if m.calls != 0 {
+			t.Errorf("NewWithCmd() with empty diff ref: want 0 git calls, got %d", m.calls)
 		}
 	})
 
