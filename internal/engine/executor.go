@@ -32,6 +32,7 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/process"
 )
 
 // DefaultTimeoutCoefficient is the default multiplier for the timeout length
@@ -269,14 +270,11 @@ func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mut
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, fmt.Sprintf("GOTMPDIR=%s", m.wdDealer.WorkDir()))
 
-	// Set up process group for killing entire process tree
-	setupProcessGroup(cmd)
-
 	var output bytes.Buffer
 	cmd.Stdout = &output
 	cmd.Stderr = &output
 
-	err := run(ctx, cmd)
+	err := process.Run(cmd)
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return mutator.TimedOut, nil
@@ -316,43 +314,6 @@ func (m *mutantExecutor) getTestArgs(pkg string) []string {
 	args = append(args, path)
 
 	return args
-}
-
-func run(ctx context.Context, cmd *exec.Cmd) error {
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	// Ensure cleanup happens regardless of how we exit
-	defer func() {
-		if cmd.Process != nil {
-			// Always kill the process group to catch any child processes
-			// This is safe even if the process already exited
-			_ = killProcessGroup(cmd)
-			// Release OS resources
-			_ = cmd.Process.Release()
-		}
-	}()
-
-	// Monitor context cancellation in parallel with process execution
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
-
-	select {
-	case <-ctx.Done():
-		// Context cancelled/timed out - kill the entire process group
-		// Do this BEFORE the parent process exits to catch children
-		_ = killProcessGroup(cmd)
-		// Wait for the process to actually exit
-		<-done
-
-		return ctx.Err()
-	case err := <-done:
-		// Process completed normally
-		return err
-	}
 }
 
 // buildFailureMarkers are the markers cmd/go prints in place of a test's
