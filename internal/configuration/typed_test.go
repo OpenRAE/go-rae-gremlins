@@ -315,16 +315,23 @@ func TestFeatureValidateAcceptsNumericBounds(t *testing.T) {
 		flags  []string
 	}{
 		{
-			name:   "zero defaults from file",
-			config: "unleash:\n  workers: 0\n  test-cpu: 0\n  timeout-coefficient: 0\n  threshold:\n    efficacy: 0\n    mutant-coverage: 0\n",
+			name: "zero defaults from file",
+			config: "unleash:\n  workers: 0\n  test-cpu: 0\n  timeout-coefficient: 0\n" +
+				"  threshold:\n    efficacy: 0\n    mutant-coverage: 0\n",
 		},
 		{
-			name:  "zero defaults from flags",
-			flags: []string{"--workers=0", "--test-cpu=0", "--timeout-coefficient=0", "--threshold-efficacy=0", "--threshold-mcover=0"},
+			name: "zero defaults from flags",
+			flags: []string{
+				"--workers=0", "--test-cpu=0", "--timeout-coefficient=0",
+				"--threshold-efficacy=0", "--threshold-mcover=0",
+			},
 		},
 		{
-			name:  "upper bounds from flags",
-			flags: []string{"--workers=64", "--test-cpu=8", "--timeout-coefficient=20", "--threshold-efficacy=100", "--threshold-mcover=100"},
+			name: "upper bounds from flags",
+			flags: []string{
+				"--workers=64", "--test-cpu=8", "--timeout-coefficient=20",
+				"--threshold-efficacy=100", "--threshold-mcover=100",
+			},
 		},
 	}
 
