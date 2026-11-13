@@ -55,6 +55,8 @@ func TestMain(m *testing.M) {
 // runHelper runs a helper role and returns its exit code.
 func runHelper(role string) int {
 	switch role {
+	case "exit":
+		return 0
 	case "fail":
 		return failingCode
 	case "block":
@@ -62,13 +64,16 @@ func runHelper(role string) int {
 			return 2
 		}
 		time.Sleep(helperLimit)
+
+		return 0
 	case treeParentBlock, treeParentExit:
 		return runTreeParent(role)
 	case treeDescendant:
 		return runTreeDescendant()
+	default:
+		// An unknown role is a test defect; fail instead of passing silently.
+		return 2
 	}
-
-	return 0
 }
 
 // runTreeParent starts one descendant and waits until it is ready. Then it
