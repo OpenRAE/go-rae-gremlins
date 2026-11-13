@@ -220,14 +220,15 @@ func Get[T any](k string) T {
 	return r
 }
 
-// Validate checks the value of each typed configuration key.
+// Validate checks the effective value of each typed configuration key.
 // It returns an error that names each key with a value that does not convert
-// to the type of the key.
+// to the type of the key, or with a numeric value that is out of range.
 func Validate() error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 
 	checks := typedKeys()
+	bounds := boundedKeys()
 	keys := make([]string, 0, len(checks))
 	for k := range checks {
 		keys = append(keys, k)
@@ -240,7 +241,11 @@ func Validate() error {
 		if v == nil {
 			continue
 		}
-		if err := checks[k](v); err != nil {
+		err := checks[k](v)
+		if bound, ok := bounds[k]; ok && err == nil {
+			err = bound(k)
+		}
+		if err != nil {
 			errs = append(errs, fmt.Errorf("invalid value for configuration key %q: %w", k, err))
 		}
 	}
@@ -273,6 +278,38 @@ func typedKeys() map[string]func(any) error {
 	}
 
 	return checks
+}
+
+// boundedKeys returns the range check of each numeric configuration key.
+// Validate runs a range check only on a value that passes its type check.
+func boundedKeys() map[string]func(string) error {
+	return map[string]func(string) error{
+		UnleashWorkersKey:            checkNotNegative,
+		UnleashTestCPUKey:            checkNotNegative,
+		UnleashTimeoutCoefficientKey: checkNotNegative,
+		UnleashThresholdEfficacyKey:  checkPercentage,
+		UnleashThresholdMCoverageKey: checkPercentage,
+	}
+}
+
+// checkNotNegative accepts 0, which selects the default, and positive values.
+func checkNotNegative(k string) error {
+	if n := viper.GetInt(k); n < 0 {
+		return fmt.Errorf("%d is negative; use 0 for the default or a positive number", n)
+	}
+
+	return nil
+}
+
+// checkPercentage accepts values from 0 to 100. The value 0 disables the
+// threshold.
+func checkPercentage(k string) error {
+	f := viper.GetFloat64(k)
+	if f >= 0 && f <= 100 {
+		return nil
+	}
+
+	return fmt.Errorf("%v is not a percentage from 0 to 100", f)
 }
 
 func checkBool(v any) error {

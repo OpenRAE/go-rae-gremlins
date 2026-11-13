@@ -179,16 +179,22 @@ func bindFlags(t *testing.T, args []string) {
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
 	fs.Bool("dry-run", false, "")
 	fs.Int("workers", 0, "")
+	fs.Int("test-cpu", 0, "")
+	fs.Int("timeout-coefficient", 0, "")
 	fs.Float64("threshold-efficacy", 0, "")
+	fs.Float64("threshold-mcover", 0, "")
 	fs.StringArray("exclude-files", nil, "")
 	if err := fs.Parse(args); err != nil {
 		t.Fatalf("parse flags %v: %v", args, err)
 	}
 	bindings := map[string]string{
-		UnleashDryRunKey:            "dry-run",
-		UnleashWorkersKey:           "workers",
-		UnleashThresholdEfficacyKey: "threshold-efficacy",
-		UnleashExcludeFiles:         "exclude-files",
+		UnleashDryRunKey:             "dry-run",
+		UnleashWorkersKey:            "workers",
+		UnleashTestCPUKey:            "test-cpu",
+		UnleashTimeoutCoefficientKey: "timeout-coefficient",
+		UnleashThresholdEfficacyKey:  "threshold-efficacy",
+		UnleashThresholdMCoverageKey: "threshold-mcover",
+		UnleashExcludeFiles:          "exclude-files",
 	}
 	for key, name := range bindings {
 		if err := viper.BindPFlag(key, fs.Lookup(name)); err != nil {
@@ -202,6 +208,7 @@ func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
 		env     map[string]string
 		config  string
 		name    string
+		flags   []string
 		wantKey []string
 	}{
 		{
@@ -237,6 +244,47 @@ func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
 			},
 			wantKey: []string{UnleashDryRunKey, UnleashWorkersKey},
 		},
+		{
+			name:    "negative workers from environment",
+			env:     map[string]string{envWorkers: "-1"},
+			wantKey: []string{UnleashWorkersKey},
+		},
+		{
+			name:    "negative test CPU from file",
+			config:  "unleash:\n  test-cpu: -2\n",
+			wantKey: []string{UnleashTestCPUKey},
+		},
+		{
+			name:    "negative timeout coefficient from flag",
+			flags:   []string{"--timeout-coefficient=-1"},
+			wantKey: []string{UnleashTimeoutCoefficientKey},
+		},
+		{
+			name:    "negative workers from flag over valid file",
+			config:  "unleash:\n  workers: 2\n",
+			flags:   []string{"--workers=-4"},
+			wantKey: []string{UnleashWorkersKey},
+		},
+		{
+			name:    "efficacy above 100 from environment",
+			env:     map[string]string{envEfficacy: "100.5"},
+			wantKey: []string{UnleashThresholdEfficacyKey},
+		},
+		{
+			name:    "efficacy not a number from environment",
+			env:     map[string]string{envEfficacy: "NaN"},
+			wantKey: []string{UnleashThresholdEfficacyKey},
+		},
+		{
+			name:    "negative mutant coverage from file",
+			config:  "unleash:\n  threshold:\n    mutant-coverage: -1\n",
+			wantKey: []string{UnleashThresholdMCoverageKey},
+		},
+		{
+			name:    "mutant coverage above 100 from flag",
+			flags:   []string{"--threshold-mcover=101"},
+			wantKey: []string{UnleashThresholdMCoverageKey},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -245,6 +293,7 @@ func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
 			for k, v := range tc.env {
 				t.Setenv(k, v)
 			}
+			bindFlags(t, tc.flags)
 
 			err := Validate()
 			if err == nil {
@@ -254,6 +303,38 @@ func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
 				if !strings.Contains(err.Error(), `"`+k+`"`) {
 					t.Errorf("Validate() error = %q, want it to name key %q", err, k)
 				}
+			}
+		})
+	}
+}
+
+func TestFeatureValidateAcceptsNumericBounds(t *testing.T) {
+	testCases := []struct {
+		name   string
+		config string
+		flags  []string
+	}{
+		{
+			name:   "zero defaults from file",
+			config: "unleash:\n  workers: 0\n  test-cpu: 0\n  timeout-coefficient: 0\n  threshold:\n    efficacy: 0\n    mutant-coverage: 0\n",
+		},
+		{
+			name:  "zero defaults from flags",
+			flags: []string{"--workers=0", "--test-cpu=0", "--timeout-coefficient=0", "--threshold-efficacy=0", "--threshold-mcover=0"},
+		},
+		{
+			name:  "upper bounds from flags",
+			flags: []string{"--workers=64", "--test-cpu=8", "--timeout-coefficient=20", "--threshold-efficacy=100", "--threshold-mcover=100"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			initIsolated(t, writeConfig(t, tc.config))
+			bindFlags(t, tc.flags)
+
+			if err := Validate(); err != nil {
+				t.Errorf("Validate() error = %v, want nil", err)
 			}
 		})
 	}

@@ -207,19 +207,31 @@ func TestUnleash(t *testing.T) {
 }
 
 func TestFeatureUnleashRejectsInvalidConfiguration(t *testing.T) {
-	configuration.Reset()
-	t.Cleanup(configuration.Reset)
-	if err := configuration.Init([]string{t.TempDir()}); err != nil {
-		t.Fatalf("configuration.Init error = %v, want nil", err)
+	testCases := []struct {
+		name    string
+		workers string
+	}{
+		{name: "not an integer", workers: "four"},
+		{name: "negative", workers: "-1"},
 	}
-	t.Setenv("GREMLINS_UNLEASH_WORKERS", "four")
 
-	err := runUnleash(context.Background())(nil, []string{t.TempDir()})
-	if err == nil {
-		t.Fatal("runUnleash error = nil, want an invalid-value error")
-	}
-	if !strings.Contains(err.Error(), configuration.UnleashWorkersKey) {
-		t.Errorf("runUnleash error = %q, want it to name %q", err, configuration.UnleashWorkersKey)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			configuration.Reset()
+			t.Cleanup(configuration.Reset)
+			if err := configuration.Init([]string{t.TempDir()}); err != nil {
+				t.Fatalf("configuration.Init error = %v, want nil", err)
+			}
+			t.Setenv("GREMLINS_UNLEASH_WORKERS", tc.workers)
+
+			err := runUnleash(context.Background())(nil, []string{t.TempDir()})
+			if err == nil {
+				t.Fatal("runUnleash error = nil, want an invalid-value error")
+			}
+			if !strings.Contains(err.Error(), configuration.UnleashWorkersKey) {
+				t.Errorf("runUnleash error = %q, want it to name %q", err, configuration.UnleashWorkersKey)
+			}
+		})
 	}
 }
 
