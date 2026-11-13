@@ -156,7 +156,7 @@ ADR 0002 preserves the `gremlins` binary contract; ADR 0004 governs the design c
 | Start | Start the command in a new process group (`Setpgid`). | Start the command in a new process group (`CREATE_NEW_PROCESS_GROUP`). |
 | Context done | `Cmd.Cancel` sends `SIGKILL` to the complete group. | `Cmd.Cancel` kills the direct process only (#128). |
 | Open output pipes | `Cmd.WaitDelay` bounds the wait for pipes that a descendant holds. | Same. |
-| After exit | Send `SIGKILL` to the group to stop remaining descendants. | Kill the direct process again; this has no effect after exit. |
+| After exit | Send `SIGKILL` to the group to stop remaining descendants. | No action. Windows cannot address the descendants (#128). |
 
 A group kill that finds no process returns `os.ErrProcessDone`, so `Wait` does not report a false error.
 The coverage runner previously killed only the `go` process. Its test binary then continued after a cancelled run.

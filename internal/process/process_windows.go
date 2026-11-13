@@ -33,3 +33,9 @@ func setProcessGroup(cmd *exec.Cmd) {
 func killProcessGroup(cmd *exec.Cmd) error {
 	return cmd.Process.Kill()
 }
+
+// killRemaining does nothing on Windows. The direct process has exited, and
+// Windows cannot address its descendants without a job object (issue #128).
+func killRemaining(_ *exec.Cmd) error {
+	return nil
+}

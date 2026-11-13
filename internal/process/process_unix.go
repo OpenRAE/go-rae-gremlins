@@ -43,3 +43,9 @@ func killProcessGroup(cmd *exec.Cmd) error {
 
 	return err
 }
+
+// killRemaining kills the processes that remain in the group of cmd after
+// cmd exits.
+func killRemaining(cmd *exec.Cmd) error {
+	return killProcessGroup(cmd)
+}

@@ -28,8 +28,8 @@ import (
 
 // Run starts cmd in a new process group and waits for it to complete.
 // When the context of cmd is done, Run kills the process group. After cmd
-// exits, Run kills any process that remains in the group. On Windows only
-// the direct process is killed.
+// exits, Run kills any process that remains in the group. On Windows, Run
+// kills only the direct process, and only when the context is done.
 //
 // Run waits at most five seconds for output pipes after cmd exits or its
 // context is done, so a descendant that holds a pipe open cannot block it.
@@ -45,7 +45,7 @@ func Run(cmd *exec.Cmd) error {
 	if cmd.Process == nil {
 		return err
 	}
-	if killErr := killProcessGroup(cmd); killErr != nil && !errors.Is(killErr, os.ErrProcessDone) {
+	if killErr := killRemaining(cmd); killErr != nil && !errors.Is(killErr, os.ErrProcessDone) {
 		return errors.Join(err, fmt.Errorf("stop the remaining processes of %s: %w", cmd.Path, killErr))
 	}
 
