@@ -48,7 +48,10 @@ const (
 func TestApplyAndRollback(t *testing.T) {
 	t.Run("applies and rolls back", func(t *testing.T) {
 		wdDealer := newWdDealerStub(t)
-		tmpDir, _ := wdDealer.Get("")
+		tmpDir, err := wdDealer.Get("")
+		if err != nil {
+			t.Fatalf("get the working directory: %v", err)
+		}
 		mod := gomodule.GoModule{
 			Name:       expectedModule,
 			Root:       tmpDir,
@@ -386,6 +389,9 @@ func writeFiles(t *testing.T, root string, files map[string]string) {
 
 const expectedTimeout = 10 * time.Second
 
+// goTestProcessEnv makes the test binary run as a helper child.
+const goTestProcessEnv = "GO_TEST_PROCESS=1"
+
 type commandHolder struct {
 	cmd     *exec.Cmd
 	command string
@@ -562,7 +568,7 @@ func TestCPU(t *testing.T) {
 
 			for _, arg := range holder.args {
 				if !tc.cpuPresent && strings.Contains(arg, "-cpu") {
-					t.Fatalf("didn't expect to have -cpu flag")
+					t.Fatal("didn't expect to have -cpu flag")
 				}
 				if !tc.cpuPresent {
 					return
@@ -691,7 +697,7 @@ func fakeExecCommandSuccess(ctx context.Context, command string, args ...string)
 	cs = append(cs, args...)
 	// #nosec G204 G702 - We are in tests, we don't care
 	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-	cmd.Env = []string{"GO_TEST_PROCESS=1"}
+	cmd.Env = []string{goTestProcessEnv}
 
 	return cmd
 }
@@ -741,7 +747,7 @@ func fakeExecCommandTestsFailure(ctx context.Context, command string, args ...st
 func getCmd(ctx context.Context, cs []string) *exec.Cmd {
 	// #nosec G204 G702 - We are in tests, we don't care
 	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-	cmd.Env = []string{"GO_TEST_PROCESS=1"}
+	cmd.Env = []string{goTestProcessEnv}
 
 	return cmd
 }

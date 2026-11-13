@@ -197,6 +197,7 @@ internal/
   gomodule/            - Go module detection and info
   log/                 - Logging utilities
   mutator/             - Mutation definitions and interface
+  process/             - Command runs that stop the process group
   report/              - Result formatting and output
 ```
 

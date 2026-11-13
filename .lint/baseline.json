@@ -45,36 +45,6 @@
     },
     {
       "linter": "errcheck",
-      "file": "internal/engine/executor.go",
-      "fingerprint": "2a4470faa72bbb9ed8e2720d9a9c5a3a0eb976e428097a98204983e57bc07d32",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/executor.go",
-      "fingerprint": "3631ec323098147d672dd0d722e4fe6a42278d7b678ee16265b0b40bc7722041",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/executor.go",
-      "fingerprint": "867d17a3809b805c56c3ae055f6fe2c7934314e72238f3d39081eaad292c7f6b",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/executor.go",
-      "fingerprint": "b16bc319c3ed616495e2cd819583bd12ea4eddca4c81ccf7e982719f3caf7c73",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/executor_test.go",
-      "fingerprint": "7122d15791286c71efaf6822eac2fbac2f84e24a0b76bca2de5a58a5eae19fa5",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
       "file": "internal/engine/stubs_test.go",
       "fingerprint": "265aa6096179c7611f6c22ed2dfa55a860e9f3f0f5c71a8b1b288d4f8782dfa7",
       "count": 1
@@ -170,12 +140,6 @@
       "count": 1
     },
     {
-      "linter": "nlreturn",
-      "file": "internal/engine/process_windows.go",
-      "fingerprint": "6853fa00936905807f4c2321c33cb91638d7ef2045794fd7f223f4cc978ca2f0",
-      "count": 1
-    },
-    {
       "linter": "noctx",
       "file": "tools/architecture/git.go",
       "fingerprint": "0ff040d58d52fdafc7a18fdbf5ee6da2918ed486fd40511afe75b1f66e42d0bf",
@@ -251,12 +215,6 @@
       "linter": "revive",
       "file": "internal/engine/engine_test.go",
       "fingerprint": "6af2652e58f9aeb00eb051a7aab74258ff0d188bd9a04058e279901b60c47a16",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/executor_test.go",
-      "fingerprint": "0533434bad91b03447355e2c5c21c3b15d6f3d6b03fdaf03435b8966ac859ae1",
       "count": 1
     },
     {
