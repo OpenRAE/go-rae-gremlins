@@ -3,12 +3,6 @@
   "findings": [
     {
       "linter": "errcheck",
-      "file": "cmd/gremlins_test.go",
-      "fingerprint": "aa5603e588cc08acb55ce4e9e7f5b2743a7a4b722f33bee4fd9e7448cfcf2de8",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
       "file": "internal/configuration/configuration.go",
       "fingerprint": "1434a864b92d907034465528082f879097d59012476f3efdc173b01158474a81",
       "count": 1
@@ -311,12 +305,6 @@
       "linter": "revive",
       "file": "internal/log/log_test.go",
       "fingerprint": "2e67ee4c54d0892044468cbf2f9f364164b50be6474fcb77671f10eb6ea6f311",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/log/log_test.go",
-      "fingerprint": "6193ae82bd5ee804c6044d523ba9acb796e047daa51153fdaab3c4e8ec4bebae",
       "count": 1
     },
     {
