@@ -29,10 +29,7 @@ import (
 // its descendants, for example the test binaries of go test, can be killed
 // together with it.
 func setProcessGroup(cmd *exec.Cmd) {
-	if cmd.SysProcAttr == nil {
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-	}
-	cmd.SysProcAttr.Setpgid = true
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }
 
 // killProcessGroup sends SIGKILL to every process in the group of cmd. It

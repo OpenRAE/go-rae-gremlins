@@ -31,6 +31,9 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/process"
 )
 
+// runWaitDelay is the documented bound of Run on open output pipes.
+const runWaitDelay = 5 * time.Second
+
 func TestFeatureRunStopsDescendants(t *testing.T) {
 	testCases := []struct {
 		wantErr       error
@@ -80,8 +83,8 @@ func TestFeatureRunStopsDescendants(t *testing.T) {
 			var err error
 			select {
 			case err = <-done:
-			case <-time.After(process.WaitDelay + stopWait):
-				t.Fatalf("Run still waiting %s after the stop", process.WaitDelay+stopWait)
+			case <-time.After(runWaitDelay + stopWait):
+				t.Fatalf("Run still waiting %s after the stop", runWaitDelay+stopWait)
 			}
 			checkRunError(t, err, tc.wantErr, tc.wantKilled)
 			if err := reportW.Close(); err != nil {
@@ -120,7 +123,7 @@ func reportPipe(t *testing.T) (reader, writer *os.File) {
 		closeFile(t, reader)
 		closeFile(t, writer)
 	})
-	if err := reader.SetReadDeadline(time.Now().Add(process.WaitDelay + 2*stopWait)); err != nil {
+	if err := reader.SetReadDeadline(time.Now().Add(runWaitDelay + 2*stopWait)); err != nil {
 		t.Fatalf("set the report pipe deadline: %v", err)
 	}
 

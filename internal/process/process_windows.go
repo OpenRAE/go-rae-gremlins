@@ -25,10 +25,7 @@ import (
 
 // setProcessGroup starts the command in a new Windows process group.
 func setProcessGroup(cmd *exec.Cmd) {
-	if cmd.SysProcAttr == nil {
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-	}
-	cmd.SysProcAttr.CreationFlags |= syscall.CREATE_NEW_PROCESS_GROUP
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP}
 }
 
 // killProcessGroup kills the direct process of cmd. Windows has no Unix

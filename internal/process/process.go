@@ -26,22 +26,21 @@ import (
 	"time"
 )
 
-// WaitDelay bounds the wait for output pipes after the command exits or its
-// context is done. A descendant that holds a pipe open cannot block Run for
-// longer than this.
-const WaitDelay = 5 * time.Second
-
 // Run starts cmd in a new process group and waits for it to complete.
 // When the context of cmd is done, Run kills the process group. After cmd
 // exits, Run kills any process that remains in the group. On Windows only
 // the direct process is killed.
 //
-// cmd must come from exec.CommandContext. Run returns the error of
-// cmd.Run, joined with any error of the kill after the exit.
+// Run waits at most five seconds for output pipes after cmd exits or its
+// context is done, so a descendant that holds a pipe open cannot block it.
+//
+// cmd must come from exec.CommandContext. Run sets cmd.SysProcAttr,
+// cmd.Cancel, and cmd.WaitDelay. It returns the error of cmd.Run, joined with
+// any error of the kill after the exit.
 func Run(cmd *exec.Cmd) error {
 	setProcessGroup(cmd)
 	cmd.Cancel = func() error { return killProcessGroup(cmd) }
-	cmd.WaitDelay = WaitDelay
+	cmd.WaitDelay = 5 * time.Second
 	err := cmd.Run()
 	if cmd.Process == nil {
 		return err
