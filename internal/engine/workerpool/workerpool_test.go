@@ -18,15 +18,55 @@ package workerpool_test
 
 import (
 	"context"
+	"fmt"
 	"go/token"
 	"runtime"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
+
+// testWaitBound is the longest a bounded test wait allows before it fails with
+// the blocked operation name. It is far below the package test timeout, so a
+// dropped result identifies the operation instead of consuming that timeout.
+const testWaitBound = 30 * time.Second
+
+// recvWithin returns the next value from ch. It fails with op when the value
+// does not arrive within testWaitBound.
+func recvWithin[T any](t *testing.T, ch <-chan T, op string) T {
+	t.Helper()
+	select {
+	case v := <-ch:
+		return v
+	case <-time.After(testWaitBound):
+		t.Fatalf("%s did not complete within %s", op, testWaitBound)
+
+		var zero T
+
+		return zero
+	}
+}
+
+// runWithin runs fn in its own goroutine. It fails with op when fn does not
+// return within testWaitBound. It owns the goroutine, so a blocked call reports
+// op instead of consuming the package test timeout.
+func runWithin(t *testing.T, fn func(), op string) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		fn()
+	}()
+	select {
+	case <-done:
+	case <-time.After(testWaitBound):
+		t.Fatalf("%s did not complete within %s", op, testWaitBound)
+	}
+}
 
 type ExecutorMock struct {
 	mutant mutator.Mutator
@@ -56,7 +96,7 @@ func TestWorker(t *testing.T) {
 	executorQueue <- tj
 	close(executorQueue)
 
-	m := <-outCh
+	m := recvWithin(t, outCh, "worker result")
 	got, ok := m.(fakeMutant)
 	if !ok {
 		t.Fatal("it should be a fakeMutant")
@@ -89,7 +129,7 @@ func TestPool(t *testing.T) {
 		// A context that is never done cannot end the submission early.
 		pool.AppendExecutor(context.Background(), tj)
 
-		m := <-outCh
+		m := recvWithin(t, outCh, "pool result")
 		got, ok := m.(fakeMutant)
 		if !ok {
 			t.Fatal("it should be a fakeMutant")
@@ -279,7 +319,32 @@ func TestFeaturePoolCancelledSubmissionReturnsWhileQueueIsFull(t *testing.T) {
 		t.Error("AppendExecutor(cancelled context) = true, want false")
 	}
 
-	for range 2 {
-		<-outCh
+	for i := range 2 {
+		recvWithin(t, outCh, fmt.Sprintf("queued result #%d", i))
 	}
+}
+
+// TestFeatureWithheldResultCleanupStopsWorkers proves that owned cleanup after
+// a withheld result leaves no worker running (issue #117). The worker blocks
+// while it sends its result and the test withholds the read. The test then
+// drains the one result as cleanup, and pool.Stop must return within the bound.
+// A worker left running would block Stop until the package test timeout.
+func TestFeatureWithheldResultCleanupStopsWorkers(t *testing.T) {
+	configuration.Set(configuration.UnleashWorkersKey, 1)
+	defer configuration.Reset()
+
+	outCh := make(chan mutator.Mutator)
+	pool := workerpool.Initialize("test")
+	pool.Start(context.Background())
+	tj := &ExecutorMock{mutant: &fakeMutant{}, outCh: outCh}
+
+	if !pool.AppendExecutor(context.Background(), tj) {
+		t.Fatal("AppendExecutor() = false, want true")
+	}
+
+	// Owned cleanup: drain the withheld result so the worker can finish its
+	// executor and exit.
+	go func() { <-outCh }()
+
+	runWithin(t, pool.Stop, "pool.Stop after withheld result")
 }
