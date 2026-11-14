@@ -1,3 +1,19 @@
+/*
+ * Copyright 2023 The Gremlins Authors
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package diff
 
 import (
@@ -5,24 +21,30 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/spf13/viper"
-
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 )
 
 func TestNewWithCmd(t *testing.T) {
 	t.Run("must return nil on empty flag", func(t *testing.T) {
+		setDiffRef(t, "")
+
 		m := &mock{}
 
 		d, err := NewWithCmd(m.call)
 
-		if d != nil && err != nil {
-			t.Fatal("incorrect result")
+		if err != nil {
+			t.Errorf("NewWithCmd() with empty diff ref: want nil error, got %v", err)
+		}
+		if d != nil {
+			t.Errorf("NewWithCmd() with empty diff ref: want nil Diff, got %#v", d)
+		}
+		if m.calls != 0 {
+			t.Errorf("NewWithCmd() with empty diff ref: want 0 git calls, got %d", m.calls)
 		}
 	})
 
 	t.Run("must return error", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "test")
+		setDiffRef(t, "test")
 
 		m := &mock{
 			outputErr: errors.New("test"),
@@ -47,7 +69,7 @@ func TestNewWithCmd(t *testing.T) {
 	})
 
 	t.Run("must return diff error", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "test")
+		setDiffRef(t, "test")
 
 		m := &mock{
 			output: []byte(testErrDiff),
@@ -60,7 +82,7 @@ func TestNewWithCmd(t *testing.T) {
 	})
 
 	t.Run("must return changes", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "test")
+		setDiffRef(t, "test")
 
 		m := &mock{
 			output: []byte(testDiff),
@@ -78,6 +100,15 @@ func TestNewWithCmd(t *testing.T) {
 			t.Error("unexpected result")
 		}
 	})
+}
+
+// setDiffRef registers the configuration reset before it sets the diff
+// reference, so the case restores the shared configuration when it ends.
+func setDiffRef(t *testing.T, ref string) {
+	t.Helper()
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	configuration.Set(configuration.UnleashDiffRef, ref)
 }
 
 type mock struct {

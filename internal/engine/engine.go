@@ -22,8 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -36,7 +38,6 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/diff"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
 	"github.com/OpenRAE/go-rae-gremlins/internal/exclusion"
-	"github.com/OpenRAE/go-rae-gremlins/internal/log"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 	"github.com/OpenRAE/go-rae-gremlins/internal/report"
 
@@ -100,43 +101,66 @@ func WithDirFs(dirFS fs.FS) Option {
 //
 // It walks the fs.FS provided and checks every .go file which is not a test.
 // For each file it will scan for tokenMutations and gather all the mutants found.
-func (mu *Engine) Run(ctx context.Context) report.Results {
+// A walk, open, or parse failure stops the discovery. When an executor fails,
+// Run stops the discovery and schedules no new mutants. Run then returns the
+// joined errors with the partial results, which the caller must not report as
+// success. The results do not contain the failed mutants.
+// When ctx is done, Run stops the discovery and the pending tests. Run returns
+// only after the discovery and the workers it started have exited.
+func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
+	runCtx, stop := context.WithCancel(ctx)
+	defer stop()
+
 	mu.mutantStream = make(chan mutator.Mutator)
+	discoverErr := make(chan error, 1)
 	go func() {
 		defer close(mu.mutantStream)
-		walkErr := fs.WalkDir(mu.fs, ".", func(walkPath string, d fs.DirEntry, err error) error {
-			if err != nil {
-				log.Errorf("skipping %s: %v\n", walkPath, err)
-
-				return nil
-			}
-			if d.IsDir() {
-				if walkPath != "." && mu.skipDir(walkPath, d.Name()) {
-					return fs.SkipDir
-				}
-
-				return nil
-			}
-
-			isGoCode := filepath.Ext(walkPath) == ".go" && !strings.HasSuffix(walkPath, "_test.go")
-
-			if isGoCode && !mu.codeData.Exclusion.IsFileExcluded(walkPath) {
-				mu.runOnFile(walkPath)
-			}
-
-			return nil
-		})
-		if walkErr != nil {
-			log.Errorf("walking module tree: %v\n", walkErr)
-		}
+		discoverErr <- mu.discover(runCtx)
 	}()
 
 	start := time.Now()
-	res := mu.executeTests(ctx)
+	res, execErr := mu.executeTests(runCtx, stop)
+	err := <-discoverErr
 	res.Elapsed = time.Since(start)
 	res.Module = mu.module.Name
 
-	return res
+	var errs []error
+	if err != nil {
+		errs = append(errs, fmt.Errorf("discovering mutants: %w", err))
+	}
+	if execErr != nil {
+		errs = append(errs, execErr)
+	}
+
+	return res, errors.Join(errs...)
+}
+
+// discover walks the module file system and sends the mutants of each Go
+// source file to the mutant stream. It returns the first walk, open, or parse
+// error. It stops without an error when ctx is done.
+func (mu *Engine) discover(ctx context.Context) error {
+	return fs.WalkDir(mu.fs, ".", func(walkPath string, d fs.DirEntry, err error) error {
+		if ctx.Err() != nil {
+			return fs.SkipAll
+		}
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if walkPath != "." && mu.skipDir(walkPath, d.Name()) {
+				return fs.SkipDir
+			}
+
+			return nil
+		}
+
+		isGoCode := filepath.Ext(walkPath) == ".go" && !strings.HasSuffix(walkPath, "_test.go")
+		if !isGoCode || mu.codeData.Exclusion.IsFileExcluded(walkPath) {
+			return nil
+		}
+
+		return mu.runOnFile(ctx, walkPath)
+	})
 }
 
 // skipDir reports whether dirPath is a testdata tree, a vendor tree, or the
@@ -152,32 +176,43 @@ func (mu *Engine) skipDir(dirPath, name string) bool {
 	return err == nil
 }
 
-func (mu *Engine) runOnFile(fileName string) {
+func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	set := token.NewFileSet()
 	file, err := mu.parseFile(set, fileName)
 	if err != nil {
-		log.Errorf("skipping %s: %v\n", fileName, err)
-
-		return
+		return err
 	}
 
-	cov := newFileCoverage(set, file, mu.codeData.Cov)
+	built, err := mu.hostBuilds(fileName)
+	if err != nil {
+		return err
+	}
+	cov := newFileCoverage(set, file, mu.codeData.Cov, built)
+	stopped := false
 	ast.Inspect(file, func(node ast.Node) bool {
+		if stopped {
+			return false
+		}
 		n, ok := NewTokenNode(node)
 		if !ok {
 			return true
 		}
-		mu.findMutations(fileName, set, file, n, cov)
+		stopped = !mu.findMutations(ctx, fileName, set, file, n, cov)
 
-		return true
+		return !stopped
 	})
+	if stopped {
+		return fs.SkipAll
+	}
+
+	return nil
 }
 
 // parseFile parses a Go file of the module file system.
 func (mu *Engine) parseFile(set *token.FileSet, fileName string) (*ast.File, error) {
 	src, err := mu.fs.Open(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("open: %w", err)
+		return nil, err
 	}
 	file, err := parser.ParseFile(set, fileName, src, parser.ParseComments)
 	if closeErr := src.Close(); closeErr != nil {
@@ -190,12 +225,33 @@ func (mu *Engine) parseFile(set *token.FileSet, fileName string) (*ast.File, err
 	return file, nil
 }
 
+// hostBuilds tells if the host build with the configured build tags includes
+// a Go file of the module file system. It applies the file name suffixes and
+// the build constraints of the file, as the go command does.
+func (mu *Engine) hostBuilds(fileName string) (bool, error) {
+	ctx := build.Default
+	ctx.BuildTags = strings.FieldsFunc(configuration.Get[string](configuration.UnleashTagsKey), func(r rune) bool {
+		return r == ',' || r == ' '
+	})
+	ctx.JoinPath = path.Join
+	ctx.OpenFile = func(name string) (io.ReadCloser, error) { return mu.fs.Open(name) }
+
+	ok, err := ctx.MatchFile(path.Dir(fileName), path.Base(fileName))
+	if err != nil {
+		return false, fmt.Errorf("matching build constraints: %w", err)
+	}
+
+	return ok, nil
+}
+
+// findMutations sends the mutants of node to the mutant stream. It returns
+// false when ctx is done before a mutant is sent.
 func (mu *Engine) findMutations(
-	fileName string, set *token.FileSet, file *ast.File, node *NodeToken, cov fileCoverage,
-) {
+	ctx context.Context, fileName string, set *token.FileSet, file *ast.File, node *NodeToken, cov fileCoverage,
+) bool {
 	mutantTypes, ok := TokenMutantType[node.Tok()]
 	if !ok {
-		return
+		return true
 	}
 
 	pkg := mu.pkgName(fileName)
@@ -206,10 +262,16 @@ func (mu *Engine) findMutations(
 		mutantType := mt
 		tm := NewTokenMutant(pkg, set, file, node)
 		tm.SetType(mutantType)
-		tm.SetStatus(mu.mutationStatus(set.Position(node.TokPos), cov.isCovered(node.TokPos)))
+		tm.SetStatus(mu.mutationStatus(cov, node.TokPos))
 
-		mu.mutantStream <- tm
+		select {
+		case mu.mutantStream <- tm:
+		case <-ctx.Done():
+			return false
+		}
 	}
+
+	return true
 }
 
 // pkgName returns the import path of the package that fileName belongs to.
@@ -226,40 +288,38 @@ func (mu *Engine) pkgName(fileName string) string {
 	return mu.module.Name + "/" + dir
 }
 
-func (mu *Engine) mutationStatus(pos token.Position, covered bool) mutator.Status {
-	var status mutator.Status
-
-	if covered {
-		status = mutator.Runnable
+// mutationStatus returns the status of a new mutant at tokPos. A mutant that
+// is outside the diff, or that no test run can cover, is skipped. Coverage
+// then tells if the mutant is runnable or not covered.
+func (mu *Engine) mutationStatus(cov fileCoverage, tokPos token.Pos) mutator.Status {
+	switch {
+	case !mu.codeData.Diff.IsChanged(cov.set.Position(tokPos)) || !cov.isObservable(tokPos):
+		return mutator.Skipped
+	case cov.isCovered(tokPos):
+		return mutator.Runnable
+	default:
+		return mutator.NotCovered
 	}
-
-	if !mu.codeData.Diff.IsChanged(pos) {
-		status = mutator.Skipped
-	}
-
-	return status
 }
 
-func (mu *Engine) executeTests(ctx context.Context) report.Results {
+// executeTests runs an executor for each mutant of the stream on a worker
+// pool. It stops the pool when the stream ends or ctx is done, and returns
+// after all the started executors have reported. When an executor fails,
+// executeTests calls stop, so the discovery ends and no new mutant is
+// scheduled. It returns the joined executor errors.
+func (mu *Engine) executeTests(ctx context.Context, stop context.CancelFunc) (report.Results, error) {
 	pool := workerpool.Initialize("mutator")
-	pool.Start()
+	pool.Start(ctx)
 
 	var mutants []mutator.Mutator
-	outCh := make(chan mutator.Mutator)
+	var errs []error
+	outCh := make(chan ExecutorResult)
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for mut := range mu.mutantStream {
-			ok := checkDone(ctx)
-			if !ok {
-				pool.Stop()
-
-				break
-			}
-			wg.Add(1)
-			pool.AppendExecutor(mu.jDealer.NewExecutor(mut, outCh, wg))
-		}
+		defer pool.Stop()
+		mu.submit(ctx, pool, outCh, wg)
 	}()
 
 	go func() {
@@ -267,20 +327,44 @@ func (mu *Engine) executeTests(ctx context.Context) report.Results {
 		close(outCh)
 	}()
 
-	for m := range outCh {
-		mu.logger.Mutant(m)
-		mutants = append(mutants, m)
+	for r := range outCh {
+		if r.Err != nil {
+			errs = append(errs, r.Err)
+			stop()
+
+			continue
+		}
+		mu.logger.Mutant(r.Mutant)
+		mutants = append(mutants, r.Mutant)
 	}
 
-	return results(mutants)
+	if len(errs) > 0 {
+		return results(mutants), fmt.Errorf("mutation testing failed: %w", errors.Join(errs...))
+	}
+
+	return results(mutants), nil
 }
 
-func checkDone(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	default:
-		return true
+// submit adds an executor to the pool for each mutant of the stream, until
+// the stream ends or ctx is done.
+func (mu *Engine) submit(ctx context.Context, pool *workerpool.Pool, outCh chan<- ExecutorResult, wg *sync.WaitGroup) {
+	for {
+		var mut mutator.Mutator
+		select {
+		case <-ctx.Done():
+			return
+		case m, ok := <-mu.mutantStream:
+			if !ok {
+				return
+			}
+			mut = m
+		}
+		wg.Add(1)
+		if !pool.AppendExecutor(ctx, mu.jDealer.NewExecutor(mut, outCh, wg)) {
+			wg.Done()
+
+			return
+		}
 	}
 }
 

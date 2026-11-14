@@ -18,6 +18,8 @@
 package workdir
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -31,13 +33,16 @@ import (
 // to a workdir to use during mutation testing instead of the actual
 // source code.
 //
-// It has two methods:
-//
-//		Get that returns a folder name that will be used by Gremlins as workdir.
-//	    Clean that must be called to remove all the created folders.
+// The caller must call Clean to remove all the created folders.
 type Dealer interface {
+	// Get returns the folder of idf that Gremlins uses as workdir.
 	Get(idf string) (string, error)
+	// Discard removes the folder of idf. The next Get for idf returns a
+	// new copy.
+	Discard(idf string) error
+	// Clean removes all the created folders.
 	Clean()
+	// WorkDir returns the root working directory.
 	WorkDir() string
 }
 
@@ -91,6 +96,21 @@ func (cd *CachedDealer) Get(idf string) (string, error) {
 // WorkDir provides the root working directory.
 func (cd *CachedDealer) WorkDir() string {
 	return cd.workDir
+}
+
+// Discard removes the cached folder of idf from the cache and from disk.
+// The next Get for idf creates a new copy of the source directory, also when
+// the removal from disk fails.
+func (cd *CachedDealer) Discard(idf string) error {
+	cd.mutex.Lock()
+	dstDir, ok := cd.cache[idf]
+	delete(cd.cache, idf)
+	cd.mutex.Unlock()
+	if !ok {
+		return nil
+	}
+
+	return os.RemoveAll(dstDir)
 }
 
 // Clean frees all the cached folders and removes all of them from disk.
@@ -154,21 +174,30 @@ func copyPath(srcPath, dstPath string, info fs.FileInfo) error {
 	return nil
 }
 
-func doCopy(srcPath, dstPath string, fileMode fs.FileMode) error {
+func doCopy(srcPath, dstPath string, fileMode fs.FileMode) (err error) {
 	//nolint:gosec // srcPath is internally controlled, not user input
 	s, err := os.Open(srcPath)
 	if err != nil {
 		return err
 	}
+	defer func() { err = closeJoin(s, "source", err) }()
 	//nolint:gosec // dstPath is internally controlled, not user input
 	d, err := os.OpenFile(dstPath, os.O_CREATE|os.O_RDWR, fileMode)
 	if err != nil {
 		return err
 	}
+	defer func() { err = closeJoin(d, "destination", err) }()
 
-	if _, err = io.Copy(d, s); err != nil {
-		return err
+	_, err = io.Copy(d, s)
+
+	return err
+}
+
+// closeJoin closes c and returns err joined with any close error.
+func closeJoin(c io.Closer, role string, err error) error {
+	if closeErr := c.Close(); closeErr != nil {
+		return errors.Join(err, fmt.Errorf("close %s: %w", role, closeErr))
 	}
 
-	return nil
+	return err
 }

@@ -21,9 +21,11 @@ import (
 	"encoding/json"
 	"errors"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,9 +46,9 @@ import (
 var fakePosition = newPosition("aFolder/aFile.go", 3, 12)
 
 func TestRegressionSkippedMutantsDoNotFailThresholds(t *testing.T) {
-	viper.Set(configuration.UnleashThresholdEfficacyKey, 80)
-	viper.Set(configuration.UnleashThresholdMCoverageKey, 90)
-	t.Cleanup(viper.Reset)
+	isolateConfig(t)
+	configuration.Set(configuration.UnleashThresholdEfficacyKey, 80)
+	configuration.Set(configuration.UnleashThresholdMCoverageKey, 90)
 	log.Init(&bytes.Buffer{}, &bytes.Buffer{})
 	t.Cleanup(log.Reset)
 
@@ -61,6 +63,24 @@ func TestRegressionSkippedMutantsDoNotFailThresholds(t *testing.T) {
 	})
 	if err := report.Do(data); err == nil {
 		t.Fatal("uncovered selected mutants must still fail thresholds")
+	}
+}
+
+func TestRegressionDryRunFromEnvironment(t *testing.T) {
+	isolateConfig(t)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	t.Setenv("GREMLINS_UNLEASH_DRY_RUN", "true")
+	configuration.Set(configuration.UnleashThresholdMCoverageKey, 90)
+	log.Init(&bytes.Buffer{}, &bytes.Buffer{})
+	t.Cleanup(log.Reset)
+
+	data := report.Results{Mutants: []mutator.Mutator{
+		stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+	}}
+	if err := report.Do(data); err != nil {
+		t.Errorf("report.Do in dry-run mode error = %v, want nil", err)
 	}
 }
 
@@ -129,6 +149,7 @@ func TestReport(t *testing.T) {
 	}
 	for _, tc := range nrTestCases {
 		t.Run(tc.name, func(t *testing.T) {
+			isolateConfig(t)
 			out := &bytes.Buffer{}
 			log.Init(out, &bytes.Buffer{})
 			defer log.Reset()
@@ -180,8 +201,8 @@ func TestReport(t *testing.T) {
 	}
 	for _, tc := range drTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			viper.Set(configuration.UnleashDryRunKey, true)
-			defer viper.Reset()
+			isolateConfig(t)
+			configuration.Set(configuration.UnleashDryRunKey, true)
 
 			out := &bytes.Buffer{}
 			log.Init(out, &bytes.Buffer{})
@@ -279,8 +300,8 @@ func TestAssessment(t *testing.T) {
 			log.Init(&bytes.Buffer{}, &bytes.Buffer{})
 			defer log.Reset()
 
-			viper.Set(tc.confKey, tc.value)
-			defer viper.Reset()
+			isolateConfig(t)
+			configuration.Set(tc.confKey, tc.value)
 
 			// Always 50%
 			mutants := []mutator.Mutator{
@@ -323,8 +344,8 @@ func TestFeatureAssessmentEmptyResultsSkipsThreshold(t *testing.T) {
 		log.Init(&bytes.Buffer{}, &bytes.Buffer{})
 		defer log.Reset()
 
-		viper.Set(configuration.UnleashThresholdEfficacyKey, float64(100))
-		defer viper.Reset()
+		isolateConfig(t)
+		configuration.Set(configuration.UnleashThresholdEfficacyKey, float64(100))
 
 		err := report.Do(report.Results{})
 
@@ -487,8 +508,8 @@ func TestMutantLog(t *testing.T) {
 	}
 }
 
-func TestReportToFile(t *testing.T) {
-	outFile := "findings.json"
+// reportToFileResults returns the results that testdata/normal_output.json describes.
+func reportToFileResults() report.Results {
 	mutants := []mutator.Mutator{
 		stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: newPosition("file1.go", 3, 10)},
 		stubMutant{status: mutator.Lived, mutantType: mutator.ArithmeticBase, position: newPosition("file1.go", 8, 20)},
@@ -503,20 +524,31 @@ func TestReportToFile(t *testing.T) {
 		stubMutant{status: mutator.NotViable, mutantType: mutator.InvertNegatives, position: newPosition("file3.go", 4, 200)},
 		stubMutant{status: mutator.Killed, mutantType: mutator.RemoveSelfAssignments, position: newPosition("file3.go", 4, 100)},
 	}
-	data := report.Results{
+
+	return report.Results{
 		Module:  "example.com/go/module",
 		Mutants: mutants,
 		Elapsed: (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 	}
-	f, _ := os.ReadFile("testdata/normal_output.json")
+}
+
+func TestReportToFile(t *testing.T) {
+	outFile := "findings.json"
+	data := reportToFileResults()
+	f, err := os.ReadFile("testdata/normal_output.json")
+	if err != nil {
+		t.Fatalf("os.ReadFile error = %v", err)
+	}
 	want := internal.OutputResult{}
-	_ = json.Unmarshal(f, &want)
+	if err := json.Unmarshal(f, &want); err != nil {
+		t.Fatalf("json.Unmarshal error = %v", err)
+	}
 
 	t.Run("it writes on file when output is set", func(t *testing.T) {
 		outDir := t.TempDir()
 		output := filepath.Join(outDir, outFile)
-		viper.Set(configuration.UnleashOutputKey, output)
-		defer viper.Reset()
+		isolateConfig(t)
+		configuration.Set(configuration.UnleashOutputKey, output)
 
 		if err := report.Do(data); err != nil {
 			t.Fatal("error not expected")
@@ -540,6 +572,7 @@ func TestReportToFile(t *testing.T) {
 	})
 
 	t.Run("it doesn't write on file when output isn't set", func(t *testing.T) {
+		isolateConfig(t)
 		outDir := t.TempDir()
 		output := filepath.Join(outDir, outFile)
 
@@ -550,44 +583,91 @@ func TestReportToFile(t *testing.T) {
 		//nolint:gosec // test code reading test output
 		_, err := os.ReadFile(output)
 		if err == nil {
-			t.Errorf("expected file not found")
-		}
-	})
-
-	// In this case we don't want to stop the execution with an error, but we just want to log the fact.
-	t.Run("it doesn't report error when file is not writeable, but doesn't write file", func(t *testing.T) {
-		outDir, cl := notWriteableDir(t)
-		defer cl()
-		output := filepath.Join(outDir, outFile)
-		viper.Set(configuration.UnleashOutputKey, output)
-		defer viper.Reset()
-
-		if err := report.Do(data); err != nil {
-			t.Fatal("error not expected")
-		}
-
-		//nolint:gosec // test code reading test output
-		_, err := os.ReadFile(output)
-		if err == nil {
-			t.Errorf("expected file not found")
+			t.Error("expected file not found")
 		}
 	})
 }
 
-func notWriteableDir(t *testing.T) (string, func()) {
+func TestRegressionReportToFileReturnsCreateErrors(t *testing.T) {
+	outFile := "findings.json"
+	data := reportToFileResults()
+	testCases := []struct {
+		outDir func(t *testing.T) string
+		name   string
+	}{
+		{
+			name: "missing parent directory",
+			outDir: func(t *testing.T) string {
+				t.Helper()
+
+				return filepath.Join(t.TempDir(), "missing-parent")
+			},
+		},
+		{
+			name: "directory not writeable",
+			outDir: func(t *testing.T) string {
+				t.Helper()
+
+				return notWriteableDir(t)
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			output := filepath.Join(tc.outDir(t), outFile)
+			isolateConfig(t)
+			configuration.Set(configuration.UnleashOutputKey, output)
+
+			err := report.Do(data)
+			if err == nil || !strings.Contains(err.Error(), output) {
+				t.Errorf("report.Do error = %v, want an error that names %q", err, output)
+			}
+
+			//nolint:gosec // test code reading test output
+			if _, err := os.ReadFile(output); err == nil {
+				t.Errorf("report file %q exists, want no file", output)
+			}
+		})
+	}
+}
+
+// isolateConfig resets the shared configuration and registers the reset
+// before the case changes it, so each case starts and ends with no settings.
+func isolateConfig(t *testing.T) {
 	t.Helper()
-	tmp := t.TempDir()
-	outPath, _ := os.MkdirTemp(tmp, "test-")
-	_ = os.Chmod(outPath, 0o000)
-	clean := os.Chmod
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+}
+
+// notWriteableDir returns a directory that the test process cannot write.
+// It skips the case when the platform or user ignores the permission change.
+func notWriteableDir(t *testing.T) string {
+	t.Helper()
+	outPath := t.TempDir()
+	chmod := os.Chmod
 	if runtime.GOOS == "windows" {
-		_ = acl.Chmod(outPath, 0o000)
-		clean = acl.Chmod
+		chmod = acl.Chmod
+	}
+	t.Cleanup(func() {
+		if err := chmod(outPath, 0o700); err != nil {
+			t.Errorf("restore permissions of %q: %v", outPath, err)
+		}
+	})
+	if err := chmod(outPath, 0o000); err != nil {
+		t.Fatalf("chmod %q error = %v", outPath, err)
+	}
+	probe, err := os.CreateTemp(outPath, "probe-")
+	if err == nil {
+		if err := probe.Close(); err != nil {
+			t.Fatalf("close probe file: %v", err)
+		}
+		t.Skip("directory permissions do not block writes on this platform or user")
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("probe write error = %v, want a permission error", err)
 	}
 
-	return outPath, func() {
-		_ = clean(outPath, 0o700)
-	}
+	return outPath
 }
 
 func sortOutputFile(x, y internal.OutputFile) bool {
@@ -673,8 +753,7 @@ func TestRegressionThresholdFlags(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, threshold := range []string{"50", "50.5"} {
 				t.Run(threshold, func(t *testing.T) {
-					configuration.Reset()
-					t.Cleanup(configuration.Reset)
+					isolateConfig(t)
 					log.Init(&bytes.Buffer{}, &bytes.Buffer{})
 					t.Cleanup(log.Reset)
 					flags := pflag.NewFlagSet("threshold", pflag.ContinueOnError)

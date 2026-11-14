@@ -69,7 +69,8 @@
       "allow": [
         "internal/configuration",
         "internal/gomodule",
-        "internal/log"
+        "internal/log",
+        "internal/process"
       ],
       "test_allow": []
     },
@@ -91,6 +92,7 @@
         "internal/gomodule",
         "internal/log",
         "internal/mutator",
+        "internal/process",
         "internal/report"
       ],
       "test_allow": []
@@ -130,6 +132,10 @@
       "test_allow": []
     },
     "internal/mutator": {
+      "allow": [],
+      "test_allow": []
+    },
+    "internal/process": {
       "allow": [],
       "test_allow": []
     },
@@ -223,7 +229,20 @@
       "execute_source": false
     },
     "delivery_finalization": {
-      "destinations": ["existing-ci", "github-api", "ground-control-release", "npm-registry"],
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
       "network": true,
       "execute_source": false
     }

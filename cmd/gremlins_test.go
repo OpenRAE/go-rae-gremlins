@@ -35,8 +35,12 @@ func TestGremlins(t *testing.T) {
 	if err != nil {
 		t.Fatal("newRootCmd should not fail")
 	}
-	_ = c.execute()
 	cmd := c.cmd
+	// Explicit arguments stop cobra from reading the go test flags in os.Args.
+	cmd.SetArgs([]string{"help"})
+	if err := c.execute(); err != nil {
+		t.Fatalf("execute() with args [help]: want nil error, got %v", err)
+	}
 
 	if cmd.Version != "1.2.3" {
 		t.Errorf("expected %q, got %q", "1.2.3", cmd.Version)

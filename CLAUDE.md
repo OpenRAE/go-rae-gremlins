@@ -42,6 +42,19 @@ make goimports
 make fieldalignment
 ```
 
+### Documentation Checks
+
+```bash
+# Check explicit Markdown paths with the pinned doc-tools release
+bash scripts/doc-tools.sh lint docs/CONTRIBUTING.md
+
+# Check the Markdown that changed since the merge base with origin/dev
+make docs-changed
+```
+
+Use the shared `documentation` skill of doc-tools v0.1.0. See
+[Documentation](docs/CONTRIBUTING.md#documentation) for setup.
+
 ### Running Gremlins
 
 ```bash
@@ -98,8 +111,8 @@ make clean
 **Coverage (`internal/coverage/`)**
 
 - Determines which mutations are covered by tests
-- Only covered mutations are tested (uncovered mutations can't be
-  caught)
+- Only covered mutations are tested (tests cannot catch uncovered
+  mutations)
 
 **Executor (`internal/engine/executor.go`)**
 
@@ -160,8 +173,9 @@ make clean
   parallelism
 - **Configuration cascade**: Flags override config file, which
   overrides defaults
-- **Context cancellation**: Graceful shutdown on SIGINT/SIGTERM via
-  `ctxDoneOnSignal()`
+- **Context cancellation**: `signalContext()` in `cmd/gremlins/main.go`
+  cancels the run context on SIGINT/SIGTERM. Coverage, scheduling, and
+  mutant execution stop on it, and a cancelled run returns an error
 
 ## Testing Conventions
 
@@ -183,6 +197,7 @@ internal/
   gomodule/            - Go module detection and info
   log/                 - Logging utilities
   mutator/             - Mutation definitions and interface
+  process/             - Command runs that stop the process group
   report/              - Result formatting and output
 ```
 
@@ -191,7 +206,7 @@ internal/
 - Use the Go version and toolchain in `go.mod`.
 - Follow [the Go coding standard](docs/development/coding-standards.md).
   `make lint` checks strict rules, formatting, and the shrink-only baseline.
-  Provision the mise-pinned linter and run `go mod download` before offline analysis.
+  Provision the mise-pinned linter and Go, and run `go mod download` before offline analysis.
   Set `LINT_BASE` to the fetched comparison commit when needed.
   Fix debt, then use `make lint-shrink`; never add baseline allowances.
 - Test coverage tracked (Codecov integration)
@@ -200,8 +215,10 @@ internal/
 
 ## Architecture design check
 
-Before coding, update `.architecture/design.json` and run `make architecture-design`.
+Before coding, write your design to `.architecture/designs/<issue>.json` and run `make architecture-design`.
+Each change uses its own design file, so open pull requests do not conflict on the design input.
 Record the model digest, affected rules, and result in the issue plan.
+
 Resolve conflicts before implementation. Repeat after model or design changes.
 See [the architecture model and design check](docs/development/architecture.md).
 CI runs `make architecture` and rejects baseline growth and missing design coverage.

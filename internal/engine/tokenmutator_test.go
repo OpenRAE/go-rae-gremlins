@@ -17,9 +17,11 @@
 package engine_test
 
 import (
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,6 +31,8 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
+
+const sourceFileName = "sourceFile.go"
 
 func TestTokenMutator_Apply_SetsSnippets(t *testing.T) {
 	t.Parallel()
@@ -69,7 +73,7 @@ func TestTokenMutator_Apply_SetsSnippets(t *testing.T) {
 			t.Parallel()
 
 			workdir := t.TempDir()
-			filePath := "sourceFile.go"
+			filePath := sourceFileName
 			fileFullPath := filepath.Join(workdir, filePath)
 
 			err := os.WriteFile(fileFullPath, []byte(src), 0o600)
@@ -120,7 +124,7 @@ func TestMutantApplyAndRollback(t *testing.T) {
 	rollbackWant := "package main\n\nfunc main() {\n\ta := 1 + 2\n\tb := 1 - 2\n}\n"
 
 	workdir := t.TempDir()
-	filePath := "sourceFile.go"
+	filePath := sourceFileName
 	fileFullPath := filepath.Join(workdir, filePath)
 
 	err := os.WriteFile(fileFullPath, []byte(rollbackWant), 0o600)
@@ -179,5 +183,91 @@ func TestMutantApplyAndRollback(t *testing.T) {
 		if !cmp.Equal(string(got), rollbackWant) {
 			t.Fatal(cmp.Diff(rollbackWant, string(got)))
 		}
+	}
+}
+
+// TestRegressionTokenMutatorApplyWriteFailureRestoresAST proves that a failed
+// write of the mutated file leaves no changed state for later mutants
+// (issue #106). The AST is shared among the mutants of a file, so Apply must
+// put back the original token when the write fails. A later mutant of the
+// same AST must then write only its own mutation.
+//
+// The test makes the source file read-only to make the write fail. It needs
+// a user that file permissions apply to, and it verifies that setup first.
+func TestRegressionTokenMutatorApplyWriteFailureRestoresAST(t *testing.T) {
+	const src = "package main\n\nfunc main() {\n\ta := 1 + 2\n\tb := 1 - 2\n}\n"
+	const wantSecond = "package main\n\nfunc main() {\n\ta := 1 + 2\n\tb := 1 + 2\n}\n"
+
+	workdir := t.TempDir()
+	filePath := sourceFileName
+	fileFullPath := filepath.Join(workdir, filePath)
+	if err := os.WriteFile(fileFullPath, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(fileFullPath, 0o400); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fileFullPath, []byte(src), 0o400); err == nil {
+		t.Skip("skipping: the current user can write a read-only file, so the write failure cannot be injected")
+	}
+
+	set := token.NewFileSet()
+	f, err := parser.ParseFile(set, filePath, src, parser.ParseComments)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var nodes []*engine.NodeToken
+	ast.Inspect(f, func(n ast.Node) bool {
+		if be, ok := n.(*ast.BinaryExpr); ok {
+			tn, ok := engine.NewTokenNode(be)
+			if !ok {
+				t.Fatal("new token node should be created")
+			}
+			nodes = append(nodes, tn)
+		}
+
+		return true
+	})
+	if len(nodes) != 2 {
+		t.Fatalf("found %d binary expressions, want 2", len(nodes))
+	}
+
+	first := engine.NewTokenMutant("example.com/test", set, f, nodes[0])
+	first.SetType(mutator.ArithmeticBase)
+	first.SetWorkdir(workdir)
+
+	err = first.Apply()
+
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("Apply() error = %v, want %v", err, fs.ErrPermission)
+	}
+	if got := nodes[0].Tok(); got != token.ADD {
+		t.Errorf("AST token after failed Apply() = %v, want %v", got, token.ADD)
+	}
+	//nolint:gosec // test code reading test file
+	got, err := os.ReadFile(fileFullPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cmp.Equal(string(got), src) {
+		t.Errorf("source after failed Apply() differs (-want +got):\n%s", cmp.Diff(src, string(got)))
+	}
+
+	if err := os.Chmod(fileFullPath, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	second := engine.NewTokenMutant("example.com/test", set, f, nodes[1])
+	second.SetType(mutator.ArithmeticBase)
+	second.SetWorkdir(workdir)
+	if err := second.Apply(); err != nil {
+		t.Fatalf("second Apply() error = %v, want nil", err)
+	}
+	//nolint:gosec // test code reading test file
+	got, err = os.ReadFile(fileFullPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cmp.Equal(string(got), wantSecond) {
+		t.Errorf("source after second Apply() differs (-want +got):\n%s", cmp.Diff(wantSecond, string(got)))
 	}
 }

@@ -17,7 +17,6 @@
 package engine_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -140,7 +139,7 @@ func runRoutingModule(t *testing.T, callingDir string, wantPkgs map[string]strin
 	codeData := engine.CodeData{Cov: wholeFilesCovered(wantPkgs)}
 	eng := engine.New(mod, codeData, jDealer)
 
-	return eng.Run(context.Background()).Mutants
+	return runEngine(t, eng).Mutants
 }
 
 // checkRoutedMutants checks that each file of wantPkgs has mutants, and that

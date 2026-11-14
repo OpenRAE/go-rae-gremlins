@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "issue": 114,
+  "summary": "Reject invalid numeric settings before the tests start. configuration.Validate runs a range check after the type check of each numeric key. unleash.workers, unleash.test-cpu, and unleash.timeout-coefficient must not be negative. unleash.threshold.efficacy and unleash.threshold.mutant-coverage must be from 0 to 100. The value 0 stays valid and keeps its documented default meaning. runUnleash already calls Validate before it starts coverage, child processes, or workers. The configuration JSON schema adds workers, test-cpu, and timeout-coefficient with minimum 0. The change is compatible: the rejected values never gave a working run, and the schema already limited the thresholds to 0 to 100. No package import, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "cmd/internal/flags",
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    },
+    {
+      "package": "internal/configuration",
+      "imports": [
+        "internal/mutator"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    }
+  ],
+  "contracts": [
+    "configuration",
+    "schema"
+  ],
+  "trust_boundaries": "The change reads configuration values that the process already reads from flags, the configuration file, and the environment. It adds no data flow, network access, or source execution. The trust_changes entries restate the existing model boundaries.",
+  "policies": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {
+    "configuration": "compatible",
+    "schema": "compatible"
+  }
+}

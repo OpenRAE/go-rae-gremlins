@@ -15,6 +15,13 @@ If the module build requires tags
 gremlins unleash --tags "tag1,tag2"
 ```
 
+## Cancellation
+
+An interrupt (`SIGINT`) or a termination signal (`SIGTERM`) stops the run.
+Gremlins stops the coverage step and the running tests, and removes its temporary files.
+It does not write a report. It reports the cancellation as an error and exits with code 1.
+More signals during the shutdown do not stop it abruptly.
+
 ## Flags
 
 `unleash` supports several flags to fine tune its behaviour.
@@ -171,8 +178,8 @@ Output
 :material-flag: `--output-diff-statuses` · :material-sign-direction: Default: empty - no diffs shown
 
 Prints a unified diff of the original vs mutated code snippet for mutants whose status matches
-the filter. Only `l` (LIVED) and `k` (KILLED) are accepted — other statuses are not valid because
-diffs are only meaningful for mutants that were actually executed and had their source changed.
+the filter. Only `l` (LIVED) and `k` (KILLED) are accepted. Other statuses are not valid.
+A diff is only meaningful for a mutant that ran and had its source changed.
 
 This flag works in combination with `--output-statuses`: a mutant that is hidden by
 `--output-statuses` will produce no output at all — no status line and no diff.
@@ -221,12 +228,12 @@ gremlins unleash --increment-decrement=false
 In _normal mode_, Gremlins executes only the tests of the packages where the mutant is found.
 This is done to optimize the performance, running less test cases for each mutation.
 
-The drawback of this approach lies in the fact that if a mutation in a package influences the tests
-of another package, this is not caught by Gremlins. In general, this is an acceptable drawback
+The disadvantage of this approach is that Gremlins does not see when a mutation in a package affects the tests
+of another package. In general, this is an acceptable disadvantage
 because packages should rely on their own tests, not on the tests of other packages.
 
-Nonetheless, there may be cases where you may want to run all the test suite for each mutation, for
-example if you are analysing integration or E2E tests. In this scenario, you can enable _integration mode_.
+But you can run the full test suite for each mutation, for example when you analyse integration or E2E tests.
+For this, enable _integration mode_.
 However, you should be aware that integration mode is generally much slower, and you can also get
 slightly different results depending on your test suite.
 
@@ -299,6 +306,8 @@ gremlins unleash --invert_negatives=false
 :material-flag: `--output`/`-o` · :material-sign-direction: Default: empty
 
 When set, Gremlins will write the give output file with machine readable results.
+Gremlins resolves a relative path from the current directory.
+If Gremlins cannot create or write the file, the command fails with exit code 1.
 
 ```shell
 gremlins unleash --output=output.json
@@ -380,7 +389,8 @@ gremlins unleash --tags "tag1,tag2"
     To understand better the use of these flag, check [workers](workers.md)
 [//]: # (@formatter:on)
 
-This flag overrides the number of CPUs the Go test tool will utilize. By default, Gremlins doesn't set this value.
+This flag overrides the number of CPUs the Go test tool will utilize. By default, Gremlins does not set this value.
+Gremlins rejects a negative value before it starts the tests.
 
 ```shell
 gremlins unleash --test-cpu=1
@@ -395,6 +405,7 @@ zero, which
 means Gremlins never exits with an error.
 
 The _test efficacy_ is calculated as `KILLED / (KILLED + LIVED)` and assesses how effective are the tests.
+The value must be from 0 to 100. Gremlins rejects other values before it starts the tests.
 
 ```shell
 gremlins unleash --threshold-efficacy 80
@@ -409,6 +420,8 @@ it is zero, which means Gremlins never exits with an error.
 
 The _mutant coverage_ is calculated as `(KILLED + LIVED) / (KILLED + LIVED + NOT_COVERED)` and assesses how many mutants
 are covered by tests.
+The calculation does not include `SKIPPED` mutants.
+The value must be from 0 to 100. Gremlins rejects other values before it starts the tests.
 
 ```shell
 gremlins unleash --threshold-mcover 80
@@ -427,7 +440,7 @@ Default: `0` (uses default value of `5`)
 Gremlins determines the timeout for each Go test run by multiplying by a
 coefficient the time it took to perform the coverage run. The default
 coefficient is `5`, which can be overridden with this flag (`0` means use
-the default).
+the default). Gremlins rejects a negative value before it starts the tests.
 
 To ensure reasonable timeouts even when the coverage run is very fast,
 Gremlins enforces a minimum base timeout of 1 second before applying the
@@ -442,15 +455,17 @@ gremlins unleash --timeout-coefficient=10
 
 [//]: # (@formatter:off)
 !!! note "Result Consistency"
-    You may observe small fluctuations in the number of
-    killed/lived/timed-out mutants between runs (typically ±2-4 mutants).
-    This is normal and can be caused by:
-    - **Race conditions**: Mutations may introduce or remove race
-      conditions that behave differently each run
-    - **Timing-sensitive tests**: Tests involving timeouts, concurrency,
-      or I/O timing
+    The number of killed, lived, and timed-out mutants can change a
+    small quantity between runs (typically ±2-4 mutants). This is normal.
+    These are some causes:
+
+    - **Race conditions**: Mutations can add or remove race
+      conditions that change between runs.
+    - **Timing-sensitive tests**: Tests of timeouts, concurrency,
+      or I/O timing.
     - **System variations**: CPU scheduling, system load, and other
-      OS-level factors
+      OS-level factors.
+
     These minor variations do not indicate a problem with the mutation
     testing process. Large variations or progressive degradation would
     indicate an issue.
@@ -465,13 +480,14 @@ gremlins unleash --timeout-coefficient=10
     To understand better the use of these flag, check [workers](workers.md)
 [//]: # (@formatter:on)
 
-Gremlins runs in parallel mode, which means that more than one test at a time will be performed, based on the number of
+Gremlins runs in parallel mode. It runs more than one test at a time, based on the number of
 CPU cores available.
 
 By default, Gremlins will use all the available CPU cores of, and , in _integration mode_, it will use half of the
 available CPU cores.
 
 The `--workers` flag allows to override the number of CPUs to use (`0` means use the default).
+Gremlins rejects a negative value before it starts the tests.
 
 ```shell
 gremlins unleash --workers=4

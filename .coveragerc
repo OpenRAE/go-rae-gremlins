@@ -1,5 +1,11 @@
 [run]
 branch = True
 relative_files = True
-source = scripts
-omit = scripts/test_lint.py
+# The regression proof tests run the proof script in a subprocess.
+patch = subprocess
+source =
+    scripts
+    .github/scripts
+omit =
+    */scripts/test_lint.py
+    */.github/scripts/test_regression_proof.py

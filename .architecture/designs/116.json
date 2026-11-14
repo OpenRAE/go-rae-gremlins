@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "issue": 116,
+  "summary": "Add the internal/process package. Its Run function runs a command in its own process group on Unix, kills the complete group when the command context is cancelled, bounds the wait for open output pipes, and kills any descendant that remains after the command exits. On Windows it keeps the current best-effort behavior: a new process group and a kill of the direct child only (issue #128). internal/engine moves its process group helpers into this package and calls process.Run for each mutant test run. internal/coverage calls process.Run for go mod download and the coverage go test run, so a cancelled run no longer leaves the test binary of the module running. New process tests in internal/engine and cmd/gremlins check a timeout and a cancellation during a run, descendant cleanup, the exit codes of the binary entry point, and an interrupt during the coverage run. The lint baseline loses the entries of the removed engine runner. No CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/process",
+      "imports": []
+    },
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/process",
+        "internal/report"
+      ]
+    },
+    {
+      "package": "internal/coverage",
+      "imports": [
+        "internal/configuration",
+        "internal/gomodule",
+        "internal/log",
+        "internal/process"
+      ]
+    },
+    {
+      "package": "cmd/gremlins",
+      "imports": [
+        "cmd",
+        "internal/execution",
+        "internal/log"
+      ]
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The change runs the same go commands as before, with the same arguments, environment, and working directories. It adds no network call, no new destination, and no new source execution. Process group control applies only to processes that Gremlins starts. The development-check, delivery-finalization, and merge-queue-policy boundaries do not change.",
+  "policies": [
+    "model",
+    "guidance",
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

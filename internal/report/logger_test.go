@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 The Gremlins Authors
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package report_test
 
 import (
@@ -124,6 +140,7 @@ func TestLogger(t *testing.T) {
 	defer out.Reset()
 	log.Init(out, &bytes.Buffer{})
 	defer log.Reset()
+	isolateConfig(t)
 
 	m := stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
 
@@ -167,9 +184,9 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		log.Init(out, errOut)
 		defer log.Reset()
 
+		isolateConfig(t)
 		configuration.Set(configuration.UnleashOutputStatusesKey, "k")
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "l")
-		defer configuration.Reset()
 
 		logger := report.NewLogger()
 		logger.Mutant(stubMutant{
@@ -193,9 +210,9 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		log.Init(out, &bytes.Buffer{})
 		defer log.Reset()
 
+		isolateConfig(t)
 		configuration.Set(configuration.UnleashOutputStatusesKey, "k")
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "k")
-		defer configuration.Reset()
 
 		logger := report.NewLogger()
 		logger.Mutant(stubMutant{
@@ -231,8 +248,8 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		out := &bytes.Buffer{}
 		log.Init(out, &bytes.Buffer{})
 		defer log.Reset()
+		isolateConfig(t)
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "l")
-		defer configuration.Reset()
 
 		logger := report.NewLogger()
 		logger.Mutant(livedWithSnippets)
@@ -250,8 +267,8 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		out := &bytes.Buffer{}
 		log.Init(out, &bytes.Buffer{})
 		defer log.Reset()
+		isolateConfig(t)
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "k")
-		defer configuration.Reset()
 
 		logger := report.NewLogger()
 		logger.Mutant(livedWithSnippets)
@@ -263,6 +280,7 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 	})
 
 	t.Run("does not print diff when output-diff-statuses is not set", func(t *testing.T) {
+		isolateConfig(t)
 		out := &bytes.Buffer{}
 		log.Init(out, &bytes.Buffer{})
 		defer log.Reset()

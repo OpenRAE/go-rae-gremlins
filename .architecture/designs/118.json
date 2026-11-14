@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "issue": 118,
+  "summary": "Isolate test configuration and fail on invalid fixture setup. The change edits test files only in internal/configuration, internal/diff, internal/exclusion, internal/report, internal/engine, and internal/engine/workdir. Tests that change the shared configuration reset it and register the reset before the change. Engine fixture reads use readFixture, which fails the calling test on a read error and keeps no file open. notWriteableDir and the workdir TestErrors permission cases check setup errors, register the permission restore first, and probe for a permission error. The repairs remove existing lint findings, so make lint-shrink removes their entries from .lint/baseline.json. The baseline only shrinks. docs/development/test-assessment.md records the G04, G05, and G09 repairs. No production code, internal dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/configuration"
+    },
+    {
+      "package": "internal/diff"
+    },
+    {
+      "package": "internal/exclusion"
+    },
+    {
+      "package": "internal/report"
+    },
+    {
+      "package": "internal/engine"
+    },
+    {
+      "package": "internal/engine/workdir"
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The tests run locally and in existing CI. They start no network call and run no scanned source. The change keeps the development-check, delivery-finalization, and merge-queue-policy boundaries unchanged.",
+  "policies": [
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

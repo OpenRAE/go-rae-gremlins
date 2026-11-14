@@ -195,6 +195,25 @@ class ReportTests(unittest.TestCase):
                 lint.source_declarations({"a.go": "package a\n"})
         self.assertFalse(marker.exists(), "candidate initializer ran during static lint")
 
+    def test_toolchain_newer_than_the_linter_go_fails(self):
+        def versions(active, built=b'{"goVersion":"go1.27.0","version":"2.15.0"}'):
+            def fake(root, args, env, **kwargs):
+                self.assertEqual(args[:3], lint.MISE_EXEC)
+                return built if "golangci-lint" in args else active
+            return fake
+        for active in [b"go1.26.11\n", b"go1.27.0\n", b"go1.27\n"]:
+            with self.subTest(active=active), mock.patch.object(lint, "command", side_effect=versions(active)):
+                lint.check_toolchain(self.root, {})
+        with mock.patch.object(lint, "command", side_effect=versions(b"go1.27.4\n")):
+            with self.assertRaisesRegex(lint.LintError, "go1.27.4 is newer than go1.27.0"):
+                lint.check_toolchain(self.root, {})
+        with mock.patch.object(lint, "command", side_effect=versions(b"go1.28rc1\n")):
+            with self.assertRaisesRegex(lint.LintError, "unrecognized Go version"):
+                lint.check_toolchain(self.root, {})
+        with mock.patch.object(lint, "command", side_effect=versions(b"go1.26.11\n", b'{"version":"2.15.0"}')):
+            with self.assertRaisesRegex(lint.LintError, "no goVersion"):
+                lint.check_toolchain(self.root, {})
+
     def test_command_failure_timeout_and_large_output_fail_closed(self):
         for failure in [FileNotFoundError(), subprocess.TimeoutExpired("lint", 1)]:
             with mock.patch.object(lint.subprocess, "run", side_effect=failure):

@@ -18,10 +18,14 @@
 package configuration
 
 import (
+	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -77,11 +81,11 @@ func Init(cPaths []string) error {
 
 	if isSpecificFile(cPaths) {
 		viper.SetConfigFile(cPaths[0])
-		err := viper.ReadInConfig()
-		if err != nil {
-			return err
-		}
-	} else if arePathsNotSet(cPaths) {
+
+		return viper.ReadInConfig()
+	}
+
+	if arePathsNotSet(cPaths) {
 		cPaths = defaultConfigPaths()
 	}
 
@@ -89,7 +93,11 @@ func Init(cPaths []string) error {
 		viper.AddConfigPath(p)
 	}
 
-	_ = viper.ReadInConfig() // ignoring error if file not present
+	// The discovered configuration file is optional. Ignore only its absence.
+	var notFound viper.ConfigFileNotFoundError
+	if err := viper.ReadInConfig(); err != nil && !errors.As(err, &notFound) {
+		return fmt.Errorf("reading configuration: %w", err)
+	}
 
 	return nil
 }
@@ -180,22 +188,218 @@ func Set[T any](k string, v T) {
 }
 
 // Get offers synchronised access to Viper.
+//
+// Get reads bool, int, float64, string, and []string values with the Viper
+// conversion method for T, so a value from a flag, an environment variable, or
+// the configuration file has the same type. Get returns the zero value of T
+// when the value does not convert. Validate reports these values as errors.
 func Get[T any](k string) T {
-	var r T
 	mutex.RLock()
 	defer mutex.RUnlock()
-	// Viper returns changed float flags as strings; use its conversion so
-	// flags, environment variables and numeric config values agree.
-	if value, ok := any(&r).(*float64); ok {
-		*value = viper.GetFloat64(k)
 
-		return r
+	var r T
+	var v any
+	switch any(r).(type) {
+	case bool:
+		v = viper.GetBool(k)
+	case int:
+		v = viper.GetInt(k)
+	case float64:
+		v = viper.GetFloat64(k)
+	case string:
+		v = viper.GetString(k)
+	case []string:
+		v = viper.GetStringSlice(k)
+	default:
+		v = viper.Get(k)
 	}
-	if value, ok := viper.Get(k).(T); ok {
-		return value
+	if t, ok := v.(T); ok {
+		return t
 	}
 
 	return r
+}
+
+// Validate checks the effective value of each typed configuration key.
+// It returns an error that names each key with a value that does not convert
+// to the type of the key, or with a numeric value that is out of range.
+func Validate() error {
+	mutex.RLock()
+	defer mutex.RUnlock()
+
+	checks := typedKeys()
+	bounds := boundedKeys()
+	keys := make([]string, 0, len(checks))
+	for k := range checks {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var errs []error
+	for _, k := range keys {
+		v := viper.Get(k)
+		if v == nil {
+			continue
+		}
+		err := checks[k](v)
+		if bound, ok := bounds[k]; ok && err == nil {
+			err = bound(k)
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("invalid value for configuration key %q: %w", k, err))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// typedKeys returns the value check of each configuration key that has a
+// fixed value type.
+func typedKeys() map[string]func(any) error {
+	checks := map[string]func(any) error{
+		GremlinsSilentKey:            checkBool,
+		UnleashDryRunKey:             checkBool,
+		UnleashOutputStatusesKey:     checkString,
+		UnleashOutputKey:             checkString,
+		UnleashTagsKey:               checkString,
+		UnleashCoverPkgKey:           checkString,
+		UnleashWorkersKey:            checkInt,
+		UnleashTestCPUKey:            checkInt,
+		UnleashTimeoutCoefficientKey: checkInt,
+		UnleashIntegrationMode:       checkBool,
+		UnleashExcludeFiles:          checkStringSlice,
+		UnleashDiffRef:               checkString,
+		UnleashThresholdEfficacyKey:  checkFloat,
+		UnleashThresholdMCoverageKey: checkFloat,
+		UnleashOutputDiffStatusesKey: checkString,
+	}
+	for _, mt := range mutator.Types {
+		checks[MutantTypeEnabledKey(mt)] = checkBool
+	}
+
+	return checks
+}
+
+// boundedKeys returns the range check of each numeric configuration key.
+// Validate runs a range check only on a value that passes its type check.
+func boundedKeys() map[string]func(string) error {
+	return map[string]func(string) error{
+		UnleashWorkersKey:            checkNotNegative,
+		UnleashTestCPUKey:            checkNotNegative,
+		UnleashTimeoutCoefficientKey: checkNotNegative,
+		UnleashThresholdEfficacyKey:  checkPercentage,
+		UnleashThresholdMCoverageKey: checkPercentage,
+	}
+}
+
+// checkNotNegative accepts 0, which selects the default, and positive values.
+func checkNotNegative(k string) error {
+	if n := viper.GetInt(k); n < 0 {
+		return fmt.Errorf("%d is negative; use 0 for the default or a positive number", n)
+	}
+
+	return nil
+}
+
+// checkPercentage accepts values from 0 to 100. The value 0 disables the
+// threshold.
+func checkPercentage(k string) error {
+	f := viper.GetFloat64(k)
+	if f >= 0 && f <= 100 {
+		return nil
+	}
+
+	return fmt.Errorf("%v is not a percentage from 0 to 100", f)
+}
+
+func checkBool(v any) error {
+	switch t := v.(type) {
+	case bool:
+		return nil
+	case string:
+		if _, err := strconv.ParseBool(t); err != nil {
+			return fmt.Errorf("%q is not a boolean", t)
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("%v (%T) is not a boolean", v, v)
+	}
+}
+
+func checkInt(v any) error {
+	switch t := v.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return nil
+	case float64:
+		if t != math.Trunc(t) {
+			return fmt.Errorf("%v is not an integer", t)
+		}
+
+		return nil
+	case string:
+		if _, err := strconv.ParseInt(t, 0, 0); err != nil {
+			return fmt.Errorf("%q is not an integer", t)
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("%v (%T) is not an integer", v, v)
+	}
+}
+
+func checkFloat(v any) error {
+	switch t := v.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		return nil
+	case string:
+		if _, err := strconv.ParseFloat(t, 64); err != nil {
+			return fmt.Errorf("%q is not a number", t)
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("%v (%T) is not a number", v, v)
+	}
+}
+
+func checkString(v any) error {
+	if !isScalar(v) {
+		return fmt.Errorf("%v (%T) is not a string", v, v)
+	}
+
+	return nil
+}
+
+func checkStringSlice(v any) error {
+	switch t := v.(type) {
+	case string, []string:
+		return nil
+	case []any:
+		return checkItems(t)
+	default:
+		return fmt.Errorf("%v (%T) is not a list of strings", v, v)
+	}
+}
+
+func checkItems(items []any) error {
+	for i, e := range items {
+		if !isScalar(e) {
+			return fmt.Errorf("item #%d %v (%T) is not a string", i, e, e)
+		}
+	}
+
+	return nil
+}
+
+// isScalar reports whether Viper can read v as a string.
+func isScalar(v any) bool {
+	switch v.(type) {
+	case string, bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		return true
+	default:
+		return false
+	}
 }
 
 // Reset is used mainly for testing purposes, in order to clean up the Viper
