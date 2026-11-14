@@ -26,12 +26,36 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/hectane/go-acl"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workdir"
 )
+
+// testWaitBound is the longest a bounded test wait allows before it fails with
+// the blocked operation name. It is far below the package test timeout, so a
+// join that never completes identifies the operation instead of consuming that
+// timeout.
+const testWaitBound = 30 * time.Second
+
+// waitWithin waits for wg in its own goroutine. It fails with op when the join
+// does not complete within testWaitBound. It owns the goroutine, so a blocked
+// join reports op instead of consuming the package test timeout.
+func waitWithin(t *testing.T, wg *sync.WaitGroup, op string) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+	select {
+	case <-done:
+	case <-time.After(testWaitBound):
+		t.Fatalf("%s did not complete within %s", op, testWaitBound)
+	}
+}
 
 func TestCopyFolder(t *testing.T) {
 	srcDir := t.TempDir()
@@ -171,7 +195,7 @@ func TestCachesFolder(t *testing.T) {
 			}()
 		}
 
-		wg.Wait()
+		waitWithin(t, &wg, "parallel Get")
 
 		occurred := make(map[string]bool)
 		for _, v := range folders {

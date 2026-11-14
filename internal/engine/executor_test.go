@@ -45,6 +45,65 @@ const (
 	exampleTags    = "tag1,t1g2"
 )
 
+// testWaitBound is the longest a bounded test wait allows before it fails with
+// the blocked operation name. It is far below the package test timeout, so a
+// dropped result or a stuck join identifies the operation instead of consuming
+// that timeout.
+const testWaitBound = 30 * time.Second
+
+// recvWithin returns the next value from ch. It fails with op when the value
+// does not arrive within testWaitBound.
+func recvWithin[T any](t *testing.T, ch <-chan T, op string) T {
+	t.Helper()
+	select {
+	case v := <-ch:
+		return v
+	case <-time.After(testWaitBound):
+		t.Fatalf("%s did not complete within %s", op, testWaitBound)
+
+		var zero T
+
+		return zero
+	}
+}
+
+// waitWithin waits for wg in its own goroutine. It fails with op when the join
+// does not complete within testWaitBound. It owns the goroutine, so a blocked
+// join reports op instead of consuming the package test timeout.
+func waitWithin(t *testing.T, wg *sync.WaitGroup, op string) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+	select {
+	case <-done:
+	case <-time.After(testWaitBound):
+		t.Fatalf("%s did not complete within %s", op, testWaitBound)
+	}
+}
+
+// startExecutor runs ex on w in its own goroutine, returns the single result it
+// reports, and joins wg. It fails with op when the result or the join does not
+// complete within testWaitBound. It owns the goroutine, so a blocked send or
+// join reports op instead of consuming the package test timeout.
+func startExecutor(
+	t *testing.T,
+	ex workerpool.Executor,
+	w *workerpool.Worker,
+	outCh <-chan engine.ExecutorResult,
+	wg *sync.WaitGroup,
+	op string,
+) engine.ExecutorResult {
+	t.Helper()
+	go ex.Start(context.Background(), w)
+	res := recvWithin(t, outCh, op+" result")
+	waitWithin(t, wg, op+" join")
+
+	return res
+}
+
 func TestApplyAndRollback(t *testing.T) {
 	t.Run("applies and rolls back", func(t *testing.T) {
 		wdDealer := newWdDealerStub(t)
@@ -71,14 +130,8 @@ func TestApplyAndRollback(t *testing.T) {
 			Name: testWorkerName,
 			ID:   1,
 		}
-		go func() {
-			<-outCh
-			close(outCh)
-		}()
 
-		executor.Start(context.Background(), w)
-
-		wg.Wait()
+		startExecutor(t, executor, w, outCh, &wg, "executor")
 
 		if !mut.applyCalled {
 			t.Error("expected apply to be called")
@@ -147,19 +200,7 @@ func TestMutatorTestExecution(t *testing.T) {
 				ID:   1,
 			}
 
-			var got mutator.Mutator
-			mutex := sync.RWMutex{}
-			go func() {
-				mutex.Lock()
-				defer mutex.Unlock()
-				got = (<-outCh).Mutant
-				close(outCh)
-			}()
-			executor.Start(context.Background(), w)
-			wg.Wait()
-
-			mutex.RLock()
-			defer mutex.RUnlock()
+			got := startExecutor(t, executor, w, outCh, &wg, "executor").Mutant
 
 			if got.Status() != tc.wantMutStatus {
 				t.Errorf("expected mutation to be %v, but got: %v", tc.wantMutStatus, got.Status())
@@ -233,9 +274,9 @@ func TestFeatureLabel(t *testing.T) {
 	}
 
 	executor.Start(context.Background(), w)
-	wg.Wait()
+	waitWithin(t, &wg, "executor join")
 
-	got := (<-outCh).Mutant
+	got := recvWithin(t, outCh, "executor result").Mutant
 	if got.Status() != mutator.NotViable {
 		t.Errorf("status = %v, want %v", got.Status(), mutator.NotViable)
 	}
@@ -347,7 +388,7 @@ func runExecutorOnce(
 	executor := mjd.NewExecutor(mut, outCh, &wg)
 
 	executor.Start(context.Background(), &workerpool.Worker{Name: testWorkerName, ID: 1})
-	wg.Wait()
+	waitWithin(t, &wg, "executor join")
 
 	select {
 	case got := <-outCh:
@@ -470,12 +511,7 @@ func TestMutatorRun(t *testing.T) {
 				Name: testWorkerName,
 				ID:   1,
 			}
-			go func() {
-				<-outCh
-				close(outCh)
-			}()
-			executor.Start(context.Background(), w)
-			wg.Wait()
+			startExecutor(t, executor, w, outCh, &wg, "executor")
 
 			wantTimeout := 2*time.Second + expectedTimeout*engine.DefaultTimeoutCoefficient
 			if tc.timeoutCoefficient != 0 {
@@ -559,12 +595,7 @@ func TestCPU(t *testing.T) {
 				Name: testWorkerName,
 				ID:   1,
 			}
-			go func() {
-				<-outCh
-				close(outCh)
-			}()
-			executor.Start(context.Background(), w)
-			wg.Wait()
+			startExecutor(t, executor, w, outCh, &wg, "executor")
 
 			for _, arg := range holder.args {
 				if !tc.cpuPresent && strings.Contains(arg, "-cpu") {
@@ -633,12 +664,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 			Name: testWorkerName,
 			ID:   1,
 		}
-		go func() {
-			<-outCh
-			close(outCh)
-		}()
-		executor.Start(context.Background(), w)
-		wg.Wait()
+		startExecutor(t, executor, w, outCh, &wg, "executor")
 
 		if mut.Workdir() != holder.cmd.Dir {
 			t.Errorf("expected working dir to be %s, got %s", holder.cmd.Dir, mut.Workdir())
@@ -679,12 +705,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 			Name: testWorkerName,
 			ID:   1,
 		}
-		go func() {
-			<-outCh
-			close(outCh)
-		}()
-		executor.Start(context.Background(), w)
-		wg.Wait()
+		startExecutor(t, executor, w, outCh, &wg, "executor")
 
 		if wantRootDir != holder.cmd.Dir {
 			t.Errorf("expected working dir to be %q, got %q", wantRootDir, holder.cmd.Dir)
@@ -797,7 +818,7 @@ func TestFeatureExecutorCancellation(t *testing.T) {
 			executor := mjd.NewExecutor(mut, outCh, &wg)
 
 			executor.Start(ctx, &workerpool.Worker{Name: testWorkerName, ID: 1})
-			wg.Wait()
+			waitWithin(t, &wg, "cancelled executor join")
 
 			select {
 			case got := <-outCh:
