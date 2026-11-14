@@ -22,8 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -181,7 +183,11 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 		return err
 	}
 
-	cov := newFileCoverage(set, file, mu.codeData.Cov)
+	built, err := mu.hostBuilds(fileName)
+	if err != nil {
+		return err
+	}
+	cov := newFileCoverage(set, file, mu.codeData.Cov, built)
 	stopped := false
 	ast.Inspect(file, func(node ast.Node) bool {
 		if stopped {
@@ -219,6 +225,25 @@ func (mu *Engine) parseFile(set *token.FileSet, fileName string) (*ast.File, err
 	return file, nil
 }
 
+// hostBuilds tells if the host build with the configured build tags includes
+// a Go file of the module file system. It applies the file name suffixes and
+// the build constraints of the file, as the go command does.
+func (mu *Engine) hostBuilds(fileName string) (bool, error) {
+	ctx := build.Default
+	ctx.BuildTags = strings.FieldsFunc(configuration.Get[string](configuration.UnleashTagsKey), func(r rune) bool {
+		return r == ',' || r == ' '
+	})
+	ctx.JoinPath = path.Join
+	ctx.OpenFile = func(name string) (io.ReadCloser, error) { return mu.fs.Open(name) }
+
+	ok, err := ctx.MatchFile(path.Dir(fileName), path.Base(fileName))
+	if err != nil {
+		return false, fmt.Errorf("matching build constraints: %w", err)
+	}
+
+	return ok, nil
+}
+
 // findMutations sends the mutants of node to the mutant stream. It returns
 // false when ctx is done before a mutant is sent.
 func (mu *Engine) findMutations(
@@ -237,7 +262,7 @@ func (mu *Engine) findMutations(
 		mutantType := mt
 		tm := NewTokenMutant(pkg, set, file, node)
 		tm.SetType(mutantType)
-		tm.SetStatus(mu.mutationStatus(set.Position(node.TokPos), cov.isCovered(node.TokPos)))
+		tm.SetStatus(mu.mutationStatus(cov, node.TokPos))
 
 		select {
 		case mu.mutantStream <- tm:
@@ -263,18 +288,18 @@ func (mu *Engine) pkgName(fileName string) string {
 	return mu.module.Name + "/" + dir
 }
 
-func (mu *Engine) mutationStatus(pos token.Position, covered bool) mutator.Status {
-	var status mutator.Status
-
-	if covered {
-		status = mutator.Runnable
+// mutationStatus returns the status of a new mutant at tokPos. A mutant that
+// is outside the diff, or that no test run can cover, is skipped. Coverage
+// then tells if the mutant is runnable or not covered.
+func (mu *Engine) mutationStatus(cov fileCoverage, tokPos token.Pos) mutator.Status {
+	switch {
+	case !mu.codeData.Diff.IsChanged(cov.set.Position(tokPos)) || !cov.isObservable(tokPos):
+		return mutator.Skipped
+	case cov.isCovered(tokPos):
+		return mutator.Runnable
+	default:
+		return mutator.NotCovered
 	}
-
-	if !mu.codeData.Diff.IsChanged(pos) {
-		status = mutator.Skipped
-	}
-
-	return status
 }
 
 // executeTests runs an executor for each mutant of the stream on a worker
