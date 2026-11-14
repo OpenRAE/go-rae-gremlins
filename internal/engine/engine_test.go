@@ -843,12 +843,8 @@ func TestRegressionSkipMutantsThatCoverageCannotObserve(t *testing.T) {
 	for name := range sys {
 		full[name] = []coverage.Block{{StartLine: 1, StartCol: 1, EndLine: 100, EndCol: 1}}
 	}
-	type line struct {
-		file string
-		line int
-	}
 	// observable maps each line with mutants to whether coverage can observe it.
-	observable := map[line]bool{
+	observable := map[mutantLine]bool{
 		{constFile, 3}:    false,
 		{constFile, 6}:    true,
 		{constFile, 8}:    true,
@@ -877,30 +873,46 @@ func TestRegressionSkipMutantsThatCoverageCannotObserve(t *testing.T) {
 			mut := engine.New(mod, engine.CodeData{Cov: tc.profile}, newJobDealerStub(t), engine.WithDirFs(sys))
 			res := runEngine(t, mut)
 
-			found := make(map[line]bool)
-			for _, m := range res.Mutants {
-				at := line{m.Position().Filename, m.Position().Line}
-				obs, ok := observable[at]
-				if !ok {
-					t.Errorf("got %s mutant at %s, want no mutant on that line", m.Type(), m.Position())
-
-					continue
-				}
-				found[at] = true
-				want := mutator.Skipped
-				if obs {
-					want = tc.observedState
-				}
-				if m.Status() != want {
-					t.Errorf("%s mutant at %s: status = %s, want %s", m.Type(), m.Position(), m.Status(), want)
-				}
-			}
-			for at := range observable {
-				if !found[at] {
-					t.Errorf("got no mutant at %s:%d, want at least one", at.file, at.line)
-				}
-			}
+			checkObservableStatuses(t, res.Mutants, observable, tc.observedState)
 		})
+	}
+}
+
+// mutantLine is a source line of a mutant.
+type mutantLine struct {
+	file string
+	line int
+}
+
+// checkObservableStatuses checks that each mutant is on a line of observable
+// and that each line of observable has a mutant. A mutant on an observable
+// line must have the status observedState. The other mutants must be skipped.
+func checkObservableStatuses(
+	t *testing.T, mutants []mutator.Mutator, observable map[mutantLine]bool, observedState mutator.Status,
+) {
+	t.Helper()
+	found := make(map[mutantLine]bool)
+	for _, m := range mutants {
+		at := mutantLine{m.Position().Filename, m.Position().Line}
+		obs, ok := observable[at]
+		if !ok {
+			t.Errorf("got %s mutant at %s, want no mutant on that line", m.Type(), m.Position())
+
+			continue
+		}
+		found[at] = true
+		want := mutator.Skipped
+		if obs {
+			want = observedState
+		}
+		if m.Status() != want {
+			t.Errorf("%s mutant at %s: status = %s, want %s", m.Type(), m.Position(), m.Status(), want)
+		}
+	}
+	for at := range observable {
+		if !found[at] {
+			t.Errorf("got no mutant at %s:%d, want at least one", at.file, at.line)
+		}
 	}
 }
 
