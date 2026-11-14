@@ -152,8 +152,7 @@ func TestFeatureClauseExpressionCoverage(t *testing.T) {
 			viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 			defer viperReset()
 
-			mapFS, mod, c := loadFixture(clausesFixture, ".")
-			defer c()
+			mapFS, mod := loadFixture(t, clausesFixture, ".")
 			profile := coverage.Profile{filenameFromFixture(clausesFixture): tc.blocks}
 
 			mut := engine.New(mod, engine.CodeData{Cov: profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))

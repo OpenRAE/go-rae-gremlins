@@ -31,7 +31,7 @@ var testPath = []string{
 func TestRules_IsFileExcluded(t *testing.T) {
 	t.Run("must exclude files by regexp", func(t *testing.T) {
 		ss := []any{"test", "internal"}
-		configuration.Set(configuration.UnleashExcludeFiles, ss)
+		setExcludeFiles(t, ss)
 
 		rules, err := New()
 		if err != nil || countTrue(testPath, rules.IsFileExcluded) != 2 {
@@ -41,7 +41,7 @@ func TestRules_IsFileExcluded(t *testing.T) {
 
 	t.Run("must return parsing error", func(t *testing.T) {
 		ss := []any{"test", "internal[[["}
-		configuration.Set(configuration.UnleashExcludeFiles, ss)
+		setExcludeFiles(t, ss)
 
 		rules, err := New()
 		if err == nil || rules != nil {
@@ -50,7 +50,7 @@ func TestRules_IsFileExcluded(t *testing.T) {
 	})
 
 	t.Run("no rules", func(t *testing.T) {
-		configuration.Set(configuration.UnleashExcludeFiles, []string(nil))
+		setExcludeFiles(t, []string(nil))
 
 		rules, err := New()
 		if err != nil || len(rules) != 0 {
@@ -61,7 +61,15 @@ func TestRules_IsFileExcluded(t *testing.T) {
 			t.Error("must not match any")
 		}
 	})
+}
 
+// setExcludeFiles registers the configuration reset before it sets the
+// exclusion rules, so the case restores the shared configuration when it ends.
+func setExcludeFiles[T any](t *testing.T, rules T) {
+	t.Helper()
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	configuration.Set(configuration.UnleashExcludeFiles, rules)
 }
 
 func countTrue(ss []string, f func(s string) bool) int {

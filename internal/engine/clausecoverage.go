@@ -30,10 +30,16 @@ import (
 // but no block for the clause expressions. fileCoverage adds the clause
 // expressions that the tests evaluated. It derives them from the clause
 // bodies that ran and from the Go evaluation order of the statements.
+//
+// fileCoverage also tells if the coverage profile can show a token position.
+// The profile has no block for a file that the host build excludes, and no
+// block for a package-level constant declaration.
 type fileCoverage struct {
 	set         *token.FileSet
 	profile     coverage.Profile
 	clauseExprs []exprSpan
+	constDecls  []exprSpan
+	built       bool
 }
 
 // exprSpan is the source range [start, end) of an expression.
@@ -42,8 +48,15 @@ type exprSpan struct {
 	end   token.Pos
 }
 
-func newFileCoverage(set *token.FileSet, file *ast.File, profile coverage.Profile) fileCoverage {
-	c := fileCoverage{set: set, profile: profile}
+// newFileCoverage returns the coverage of file. built tells if the host build
+// includes the file.
+func newFileCoverage(set *token.FileSet, file *ast.File, profile coverage.Profile, built bool) fileCoverage {
+	c := fileCoverage{set: set, profile: profile, built: built}
+	for _, decl := range file.Decls {
+		if d, ok := decl.(*ast.GenDecl); ok && d.Tok == token.CONST {
+			c.constDecls = append(c.constDecls, exprSpan{start: d.Pos(), end: d.End()})
+		}
+	}
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch n := node.(type) {
 		case *ast.SwitchStmt:
@@ -71,6 +84,17 @@ func (c fileCoverage) isCovered(pos token.Pos) bool {
 	}
 
 	return false
+}
+
+// isObservable tells if a test run can cover pos. The tests of the host build
+// cannot run a file that the build excludes. A package-level constant
+// declaration has no coverage block because the compiler evaluates it.
+func (c fileCoverage) isObservable(pos token.Pos) bool {
+	if !c.built {
+		return false
+	}
+
+	return !slices.ContainsFunc(c.constDecls, func(s exprSpan) bool { return pos >= s.start && pos < s.end })
 }
 
 // bodyRan tells if the body of the clause with the given colon ran.

@@ -289,3 +289,10 @@ Python 3.12, the Go version in `go.mod`, and full Git history. Test files and
 fixtures must be tracked by Git. The helper creates and removes a temporary
 base snapshot; it leaves the working tree and Git index intact. Keep local
 verification targeted: the full-suite discovery runs belong in CI.
+
+A pull request from `dev` into `main` uses the `--per-change` option. A later
+`dev` change can alter an API that an earlier regression test calls. That test
+then does not compile against `main`. With this option, the helper finds the
+first-parent `dev` change that adds each new regression case. It proves the
+case at that change against the parent of that change. A case that no change
+adds and proves fails the proof check.

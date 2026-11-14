@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "issue": 157,
+  "summary": "Make the lint gate fail when the active Go is newer than the Go that built the pinned golangci-lint. With a newer Go, the linter loses type information, and revive skips its type-aware rules without an error. scripts/lint.py reads the linter's build Go and the Go that mise exec gives, and stops on a newer Go. mise.toml pins Go 1.26.11, the go.mod toolchain, so local lint uses the same Go as CI. The CI mise steps, the Makefile, and the guidance install that Go. No Go package, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The lint gate keeps its offline analysis environment. mise installs the pinned Go toolchain before analysis, as it installs the pinned linter. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "conflicts": [],
+  "policies": [
+    "build",
+    "ci",
+    "contributing",
+    "guidance",
+    "lint_gate",
+    "lint_version"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}
