@@ -25,6 +25,7 @@ Native macOS and Windows invocations retain their existing behavior and are not 
 The budget covers Gremlins, coverage, module downloads, compilers, every concurrent mutant, and all test descendants.
 Containment begins at launch; moving an already running parent misses children created before the move.
 The supervising caller remains outside the affected unit.
+
 It reports a nonzero, explicit resource-exhaustion result from the runner's OOM state after group termination.
 Preserve ordinary application exit statuses, including threshold failures; runner failure is separate from Gremlins' exit-code contract.
 Do not infer OOM from exit 137, SIGKILL, output text, or a timeout alone.
@@ -85,10 +86,12 @@ The acceptance experiment needs a small controlled allocator inside an independe
 Establish and verify the outer safety bound before starting the allocator; use a smaller inner budget with ample outer headroom.
 Exercise a descendant allocator, including a changed process group, to prove child-tree coverage.
 Verify that both coverage and mutant commands inherit the enforced boundary.
+
 Retain and touch allocated pages; virtual reservation alone does not prove the memory controller's behavior.
 Distinguish fixture compilation from allocator execution so compiler exhaustion cannot satisfy the experiment accidentally.
 Prove group termination, OOM-specific runner evidence, nonzero completion, cleanup, and rejection of successful partial reports.
 Also distinguish normal success, application threshold failure, ordinary test failure, timeout/cancellation, and unavailable enforcement.
+
 Use finite allocation/time limits and bounded waits; never size an experiment to exhaust the host.
 A skipped capability test is not acceptance evidence; record the actual supported environment and result.
 Use targeted checks locally and existing hosted verification; assess mutation testing where executable repository logic changes.

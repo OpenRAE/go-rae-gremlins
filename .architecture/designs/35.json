@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "issue": 35,
+  "summary": "Parse the module declaration of go.mod with golang.org/x/mod. gomodule.Init reads the nearest go.mod as bytes, parses it with modfile.ParseLax, rejects a parser error and a missing or empty module path, and validates the path with module.CheckImportPath. It returns an error when no go.mod exists instead of opening /go.mod. ParseLax keeps directives from a newer Go release from stopping a run; the go command validates the full file during coverage. go.mod adds a direct golang.org/x/mod v0.38.0 requirement, the version that x/tools v0.48.0 already selects. .golangci.yml depguard allows exactly x/mod/modfile and x/mod/module. gomodule and coverage regression tests cover comments, blank lines, quoted and block paths, malformed and missing declarations, and the coverage match. The lint baseline shrinks for the fixed gomodule findings. Configuration keeps its root search because the model does not allow configuration to import gomodule. No internal dependency, CLI flag, configuration key, JSON report field, or exit code changes. Design record: docs/development/module-declaration-preflight.md.",
+  "changes": [
+    {
+      "package": "internal/gomodule",
+      "imports": [],
+      "test_imports": []
+    },
+    {
+      "package": "internal/coverage",
+      "imports": [
+        "internal/configuration",
+        "internal/gomodule",
+        "internal/log"
+      ],
+      "test_imports": [
+        "internal/gomodule"
+      ]
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The target go.mod bytes cross from the local file system into the process. Detection reads the file only. Syntax, module presence, and import-path checks run before Gremlins uses the metadata. Detection starts no subprocess, download, or version fixer, and writes no file. Errors keep the parser cause and name go.mod without the file contents. Development checks stay local or in existing CI. The delivery_finalization entry restates the modeled boundary.",
+  "conflicts": [],
+  "policies": [
+    "lint",
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

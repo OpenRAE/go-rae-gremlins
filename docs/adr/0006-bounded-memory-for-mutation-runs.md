@@ -38,25 +38,32 @@ cgroup membership binds a child even when it starts a new process group.
 A caller script owns the budget and stays outside the unit.
 `scripts/run-bounded.sh` validates the budget and the controller, then starts the unit.
 It reads the unit `Result` after the run.
+
 On `Result=oom-kill` it prints a visible resource-exhaustion message, deletes any partial output, and exits with code 137.
 On any other result it passes the inner exit code through unchanged.
 So Gremlins threshold exits 10 and 11, and ordinary exit 1, stay intact.
 The script never infers an OOM from a signal, exit 137, output text, or a time limit alone.
 
 A signal to the script stops the unit first, so the workload does not keep running.
+
 The script owns an isolated temporary root.
-It passes the root to the unit as `TMPDIR`, so the workload's temporary files, including the go command's, go under it, and removes it after the run.
+It passes the root to the unit as `TMPDIR`, so the workload's temporary files go under it.
+This includes the temporary files of the go command. The script removes the root after the run.
 It does not set `GOTMPDIR`, because the go command derives it from `TMPDIR` and Gremlins sets a per-mutant value itself.
 So a group-wide OOM kill does not leave temporary files behind.
+
 The script builds the workload environment from scratch with `env -i`.
-It forwards the caller's non-secret allowlist, the `GREMLINS_*` configuration, and the non-secret Go settings, so a bounded run honors the same settings as a direct command.
+It forwards the caller's non-secret allowlist, the `GREMLINS_*` configuration, and the non-secret Go settings.
+So a bounded run honors the same settings as a direct command.
 So the per-user manager environment is not inherited by the workload.
 It skips a value that carries URL credentials, and does not forward the manager bus address.
 It escapes a dollar sign in the command line, so systemd treats the arguments as data.
 
 The script uses only the per-user manager, so the command runs as the unprivileged invoking user.
-It rejects an effective root caller, read from the shell's own effective user id, before any other action, so it never runs the command as root.
+It rejects an effective root caller before any other action, so it never runs the command as root.
+It reads the effective user id from the shell.
 It verifies a finite memory limit and a zero swap limit before it runs target code.
+
 It rejects a budget that is not smaller than the host total memory.
 It fails with a clear message when no effective controller is available.
 It never runs the workload without a budget, never uses sudo, and never runs the command as root.
@@ -91,8 +98,8 @@ No data leaves the host; the proof and the run use local paths and existing CI o
 | --- | --- | --- |
 | Budget input | Reject a missing, zero, unlimited, malformed, or at-or-above-host-memory budget before launch. | Budget-parsing and excessive-budget cases in the acceptance check. |
 | Controller capability | Verify a finite memory limit and a zero swap limit before target code runs; fail closed with no unbounded fallback. | Capability and swap-limit checks in the required CI job. |
-| Privilege | Use only the per-user manager and reject an effective root caller, decided from the shell's readonly effective user id before any external command runs. The supervisor and target code run as the unprivileged user. No sudo, no root execution, and no system-manager path. | Root-rejection case under a real root context, and the fail-closed case, in the acceptance check. |
-| Target environment | Build the workload environment from scratch with `env -i`, then forward the caller's allowlist, the `GREMLINS_*` configuration, and the non-secret Go settings, so the manager environment is not inherited and a bounded run matches a direct command. Skip a value that carries URL credentials. Do not forward tokens, the manager bus address, or the whole environment. | Caller-secret and manager-secret non-forwarding cases, and a safe-setting survival case, in the acceptance check. |
+| Privilege | Use only the per-user manager. Reject an effective root caller before any external command runs. Decide this from the readonly effective user id of the shell. The supervisor and target code run as the unprivileged user. No sudo, no root execution, and no system-manager path. | Root-rejection case under a real root context, and the fail-closed case, in the acceptance check. |
+| Target environment | Build the workload environment from scratch with `env -i`, so the manager environment is not inherited. Forward the caller's allowlist, the `GREMLINS_*` configuration, and the non-secret Go settings, so a bounded run matches a direct command. Skip a value that carries URL credentials. Do not forward tokens, the manager bus address, or the whole environment. | Caller-secret and manager-secret non-forwarding cases, and a safe-setting survival case, in the acceptance check. |
 | Arguments | Pass the executable and arguments separately. Escape a dollar sign so systemd treats the command line as data. | Dollar-sign argument case in the acceptance check. |
 | OS enforcement | The kernel enforces `MemoryMax` and `MemorySwapMax=0`; a child in a new process group stays bound. | Descendant-allocator case in the acceptance check. |
 | Result and diagnostics | Read the unit `Result`; report the OOM result even under `--silent`; never infer OOM from a signal or a child exit 137. | OOM-result case and the non-OOM exit-137 negative control in the acceptance check. |

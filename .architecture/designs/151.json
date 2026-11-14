@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "issue": 151,
+  "summary": "Gate the dev merge queue. The CI Policy job runs make merge-queue-policy, which runs .github/scripts/merge_queue_policy.py. The script reads the live dev and main branch rules with gh api and the workflow files. It fails when dev has no merge queue, main has a merge queue, dev has classic required checks, dev has non-strict checks without a queue, or a required dev check has no merge_group producer. The lint job installs PyYAML and make lint-cover runs the new Python tests. A new ggshield workflow produces the required GitGuardian check on pull requests and merge groups. ADR 0007 and docs/CONTRIBUTING.md describe the queue. No Go package, import, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The merge queue policy check is a new CI data flow. It reads the public branch rules of this repository from the GitHub API with the read-only workflow token. It sends no repository content and executes no candidate source beyond the checked-in script. ADR 0007 records the new merge_queue_policy boundary in the model. The ggshield workflow is not a modeled policy path. It sends the new commits to the GitGuardian API with the GITGUARDIAN_API_KEY secret. The other trust_changes entries restate the existing boundaries.",
+  "conflicts": [],
+  "policies": [
+    "model",
+    "ci",
+    "build",
+    "contributing"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

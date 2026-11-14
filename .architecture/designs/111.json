@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "issue": 111,
+  "summary": "Return errors when the requested JSON report cannot be written. fileReport, reportFindings, and report.Do now return encode, create, write, and close errors instead of only logging create and write failures. cmd/unleash.go already returns the report.Do error, so the command fails with exit code 1 through the existing error path. Report tests cover a missing parent directory and an unwritable directory, and the existing test checks the successful output fields. A command regression test runs unleash with a missing-parent output path and expects the error. The lint baseline shrinks because the change fixes two report errcheck findings and three report test findings. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "cmd/internal/flags",
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    },
+    {
+      "package": "internal/report",
+      "imports": [
+        "internal/configuration",
+        "internal/execution",
+        "internal/log",
+        "internal/mutator",
+        "internal/report/internal"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/execution",
+        "internal/log",
+        "internal/mutator",
+        "internal/report",
+        "internal/report/internal"
+      ]
+    }
+  ],
+  "contracts": [
+    "cli"
+  ],
+  "trust_boundaries": "The JSON report crosses out of the process at the file system boundary. The change makes a failed report write visible to the caller instead of a silent success. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "conflicts": [],
+  "policies": [
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {
+    "cli": "compatible"
+  }
+}
