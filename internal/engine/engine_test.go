@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"go/token"
-	"io"
 	"io/fs"
 	"os"
 	"strings"
@@ -498,8 +497,7 @@ func TestMutations(t *testing.T) {
 			viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 			defer viperReset()
 
-			mapFS, mod, c := loadFixture(tc.fixture, ".")
-			defer c()
+			mapFS, mod := loadFixture(t, tc.fixture, ".")
 
 			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
 			res := runEngine(t, mut)
@@ -528,8 +526,7 @@ func TestMutantSkipDisabled(t *testing.T) {
 		mt := mt
 		t.Run(mt.String(), func(t *testing.T) {
 			t.Parallel()
-			mapFS, mod, c := loadFixture(defaultFixture, ".")
-			defer c()
+			mapFS, mod := loadFixture(t, defaultFixture, ".")
 
 			viperSet(map[string]any{
 				configuration.UnleashDryRunKey:         true,
@@ -552,8 +549,7 @@ func TestMutantSkipDisabled(t *testing.T) {
 
 func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 	t.Parallel()
-	mapFS, mod, c := loadFixture(defaultFixture, ".")
-	defer c()
+	mapFS, mod := loadFixture(t, defaultFixture, ".")
 
 	viperSet(map[string]any{
 		configuration.UnleashDryRunKey:                                   true,
@@ -584,8 +580,7 @@ func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 
 func TestSkipTestAndNonGoFiles(t *testing.T) {
 	t.Parallel()
-	f, _ := os.Open("testdata/fixtures/geq_go")
-	file, _ := io.ReadAll(f)
+	file := readFixture(t, "testdata/fixtures/geq_go")
 
 	sys := fstest.MapFS{
 		"file_test.go": {Data: file},
@@ -786,8 +781,7 @@ func runEngine(t *testing.T, mut engine.Engine) report.Results {
 
 func TestSkipNotDiffMutants(t *testing.T) {
 	t.Parallel()
-	f, _ := os.Open("testdata/fixtures/geq_go")
-	file, _ := io.ReadAll(f)
+	file := readFixture(t, "testdata/fixtures/geq_go")
 
 	sys := fstest.MapFS{
 		"file.go": {Data: file},
@@ -905,8 +899,7 @@ func TestFeatureEngineRunCancelReleasesBlockedSubmission(t *testing.T) {
 // the run instead of leaving a missing mutant in successful results
 // (issue #106).
 func TestFeatureRunReturnsExecutorError(t *testing.T) {
-	mapFS, mod, c := loadFixture(defaultFixture, ".")
-	defer c()
+	mapFS, mod := loadFixture(t, defaultFixture, ".")
 
 	errExecutor := errors.New("executor stub error")
 	var failed mutator.Mutator
@@ -961,8 +954,7 @@ func TestPackageDiscovery(t *testing.T) {
 				configuration.UnleashTagsKey:         "tag1 tag2",
 			})
 			defer viperReset()
-			mapFS, mod, c := loadFixture(defaultFixture, tc.fromPkg)
-			defer c()
+			mapFS, mod := loadFixture(t, defaultFixture, tc.fromPkg)
 
 			jds := newJobDealerStub(t)
 			mut := engine.New(mod, testCodeData, jds, engine.WithDirFs(mapFS))
