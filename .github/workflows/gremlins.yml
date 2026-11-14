@@ -76,4 +76,15 @@ jobs:
       - name: Prove new regression tests against base code
         env:
           BASE_COMMIT: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
-        run: python .github/scripts/regression_proof.py "$BASE_COMMIT"
+          # A dev to main promotion proves each test against the dev change that added it.
+          PROMOTION: >-
+            ${{ github.event_name == 'pull_request'
+            && github.event.pull_request.base.ref == 'main'
+            && github.event.pull_request.head.ref == 'dev'
+            && github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          if [ "$PROMOTION" = true ]; then
+            python .github/scripts/regression_proof.py --per-change "$BASE_COMMIT"
+          else
+            python .github/scripts/regression_proof.py "$BASE_COMMIT"
+          fi
