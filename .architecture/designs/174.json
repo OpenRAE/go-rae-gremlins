@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "issue": 174,
+  "summary": "Skip the mutants that a Go coverage profile cannot show, so they do not lower the mutant coverage. internal/engine gives the status SKIPPED to a mutant in a package-level constant declaration and to a mutant in a file that the host build excludes. The engine still parses every Go file first, so a parse error still stops the run. go/build MatchFile reads the file name suffixes and the build constraints through the module file system, with the configured build tags. A constant declaration in a function body keeps the coverage of its block. The SKIPPED status already exists and is not part of the mutant coverage. The quick start and the unleash threshold pages describe the behavior. No internal dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/mutator",
+        "internal/process",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/gomodule",
+        "internal/mutator",
+        "internal/report"
+      ]
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The engine reads the Go files of the module that it already reads for the mutant discovery. It adds no network access and runs no scanned source. The change keeps the development-check, delivery-finalization, and merge-queue-policy boundaries unchanged.",
+  "policies": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

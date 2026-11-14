@@ -420,6 +420,7 @@ it is zero, which means Gremlins never exits with an error.
 
 The _mutant coverage_ is calculated as `(KILLED + LIVED) / (KILLED + LIVED + NOT_COVERED)` and assesses how many mutants
 are covered by tests.
+The calculation does not include `SKIPPED` mutants.
 The value must be from 0 to 100. Gremlins rejects other values before it starts the tests.
 
 ```shell

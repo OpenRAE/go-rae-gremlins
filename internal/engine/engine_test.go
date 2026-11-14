@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -814,6 +815,92 @@ func TestSkipNotDiffMutants(t *testing.T) {
 		if mutant.Status() != mutator.Skipped {
 			t.Errorf("all mutants should be skipped")
 		}
+	}
+}
+
+// TestRegressionSkipMutantsThatCoverageCannotObserve checks that a mutant in
+// a package-level constant declaration, or in a file that the host build
+// excludes, is skipped and not reported as not covered. The other mutants
+// follow the coverage profile, with or without coverage blocks.
+func TestRegressionSkipMutantsThatCoverageCannotObserve(t *testing.T) {
+	otherOS := "windows"
+	if runtime.GOOS == otherOS {
+		otherOS = "linux"
+	}
+	hostFile := "host_" + runtime.GOOS + ".go"
+	otherFile := "other_" + otherOS + ".go"
+	const constFile = "consts.go"
+	fn := []byte("package p\n\nfunc g(a int) bool { return a > 0 }\n")
+	sys := fstest.MapFS{
+		constFile: {Data: []byte("package p\n\nconst scaled = 5 * 2\n\n" +
+			"func f(a int) int {\n\tconst local = 3 * 4\n\n\treturn a * local\n}\n")},
+		hostFile:     {Data: fn},
+		otherFile:    {Data: fn},
+		"ignored.go": {Data: append([]byte("//go:build ignore\n\n"), fn...)},
+		"tagged.go":  {Data: append([]byte("//go:build gremlinstag\n\n"), fn...)},
+	}
+	full := coverage.Profile{}
+	for name := range sys {
+		full[name] = []coverage.Block{{StartLine: 1, StartCol: 1, EndLine: 100, EndCol: 1}}
+	}
+	type line struct {
+		file string
+		line int
+	}
+	// observable maps each line with mutants to whether coverage can observe it.
+	observable := map[line]bool{
+		{constFile, 3}:    false,
+		{constFile, 6}:    true,
+		{constFile, 8}:    true,
+		{hostFile, 3}:     true,
+		{otherFile, 3}:    false,
+		{"ignored.go", 5}: false,
+		{"tagged.go", 5}:  true,
+	}
+	tests := []struct {
+		name          string
+		profile       coverage.Profile
+		observedState mutator.Status
+	}{
+		{name: "every line covered", profile: full, observedState: mutator.Runnable},
+		{name: "no coverage blocks", profile: coverage.Profile{}, observedState: mutator.NotCovered},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+			viperSet(map[string]any{
+				configuration.UnleashDryRunKey: true,
+				configuration.UnleashTagsKey:   "other,gremlinstag",
+			})
+			defer viperReset()
+
+			mut := engine.New(mod, engine.CodeData{Cov: tc.profile}, newJobDealerStub(t), engine.WithDirFs(sys))
+			res := runEngine(t, mut)
+
+			found := make(map[line]bool)
+			for _, m := range res.Mutants {
+				at := line{m.Position().Filename, m.Position().Line}
+				obs, ok := observable[at]
+				if !ok {
+					t.Errorf("got %s mutant at %s, want no mutant on that line", m.Type(), m.Position())
+
+					continue
+				}
+				found[at] = true
+				want := mutator.Skipped
+				if obs {
+					want = tc.observedState
+				}
+				if m.Status() != want {
+					t.Errorf("%s mutant at %s: status = %s, want %s", m.Type(), m.Position(), m.Status(), want)
+				}
+			}
+			for at := range observable {
+				if !found[at] {
+					t.Errorf("got no mutant at %s:%d, want at least one", at.file, at.line)
+				}
+			}
+		})
 	}
 }
 
