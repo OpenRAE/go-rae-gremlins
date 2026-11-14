@@ -216,6 +216,59 @@ class RegressionProofTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("did not pass on head", result.stderr)
 
+    def commit(self, message):
+        self.git("add", ".")
+        self.git("-c", "user.name=Test", "-c", "user.email=test@example.test",
+                 "-c", "commit.gpgsign=false", "commit", "-qm", message)
+
+    def per_change_proof(self):
+        return subprocess.run([sys.executable, str(SCRIPT), "--per-change", self.base],
+                              cwd=self.root, text=True, capture_output=True,
+                              env={**os.environ, "GOWORK": "off"}, timeout=90)
+
+    def regression_then_api_change(self):
+        self.regression('if Value() != 2 { t.Fatal("wrong value") }')
+        self.write("value.go", "package proof\nfunc Value() int { return 2 }\n")
+        self.commit("fix value")
+        self.regression('if Value(1) != 2 { t.Fatal("wrong value") }')
+        self.write("value.go", "package proof\nfunc Value(n int) int { return n + 1 }\n")
+        self.commit("change value API")
+
+    def test_per_change_proves_regression_before_later_api_change(self):
+        self.regression_then_api_change()
+        result = self.per_change_proof()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("TestRegressionValue proved", result.stdout)
+
+    def test_combined_proof_rejects_regression_after_api_change(self):
+        self.regression_then_api_change()
+        result = self.proof()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("not an assertion failure on base", result.stderr)
+
+    def test_per_change_rejects_regression_passing_before_its_change(self):
+        self.regression('if Value() != 1 { t.Fatal("wrong value") }')
+        self.commit("false regression")
+        self.write("value.go", "package proof\nfunc Value() int { return 1 }\n"
+                   "func Other() int { return 2 }\n")
+        self.commit("later change")
+        result = self.per_change_proof()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("TestRegressionValue passes on base", result.stderr)
+
+    def test_per_change_rejects_regression_no_change_adds(self):
+        self.regression('if Value() != 2 { t.Fatal("wrong value") }')
+        self.write("value.go", "package proof\nfunc Value() int { return 2 }\n")
+        module = self.helper()
+        with self.assertRaisesRegex(ValueError, "no first-parent change adds and proves"):
+            module.prove_changes(self.root, self.base, [(".", "TestRegressionValue")])
+
+    def test_test_package(self):
+        module = self.helper()
+        self.assertEqual(module.test_package("value_test.go"), ".")
+        self.assertEqual(module.test_package("internal/engine/engine_test.go"), "./internal/engine")
+        self.assertEqual(module.test_package("cmd/testdata/fixture/go.mod"), "./cmd")
+
     def helper(self):
         spec = importlib.util.spec_from_file_location("regression_proof", SCRIPT)
         module = importlib.util.module_from_spec(spec)

@@ -10,6 +10,7 @@ Passing lint does not prove full compliance.
 The fixtures assert 64 checker predicates, formatter simplification, Windows-only source coverage, and documented exceptions.
 They use local stand-ins for blocked assertion packages. They download no test dependency and execute no Go fixture.
 Baseline tests cover growth, substitutions, occurrences, stale entries, history, initial adoption, and malformed input.
+
 CI uses Coverage.py 7.16.0 for the Python adapter, with line and branch reporting through the existing Sonar pipeline.
 The admission check requires both coverage reports and rejects unexpected files, links, and XML entity declarations.
 Use `make lint-cover` when the pinned Coverage.py is installed; `make lint-test` needs only the standard library.
@@ -60,7 +61,7 @@ Use `make lint` for the authoritative gate, including format checks and all supp
 | Indentation confusion; function formatting | `gofmt` handles syntax layout. | Simplify complex signatures and expressions. |
 | Conditionals and loops | Revive `increment-decrement`, `range`, `var-declaration`, `unnecessary-if`; Staticcheck simplification checks. | Choose clear conditions and control flow. |
 | Copying | `govet` copylocks and atomic checks; Staticcheck; Revive `waitgroup-by-value`. | Aliasing and whether a copy preserves application semantics. |
-| Don't panic; Must functions | Staticcheck checks supported panic/recover defects. | Panic is permitted in specified fatal or invariant cases; an unconditional ban would conflict with Google. |
+| Do not panic; Must functions | Staticcheck checks supported panic/recover defects. | Panic is permitted in specified fatal or invariant cases; an unconditional ban would conflict with Google. |
 | Goroutine lifetimes; synchronous functions | `govet` lostcancel, loopclosure, testinggoroutine; `contextcheck`; `bodyclose`; `rowserrcheck`; `sqlclosecheck`. | Shutdown ownership, cancellation, leaks, and synchronous API design. |
 | Interfaces; generics | Go type checking and Staticcheck's applicable diagnostics. | Interface ownership, appropriate abstraction, and constraint design. |
 | Pass values; receiver type | `govet` copylocks; Gocritic `ptrToRefParam`; `recvcheck`. | Size, mutation, consistency, and pointer semantics. |
@@ -85,6 +86,7 @@ Partial coverage is named explicitly; it does not certify the remaining semantic
 Package-local unkeyed literals remain permitted by Google's rule.
 Likewise, source names and test failure messages cannot be judged by string shape alone.
 Reviewers must apply these context-dependent requirements.
+
 The declaration parser prevents identical nearby source in separate functions from sharing a baseline identity.
 No deterministic check is replaced by an arbitrary complexity or line-length threshold.
 
@@ -145,6 +147,7 @@ make lint-shrink LINT_BASE=origin/dev
 The shrink command refuses new identities and higher counts before writing.
 It cannot create a new baseline or refresh changed fingerprints.
 Normal checks are read-only.
+
 The initial baseline records 152 findings in 151 identities with Go 1.26.10 and golangci-lint 2.15.0.
 The existing Go source and dependency inputs match comparison commit `bb2a9b44a8237ce0db2c6d78cafa030b8fd71b60`.
 Do not edit allowances, add generated markers, weaken rules, or add suppressions to conceal new debt.
