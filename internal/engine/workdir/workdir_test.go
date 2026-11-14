@@ -192,58 +192,73 @@ func TestErrors(t *testing.T) {
 
 		_, err := dealer.Get("test")
 		if err == nil {
-			t.Errorf("expected an error")
+			t.Error("expected an error")
 		}
 	})
 
 	t.Run("srcDir is not readable", func(t *testing.T) {
 		srcDir := t.TempDir()
-		err := os.Chmod(srcDir, 0000)
-		clean := os.Chmod
-		if runtime.GOOS == "windows" {
-			err = acl.Chmod(srcDir, 0000)
-			clean = acl.Chmod
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func(d string) {
-			_ = clean(d, 0700)
-		}(srcDir)
+		denyAccess(t, srcDir, func(d string) error {
+			_, err := os.ReadDir(d)
+
+			return err
+		})
 
 		dstDir := t.TempDir()
 
 		mngr := workdir.NewCachedDealer(dstDir, srcDir)
 
-		_, err = mngr.Get("test")
+		_, err := mngr.Get("test")
 		if err == nil {
-			t.Errorf("expected an error")
+			t.Error("expected an error")
 		}
 	})
 
 	t.Run("dstDir is not writeable", func(t *testing.T) {
 		srcDir := t.TempDir()
 		dstDir := t.TempDir()
-		err := os.Chmod(dstDir, 0000)
-		clean := os.Chmod
-		if runtime.GOOS == "windows" {
-			err = acl.Chmod(dstDir, 0000)
-			clean = acl.Chmod
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func(d string) {
-			_ = clean(d, 0700)
-		}(dstDir)
+		denyAccess(t, dstDir, func(d string) error {
+			f, err := os.CreateTemp(d, "probe-")
+			if err != nil {
+				return err
+			}
+
+			return f.Close()
+		})
 
 		dealer := workdir.NewCachedDealer(dstDir, srcDir)
 
-		_, err = dealer.Get("test")
+		_, err := dealer.Get("test")
 		if err == nil {
-			t.Errorf("expected an error")
+			t.Error("expected an error")
 		}
 	})
+}
+
+// denyAccess removes all permissions from dir and registers the restore
+// first. probe must fail with a permission error after the change; the case
+// skips when the platform or user ignores the permission change.
+func denyAccess(t *testing.T, dir string, probe func(string) error) {
+	t.Helper()
+	chmod := os.Chmod
+	if runtime.GOOS == "windows" {
+		chmod = acl.Chmod
+	}
+	t.Cleanup(func() {
+		if err := chmod(dir, 0o700); err != nil {
+			t.Errorf("restore permissions of %q: %v", dir, err)
+		}
+	})
+	if err := chmod(dir, 0o000); err != nil {
+		t.Fatalf("chmod %q error = %v", dir, err)
+	}
+	err := probe(dir)
+	if err == nil {
+		t.Skip("directory permissions do not block access on this platform or user")
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("probe error = %v, want a permission error", err)
+	}
 }
 
 func TestWorkDirReturnsTheRootWorkingDir(t *testing.T) {

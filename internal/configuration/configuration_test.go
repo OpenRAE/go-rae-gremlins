@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/mitchellh/go-homedir"
-	"github.com/spf13/viper"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
@@ -107,10 +106,10 @@ func TestConfiguration(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.envEntries != nil {
-				for _, e := range tc.envEntries {
-					t.Setenv(e.name, e.value)
-				}
+			Reset()
+			t.Cleanup(Reset)
+			for _, e := range tc.envEntries {
+				t.Setenv(e.name, e.value)
 			}
 			err := Init(tc.configPaths)
 			if tc.expectErr && err == nil {
@@ -126,7 +125,6 @@ func TestConfiguration(t *testing.T) {
 					t.Error(cmp.Diff(got, wanted))
 				}
 			}
-			viper.Reset()
 		})
 	}
 }
@@ -195,7 +193,8 @@ func runInitCases(t *testing.T, testCases []initCase) {
 	t.Helper()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Cleanup(viper.Reset)
+			Reset()
+			t.Cleanup(Reset)
 			paths := tc.setup(t)
 
 			err := Init(paths)
@@ -334,6 +333,7 @@ func TestGeneratesMutantTypeEnabledKey(t *testing.T) {
 
 func TestViperSynchronisedAccess(t *testing.T) {
 	t.Parallel()
+	t.Cleanup(Reset)
 	testCases := []struct {
 		value any
 		name  string
@@ -382,6 +382,7 @@ func TestViperSynchronisedAccess(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
+	t.Cleanup(Reset)
 	Set("test.key", true)
 
 	Reset()

@@ -21,60 +21,6 @@
     },
     {
       "linter": "errcheck",
-      "file": "internal/engine/engine_test.go",
-      "fingerprint": "0fc297550c3f11f44b5651851b128186132b92d9f3bf43ca9d3a5293ad93433e",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/engine_test.go",
-      "fingerprint": "b655d36aeff8b6c6db168cd6d57637010428dea60a17e73750db3b9e4301fbc1",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/engine_test.go",
-      "fingerprint": "f8ad71ad316874fdb5890978f902f1299a45ff33756e12b3bdc2cc360c2afaa6",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/engine_test.go",
-      "fingerprint": "fb607e6a597d9095d3c0aed05b70a2c74a0ca6719a300027f6280ad22ddf10c6",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/stubs_test.go",
-      "fingerprint": "265aa6096179c7611f6c22ed2dfa55a860e9f3f0f5c71a8b1b288d4f8782dfa7",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/stubs_test.go",
-      "fingerprint": "3607364a47236bf0af5d30a82f0be36a9d5b4133ead6411206e6d5ad171260ff",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/stubs_test.go",
-      "fingerprint": "cf1a23369417f5d2c90b4d054eedf53b9424c2c51a7a80938a981deb12d788cc",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/workdir/workdir_test.go",
-      "fingerprint": "4ed2d9e5c93a7ce57d31496888e5ee367b757379ca539ee27b0ce92ee07a900b",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/engine/workdir/workdir_test.go",
-      "fingerprint": "66255ac24093378532ff6b512bd9d97fc342d174e1d7b9cbec973cbb34a68a7d",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
       "file": "internal/log/log.go",
       "fingerprint": "3300c24483c060dc3890ed3fdae373ebaed522f4bfcefc2bf4d22fc8fa02b50a",
       "count": 1
@@ -100,38 +46,8 @@
     {
       "linter": "errcheck",
       "file": "internal/report/report_test.go",
-      "fingerprint": "0b0bcb82db38ab38053cc3b63bc58bd36150bd55724a6546b6987b40f40c4f2e",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/report/report_test.go",
-      "fingerprint": "10d68ff54df89fd8a52e4f1fccecaa1b3fa461e914de3ef781a0b363911e237f",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/report/report_test.go",
-      "fingerprint": "5ab3d645a130b81000f0315196eccc59063685ccf5601a0ed6f276dd6992619c",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/report/report_test.go",
-      "fingerprint": "80c142d7d1b152b8baed26187fda8c7982adb116140a212811a687b08e1cfbe1",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/report/report_test.go",
       "fingerprint": "b296f73b507db632f792eb605bbd5727ae18fee02f7d854d25f37ae768e63517",
       "count": 2
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/report/report_test.go",
-      "fingerprint": "c508cd318bd305c2aa3b46c140cb663c893f241a6b2aa4e8916bf43e1cffff57",
-      "count": 1
     },
     {
       "linter": "errcheck",
@@ -220,12 +136,6 @@
     {
       "linter": "revive",
       "file": "internal/engine/workdir/workdir_test.go",
-      "fingerprint": "33387acb6ab62c72d6f1fcd6138c62ed451c8f8b95d71799ab70b67d876aeb82",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/workdir/workdir_test.go",
       "fingerprint": "3ce0d67e97cdcf9098c0b5687746002c9924d05f31a894190974ca6b7201f4f6",
       "count": 1
     },
@@ -233,18 +143,6 @@
       "linter": "revive",
       "file": "internal/engine/workdir/workdir_test.go",
       "fingerprint": "4f1e338f52a56deecc8bfe38bb46a933816ecff2bf1289924ce9a7edffbbc51b",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/workdir/workdir_test.go",
-      "fingerprint": "c681190cad0b63a7b1c32ae827fe04e5c3dc8901ae093894bf5fd268c4799211",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/workdir/workdir_test.go",
-      "fingerprint": "ca59e4e09056997d722109ba3d5e9ccc55d934d397f137a5daf9e175e8f1ba23",
       "count": 1
     },
     {
@@ -371,12 +269,6 @@
       "linter": "revive",
       "file": "tools/architecture/scan.go",
       "fingerprint": "447003f2a4a2e614f0513896c1935ca1e6db7e8de276cbcf682fc3f75e92a211",
-      "count": 1
-    },
-    {
-      "linter": "usetesting",
-      "file": "internal/report/report_test.go",
-      "fingerprint": "83194ed30525c1b7a2ebb84c14d0899ea0afdb3772e4d9446bf20f768a492ba3",
       "count": 1
     }
   ]

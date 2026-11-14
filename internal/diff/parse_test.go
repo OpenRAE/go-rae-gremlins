@@ -21,15 +21,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/spf13/viper"
-
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 )
 
 func TestNewWithCmd(t *testing.T) {
 	t.Run("must return nil on empty flag", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "")
-		t.Cleanup(viper.Reset)
+		setDiffRef(t, "")
 
 		m := &mock{}
 
@@ -47,7 +44,7 @@ func TestNewWithCmd(t *testing.T) {
 	})
 
 	t.Run("must return error", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "test")
+		setDiffRef(t, "test")
 
 		m := &mock{
 			outputErr: errors.New("test"),
@@ -72,7 +69,7 @@ func TestNewWithCmd(t *testing.T) {
 	})
 
 	t.Run("must return diff error", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "test")
+		setDiffRef(t, "test")
 
 		m := &mock{
 			output: []byte(testErrDiff),
@@ -85,7 +82,7 @@ func TestNewWithCmd(t *testing.T) {
 	})
 
 	t.Run("must return changes", func(t *testing.T) {
-		viper.Set(configuration.UnleashDiffRef, "test")
+		setDiffRef(t, "test")
 
 		m := &mock{
 			output: []byte(testDiff),
@@ -103,6 +100,15 @@ func TestNewWithCmd(t *testing.T) {
 			t.Error("unexpected result")
 		}
 	})
+}
+
+// setDiffRef registers the configuration reset before it sets the diff
+// reference, so the case restores the shared configuration when it ends.
+func setDiffRef(t *testing.T, ref string) {
+	t.Helper()
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	configuration.Set(configuration.UnleashDiffRef, ref)
 }
 
 type mock struct {

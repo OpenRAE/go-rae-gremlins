@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"go/token"
-	"io"
+	"io/fs"
 	"os"
 	"strings"
 	"sync"
@@ -62,21 +62,29 @@ func viperReset() {
 	viperMutex.Unlock()
 }
 
-func loadFixture(fixture, fromPackage string) (fstest.MapFS, gomodule.GoModule, func()) {
-	//nolint:gosec // test code reading test fixtures
-	f, _ := os.Open(fixture)
-	src, _ := io.ReadAll(f)
-	filename := filenameFromFixture(fixture)
+// readFixture returns the content of the fixture file at the package-relative
+// path and fails the test when the fixture is missing or cannot be read.
+func readFixture(t *testing.T, fixture string) []byte {
+	t.Helper()
+	src, err := fs.ReadFile(os.DirFS("."), fixture)
+	if err != nil {
+		t.Fatalf("read fixture %q: %v", fixture, err)
+	}
+
+	return src
+}
+
+// loadFixture reads fixture into a virtual file system.
+func loadFixture(t *testing.T, fixture, fromPackage string) (fstest.MapFS, gomodule.GoModule) {
+	t.Helper()
 	mapFS := fstest.MapFS{
-		filename: {Data: src},
+		filenameFromFixture(fixture): {Data: readFixture(t, fixture)},
 	}
 
 	return mapFS, gomodule.GoModule{
 		Name:       expectedModule,
 		Root:       ".",
 		CallingDir: fromPackage,
-	}, func() {
-		_ = f.Close()
 	}
 }
 

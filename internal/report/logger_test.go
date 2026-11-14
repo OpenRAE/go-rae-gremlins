@@ -140,6 +140,7 @@ func TestLogger(t *testing.T) {
 	defer out.Reset()
 	log.Init(out, &bytes.Buffer{})
 	defer log.Reset()
+	isolateConfig(t)
 
 	m := stubMutant{status: mutator.NotCovered, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
 
@@ -183,9 +184,9 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		log.Init(out, errOut)
 		defer log.Reset()
 
+		isolateConfig(t)
 		configuration.Set(configuration.UnleashOutputStatusesKey, "k")
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "l")
-		defer configuration.Reset()
 
 		logger := report.NewLogger()
 		logger.Mutant(stubMutant{
@@ -209,9 +210,9 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		log.Init(out, &bytes.Buffer{})
 		defer log.Reset()
 
+		isolateConfig(t)
 		configuration.Set(configuration.UnleashOutputStatusesKey, "k")
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "k")
-		defer configuration.Reset()
 
 		logger := report.NewLogger()
 		logger.Mutant(stubMutant{
@@ -247,8 +248,8 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		out := &bytes.Buffer{}
 		log.Init(out, &bytes.Buffer{})
 		defer log.Reset()
+		isolateConfig(t)
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "l")
-		defer configuration.Reset()
 
 		logger := report.NewLogger()
 		logger.Mutant(livedWithSnippets)
@@ -266,8 +267,8 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 		out := &bytes.Buffer{}
 		log.Init(out, &bytes.Buffer{})
 		defer log.Reset()
+		isolateConfig(t)
 		configuration.Set(configuration.UnleashOutputDiffStatusesKey, "k")
-		defer configuration.Reset()
 
 		logger := report.NewLogger()
 		logger.Mutant(livedWithSnippets)
@@ -279,6 +280,7 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 	})
 
 	t.Run("does not print diff when output-diff-statuses is not set", func(t *testing.T) {
+		isolateConfig(t)
 		out := &bytes.Buffer{}
 		log.Init(out, &bytes.Buffer{})
 		defer log.Reset()
