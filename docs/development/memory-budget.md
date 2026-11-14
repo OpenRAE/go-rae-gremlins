@@ -25,10 +25,12 @@ So the Gremlins threshold exits 10 and 11 stay intact.
 
 Start the per-user manager with `loginctl enable-linger "$(id -un)"`.
 This needs no sudo, because polkit authorizes a user for their own account.
+
 The script uses only the per-user manager, so the command runs as the unprivileged user.
 It never uses sudo, it refuses to run as root, and it never runs the command as root.
 It builds the command environment from scratch, so the manager environment and its secrets are not inherited.
 It forwards your `GREMLINS_*` configuration and non-secret Go settings, so a bounded run honors the same settings as a direct command.
+
 It verifies a finite memory limit and a zero swap limit before the run.
 It rejects a budget that is not smaller than host memory.
 It fails with a clear message when no effective controller is available, and never runs the command without a budget.

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "issue": 58,
+  "summary": "Close the source and destination files that workdir.doCopy opens. Deferred calls close both files on every path. A new closeJoin helper joins a close error with the copy error, and a feature test covers it with a failing closer. Focused regression tests count the open descriptors after repeated copies and after failed copies, and they compare the copied content. The regression proof script now runs a case again with base versions of the other test files in its package when that package does not compile on base. CONTRIBUTING.md records this rule. The Python coverage run now measures .github/scripts through the proof tests, with subprocess coverage, and Sonar treats the proof test file as a test. The package keeps its single internal/log import. No dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/engine/workdir",
+      "imports": [
+        "internal/log"
+      ],
+      "test_imports": []
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The change adds no data flow, network access, or source execution. The work directory copy reads the module source and writes the temporary copy as before. The regression proof script reads base test files from the local Git history into its temporary snapshot. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "conflicts": [],
+  "policies": [
+    "build",
+    "contributing",
+    "lint_coverage",
+    "sonar"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

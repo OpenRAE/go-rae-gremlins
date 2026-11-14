@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "issue": 106,
+  "summary": "Stop a failed mutation from contaminating later results. TokenMutator.Apply puts back the shared AST token on every path, and it writes back the original file when the mutated write fails. Each executor sends one result for each mutant, with the mutant or an error. A failed workdir, apply, test run, or rollback gives an error, not a panic or a missing result. After a failed apply or rollback, the executor discards the worker directory, so the next mutant gets a new copy. Engine.Run joins the executor errors with the discovery error of issue 107. After the first executor error, Run cancels the discovery and schedules no new mutant. The unleash command already returns the Run error, so a run with a failed mutant exits with the existing general error code 1 and writes no report. internal/engine no longer imports internal/log. The lint baseline drops the fixed findings of the changed engine and workdir files. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
+  "changes": [
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": []
+    },
+    {
+      "package": "internal/engine/workdir",
+      "imports": [
+        "internal/log"
+      ],
+      "test_imports": []
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The change adds no data flow, network access, or source execution. The executor removes only the temporary worker directory that the work directory dealer created. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "conflicts": [],
+  "policies": [
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

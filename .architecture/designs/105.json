@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "issue": 105,
+  "summary": "Return errors from a malformed or unreadable discovered configuration file. configuration.Init ignores only viper.ConfigFileNotFoundError from the directory-search read and returns every other read or parse error. An explicit file returns its read result directly. The CLI already exits on an Init error, so a bad file stops the run before test execution. Focused tests cover the explicit-file and directory-search paths. TestConfigPaths uses t.Chdir and checks its errors, and the lint baseline shrinks because the change fixes those findings. No dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/configuration",
+      "imports": [
+        "internal/mutator"
+      ],
+      "test_imports": [
+        "internal/mutator"
+      ]
+    }
+  ],
+  "contracts": [
+    "configuration"
+  ],
+  "trust_boundaries": "The configuration file crosses into the process at the configuration boundary. The change rejects a file that the process cannot read or parse, instead of a silent fallback to defaults. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "conflicts": [],
+  "policies": [
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {
+    "configuration": "compatible"
+  }
+}
