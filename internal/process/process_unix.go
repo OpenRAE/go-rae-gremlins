@@ -55,6 +55,26 @@ func (t *processTree) kill() error {
 	return err
 }
 
+// memory returns the total resident memory in bytes of cmd and its
+// descendants.
+func (t *processTree) memory() (uint64, error) {
+	return treeResident(t.cmd.Process.Pid)
+}
+
+// peak returns the largest resident set in bytes of one process in the
+// group. The kernel reports the maximum of cmd and its waited descendants.
+func (t *processTree) peak() (uint64, error) {
+	if t.cmd.ProcessState == nil {
+		return 0, errors.New("the process has no exit state")
+	}
+	usage, ok := t.cmd.ProcessState.SysUsage().(*syscall.Rusage)
+	if !ok || usage.Maxrss < 0 {
+		return 0, errors.New("the process has no resource usage")
+	}
+
+	return uint64(usage.Maxrss) * maxrssUnit, nil
+}
+
 // close does nothing. A process group holds no resource of Gremlins.
 func (*processTree) close() error {
 	return nil

@@ -29,6 +29,8 @@ import "go/token"
 //     means the test suite is not effective in catching it.
 //   - Killed means that the TokenMutant has been tested and the tests failed, which
 //     means they are effective in covering this regression.
+//   - MemoryError means that the test run of the TokenMutant reached its memory
+//     limit, so the Go runtime stopped it.
 type Status int
 
 // Currently supported MutantStatus.
@@ -40,6 +42,7 @@ const (
 	Killed
 	NotViable
 	TimedOut
+	MemoryError
 )
 
 func (ms Status) String() string {
@@ -58,6 +61,8 @@ func (ms Status) String() string {
 		return "NOT VIABLE"
 	case TimedOut:
 		return "TIMED OUT"
+	case MemoryError:
+		return "MEMORY ERROR"
 	default:
 		panic("this should not happen")
 	}

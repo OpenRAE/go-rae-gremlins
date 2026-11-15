@@ -116,7 +116,7 @@ func TestApplyAndRollback(t *testing.T) {
 			Root:       tmpDir,
 			CallingDir: ".",
 		}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(fakeExecCommandSuccess))
+		mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout, engine.WithExecContext(fakeExecCommandSuccess))
 		mut := &mutantStub{
 			status:  mutator.Runnable,
 			mutType: mutator.ConditionalsBoundary,
@@ -149,6 +149,7 @@ func TestMutatorTestExecution(t *testing.T) {
 	testCases := []struct {
 		testResult    execContext
 		name          string
+		budget        string
 		mutantStatus  mutator.Status
 		wantMutStatus mutator.Status
 	}{
@@ -170,11 +171,21 @@ func TestMutatorTestExecution(t *testing.T) {
 			mutantStatus:  mutator.Runnable,
 			wantMutStatus: mutator.Killed,
 		},
+		{
+			name:          "if tests pass the memory limit then mutation is MEMORY ERROR",
+			testResult:    fakeExecCommandAllocates,
+			budget:        "64M",
+			mutantStatus:  mutator.Runnable,
+			wantMutStatus: mutator.MemoryError,
+		},
 	}
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			viperSet(map[string]any{configuration.UnleashDryRunKey: false})
+			viperSet(map[string]any{
+				configuration.UnleashDryRunKey:       false,
+				configuration.UnleashMemoryBudgetKey: tc.budget,
+			})
 			defer viperReset()
 			wdDealer := newWdDealerStub(t)
 			holder := &commandHolder{}
@@ -183,7 +194,7 @@ func TestMutatorTestExecution(t *testing.T) {
 				Root:       ".",
 				CallingDir: ".",
 			}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 				engine.WithExecContext(fakeExecCommandWithHolder(holder, tc.testResult)),
 			)
 			mut := &mutantStub{
@@ -258,7 +269,7 @@ func TestFeatureLabel(t *testing.T) {
 	wdDealer := workdir.NewCachedDealer(t.TempDir(), mod.Root)
 	defer wdDealer.Clean()
 
-	mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout)
+	mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout)
 	mut := &mutantStub{
 		status:  mutator.Runnable,
 		mutType: mutator.ConditionalsBoundary,
@@ -381,7 +392,7 @@ func runExecutorOnce(
 		Root:       ".",
 		CallingDir: ".",
 	}
-	mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(testResult))
+	mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout, engine.WithExecContext(testResult))
 	outCh := make(chan engine.ExecutorResult, 1)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -465,7 +476,7 @@ func TestMutatorRun(t *testing.T) {
 			pkg:      examplePackage,
 			callDir:  exampleCallDir,
 			tags:     exampleTags,
-			wantPath: "./...",
+			wantPath: "-p 1 ./...",
 		},
 		{
 			name:               "it can override timeout coefficient",
@@ -496,7 +507,7 @@ func TestMutatorRun(t *testing.T) {
 			}
 			wdDealer := newWdDealerStub(t)
 			holder := &commandHolder{}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 				engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 			mut := &mutantStub{
 				status:  mutator.Runnable,
@@ -580,7 +591,7 @@ func TestCPU(t *testing.T) {
 			}
 			wdDealer := newWdDealerStub(t)
 			holder := &commandHolder{}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 				engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 			mut := &mutantStub{
 				status:  mutator.Runnable,
@@ -639,6 +650,26 @@ func TestProcessTestsFailure(_ *testing.T) {
 	os.Exit(1) // skipcq: RVV-A0003
 }
 
+// allocated holds the memory of TestProcessAllocates.
+var allocated [][]byte
+
+// TestProcessAllocates is a helper child that makes 512 MiB of memory
+// resident, 1 MiB each millisecond, so a memory watchdog sees the growth.
+func TestProcessAllocates(_ *testing.T) {
+	if os.Getenv("GO_TEST_PROCESS") != "1" {
+		return
+	}
+	for range 512 {
+		chunk := make([]byte, 1<<20)
+		for i := 0; i < len(chunk); i += os.Getpagesize() {
+			chunk[i] = 1
+		}
+		allocated = append(allocated, chunk)
+		time.Sleep(time.Millisecond)
+	}
+	os.Exit(0) // skipcq: RVV-A0003
+}
+
 func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 	t.Run("mutation should run in the correct folder", func(t *testing.T) {
 		callingDir := exampleCallDir
@@ -649,7 +680,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		}
 		wdDealer := newWdDealerStub(t)
 		holder := &commandHolder{}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+		mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 			engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 		mut := &mutantStub{
 			status:  mutator.Runnable,
@@ -690,7 +721,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		}
 
 		holder := &commandHolder{}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+		mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 			engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 		mut := &mutantStub{
 			status:  mutator.Runnable,
@@ -765,6 +796,13 @@ func fakeExecCommandTestsFailure(ctx context.Context, command string, args ...st
 	return getCmd(ctx, cs)
 }
 
+func fakeExecCommandAllocates(ctx context.Context, command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestProcessAllocates", "--", command}
+	cs = append(cs, args...)
+
+	return getCmd(ctx, cs)
+}
+
 func getCmd(ctx context.Context, cs []string) *exec.Cmd {
 	// #nosec G204 G702 - We are in tests, we don't care
 	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
@@ -806,7 +844,7 @@ func TestFeatureExecutorCancellation(t *testing.T) {
 			}
 			wdDealer := newWdDealerStub(t)
 			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(cancelingExec))
+			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout, engine.WithExecContext(cancelingExec))
 			mut := &mutantStub{
 				status:  mutator.Runnable,
 				mutType: mutator.ConditionalsBoundary,

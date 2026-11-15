@@ -82,7 +82,7 @@ func TestGetTestArgs(t *testing.T) {
 			testExecutionTime: 10 * time.Second,
 			integrationMode:   true,
 			pkg:               examplePackage,
-			want:              []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, allPackagesArg},
+			want:              []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, "-p", "1", allPackagesArg},
 		},
 		"should_include_all_flags_when_all_options_are_configured": {
 			buildTags:         "integration",
@@ -90,7 +90,7 @@ func TestGetTestArgs(t *testing.T) {
 			testCPU:           2,
 			integrationMode:   true,
 			pkg:               examplePackage,
-			want:              []string{goTestArg, "-tags", "integration", timeoutArg, expectedTimeout, failFastArg, "-cpu", "2", allPackagesArg},
+			want:              []string{goTestArg, "-tags", "integration", timeoutArg, expectedTimeout, failFastArg, "-cpu", "2", "-p", "1", allPackagesArg},
 		},
 	}
 

@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "issue": 190,
+  "summary": "Bound the memory of a mutation run. The run budget is --memory-budget, or by default the smaller of 1 GiB and half of the available memory. In a cgroup, available memory is the smaller of the system value and the cgroup headroom. The coverage run uses -count=1, so the Go test cache cannot hide the work that each mutant test run repeats, and it measures the peak memory of its largest process. Each mutant gets a limit of twice that peak, capped at the budget, and reserves that limit from the budget before its test run. A worker waits when the budget has no room. A watchdog samples the total memory of the process tree of each test run every 50 ms: the resident memory on Linux and macOS, and the peak committed memory of the job object on Windows. When the total passes the limit, the watchdog stops the tree and the mutant gets the new MEMORY ERROR status, which the report treats like TIMED OUT. The captured test output keeps only what the build failure markers need. The full-repository CI run sets --memory-budget 2G. The engine also skips the files and directories that the go tool ignores, whose names start with a dot or an underscore, such as .git.",
+  "changes": [],
+  "contracts": [
+    "cli",
+    "configuration",
+    "schema",
+    "report"
+  ],
+  "trust_boundaries": "No modeled trust boundary changes. The watchdog and the memory probe read process and memory counters of the local system: /proc and the cgroup files on Linux, the proc_info system call and sysctl values on macOS, and the job object and system memory status on Windows. They read no network input and add no destination. The trust_changes entries restate the existing boundaries.",
+  "conflicts": [],
+  "policies": [
+    "guidance"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {
+    "cli": "compatible",
+    "configuration": "compatible",
+    "schema": "compatible",
+    "report": "compatible"
+  }
+}

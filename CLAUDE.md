@@ -104,7 +104,7 @@ make clean
   `InvertBitwise`, `InvertBitwiseAssignments`, `InvertLogical`,
   `InvertLoopCtrl`, `InvertNegatives`, `RemoveSelfAssignments`
 - Status values: `NotCovered`, `Runnable`, `Skipped`, `Lived`,
-  `Killed`, `NotViable`, `TimedOut`
+  `Killed`, `NotViable`, `TimedOut`, `MemoryError`
 - Each mutator implements: `Apply()` (mutate code), `Rollback()`
   (restore original)
 
@@ -148,7 +148,8 @@ make clean
    - Apply mutation via `Mutator.Apply()`
    - Run tests
    - Set status: `Killed` (tests failed), `Lived` (tests passed),
-     `TimedOut`, `NotViable` (build failed)
+     `TimedOut`, `MemoryError` (memory limit passed), `NotViable`
+     (build failed)
    - Rollback mutation
 7. Report results with efficacy/coverage metrics
 

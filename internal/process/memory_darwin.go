@@ -1,0 +1,123 @@
+//go:build darwin
+
+/*
+ * Copyright 2026 The Gremlins Authors
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+package process
+
+import (
+	"errors"
+	"fmt"
+	"math"
+	"os"
+	"syscall"
+	"unsafe"
+)
+
+// maxrssUnit is the unit of Rusage.Maxrss in bytes. Darwin reports bytes.
+const maxrssUnit = 1
+
+// The proc_info system call arguments of libproc, from sys/proc_info.h.
+const (
+	procInfoCallListPids = 1
+	procInfoCallPidInfo  = 2
+	procPgrpOnly         = 2
+	procPidTaskInfo      = 4
+	// maxGroupSize is the largest number of processes that treeResident
+	// reads in one process group.
+	maxGroupSize = 4096
+)
+
+// procTaskInfo is the proc_taskinfo structure of sys/proc_info.h.
+type procTaskInfo struct {
+	virtualSize  uint64
+	residentSize uint64
+	times        [4]uint64
+	counters     [12]int32
+}
+
+// memorySupported returns nil. proc_info reports the memory of a tree.
+func memorySupported() error {
+	return nil
+}
+
+// treeResident returns the total resident memory in bytes of the processes
+// in the process group that root leads. A process that exits during the
+// read adds nothing.
+func treeResident(root int) (uint64, error) {
+	pids := make([]int32, maxGroupSize)
+	// #nosec G103 - Audited: the kernel writes at most the given byte count to
+	// pids, which stays alive during the call.
+	n, err := procInfo(procInfoCallListPids, procPgrpOnly, root, unsafe.Pointer(&pids[0]), len(pids)*4)
+	if err != nil {
+		return 0, fmt.Errorf("list the process group %d: %w", root, err)
+	}
+	var total uint64
+	for _, pid := range pids[:n/4] {
+		if pid == 0 {
+			continue
+		}
+		var info procTaskInfo
+		// #nosec G103 - Audited: the kernel writes at most the given byte count
+		// to info, which stays alive during the call.
+		size, err := procInfo(procInfoCallPidInfo, int(pid), procPidTaskInfo, unsafe.Pointer(&info), int(unsafe.Sizeof(info)))
+		if errors.Is(err, syscall.ESRCH) {
+			continue
+		}
+		if err != nil {
+			return 0, fmt.Errorf("read the memory of process %d: %w", pid, err)
+		}
+		if size != int(unsafe.Sizeof(info)) {
+			continue
+		}
+		total += info.residentSize
+	}
+
+	return total, nil
+}
+
+// procInfo calls the proc_info system call and returns its result in bytes.
+func procInfo(call, pid, flavor int, buffer unsafe.Pointer, size int) (int, error) {
+	r, _, errno := syscall.Syscall6(syscall.SYS_PROC_INFO, uintptr(call), uintptr(pid), uintptr(flavor), 0,
+		uintptr(buffer), uintptr(size))
+	if errno != 0 {
+		return 0, errno
+	}
+
+	return int(r), nil
+}
+
+// AvailableMemory returns the memory in bytes that new processes can use:
+// the free, speculative, and purgeable pages of the system.
+func AvailableMemory() (uint64, error) {
+	var pages uint64
+	for _, name := range []string{"vm.page_free_count", "vm.page_speculative_count", "vm.page_purgeable_count"} {
+		count, err := syscall.SysctlUint32(name)
+		if err != nil {
+			return 0, fmt.Errorf("read %s: %w", name, err)
+		}
+		pages += uint64(count)
+	}
+	size := os.Getpagesize()
+	if size <= 0 {
+		return 0, fmt.Errorf("the memory page size %d is not positive", size)
+	}
+	if pages > math.MaxUint64/uint64(size) {
+		return 0, fmt.Errorf("the available page count %d overflows", pages)
+	}
+
+	return pages * uint64(size), nil
+}

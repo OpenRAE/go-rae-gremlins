@@ -46,6 +46,16 @@ const (
 	pidParent = "pid-parent"
 	// inheritOutputEnv makes the descendant hold the output pipe of its parent.
 	inheritOutputEnv = "GO_TEST_PROCESS_INHERIT_OUTPUT"
+	// allocate touches up to allocateTotal bytes, one chunk per millisecond,
+	// and then exits.
+	allocate = "allocate"
+	// allocateParent starts an allocate descendant and waits for it.
+	allocateParent = "allocate-parent"
+	allocateChunk  = 1 << 20
+	allocateTotal  = 512 << 20
+	// testLimit is the memory limit of the limit tests, far below
+	// allocateTotal and far above the memory of an idle helper.
+	testLimit = 64 << 20
 )
 
 // TestMain runs the helper role in helperRoleEnv instead of the tests.
@@ -76,6 +86,17 @@ func runHelper(role string) int {
 		return runTreeDescendant()
 	case pidParent:
 		return runPIDParent()
+	case allocate:
+		return runAllocate()
+	case allocateParent:
+		// #nosec G204 G702 - The helper starts the test binary itself.
+		cmd := exec.CommandContext(context.Background(), os.Args[0], helperRun)
+		cmd.Env = append(os.Environ(), helperRoleEnv+"="+allocate)
+		if err := cmd.Run(); err != nil {
+			return 2
+		}
+
+		return 0
 	default:
 		// An unknown role is a test defect; fail instead of passing silently.
 		return 2
@@ -155,6 +176,25 @@ func runPIDParent() int {
 	return 0
 }
 
+// allocated holds the memory of runAllocate, so the compiler keeps it.
+var allocated [][]byte
+
+// runAllocate touches allocateTotal bytes in chunks, one per millisecond,
+// so a watchdog that samples every 50 ms sees the growth. It writes to each
+// page, so the pages are resident.
+func runAllocate() int {
+	for range allocateTotal / allocateChunk {
+		chunk := make([]byte, allocateChunk)
+		for i := 0; i < len(chunk); i += os.Getpagesize() {
+			chunk[i] = 1
+		}
+		allocated = append(allocated, chunk)
+		time.Sleep(time.Millisecond)
+	}
+
+	return 0
+}
+
 // helperCommand returns a command that runs the helper role.
 func helperCommand(ctx context.Context, role string) *exec.Cmd {
 	// #nosec G204 G702 - The test runs its own binary.
@@ -229,5 +269,67 @@ func closeFile(t *testing.T, f *os.File) {
 	t.Helper()
 	if err := f.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
 		t.Errorf("close %s: %v", f.Name(), err)
+	}
+}
+
+func TestFeatureRunBoundedStopsTheTreeOverTheLimit(t *testing.T) {
+	for _, role := range []string{allocate, allocateParent} {
+		t.Run(role, func(t *testing.T) {
+			done := make(chan struct{})
+			var usage process.Usage
+			var err error
+			go func() {
+				defer close(done)
+				usage, err = process.RunBounded(helperCommand(context.Background(), role), testLimit)
+			}()
+			select {
+			case <-done:
+			case <-time.After(helperLimit):
+				t.Fatalf("RunBounded(%s) still running after %s", role, helperLimit)
+			}
+			if !usage.OverLimit {
+				t.Errorf("RunBounded(%s, %d).OverLimit = false, want true", role, testLimit)
+			}
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) {
+				t.Errorf("RunBounded(%s, %d) error = %v, want the exit of the stopped tree", role, testLimit, err)
+			}
+		})
+	}
+}
+
+func TestFeatureRunBoundedReportsUsageUnderTheLimit(t *testing.T) {
+	usage, err := process.RunBounded(helperCommand(context.Background(), "exit"), allocateTotal)
+	if err != nil {
+		t.Fatalf("RunBounded(exit) = %v, want nil", err)
+	}
+	if usage.OverLimit {
+		t.Error("RunBounded(exit).OverLimit = true, want false")
+	}
+	if usage.Peak == 0 {
+		t.Error("RunBounded(exit).Peak = 0, want the peak memory of the helper")
+	}
+}
+
+func TestFeatureRunBoundedWithoutLimitDoesNotStopTheTree(t *testing.T) {
+	usage, err := process.RunBounded(helperCommand(context.Background(), allocate), 0)
+	if err != nil {
+		t.Fatalf("RunBounded(allocate, 0) = %v, want nil", err)
+	}
+	if usage.OverLimit {
+		t.Error("RunBounded(allocate, 0).OverLimit = true, want false")
+	}
+	if usage.Peak < testLimit {
+		t.Errorf("RunBounded(allocate, 0).Peak = %d, want at least %d", usage.Peak, testLimit)
+	}
+}
+
+func TestFeatureAvailableMemory(t *testing.T) {
+	got, err := process.AvailableMemory()
+	if err != nil {
+		t.Fatalf("AvailableMemory() = %v, want nil", err)
+	}
+	if got == 0 {
+		t.Error("AvailableMemory() = 0, want the available memory of the host")
 	}
 }

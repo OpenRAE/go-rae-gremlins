@@ -60,6 +60,12 @@ func Test_parseFilter(t *testing.T) {
 			},
 		},
 		{
+			filter: "m",
+			want: report.Filter{
+				mutator.MemoryError: struct{}{},
+			},
+		},
+		{
 			filter: "",
 		},
 		{

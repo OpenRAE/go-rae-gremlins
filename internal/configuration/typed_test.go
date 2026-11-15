@@ -285,6 +285,16 @@ func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
 			flags:   []string{"--threshold-mcover=101"},
 			wantKey: []string{UnleashThresholdMCoverageKey},
 		},
+		{
+			name:    "memory budget without a size from file",
+			config:  "unleash:\n  memory-budget: lots\n",
+			wantKey: []string{UnleashMemoryBudgetKey},
+		},
+		{
+			name:    "zero memory budget from file",
+			config:  "unleash:\n  memory-budget: 0\n",
+			wantKey: []string{UnleashMemoryBudgetKey},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -445,5 +455,39 @@ func TestFeatureGetUntypedReturnsRawValue(t *testing.T) {
 	}
 	if got := Get[[]string](UnleashExcludeFiles); len(got) != 0 {
 		t.Errorf("Get[[]string](%q) = %#v, want empty", UnleashExcludeFiles, got)
+	}
+}
+
+func TestFeatureParseSize(t *testing.T) {
+	testCases := map[string]struct {
+		in      string
+		want    uint64
+		wantErr bool
+	}{
+		"bytes":              {in: "1024", want: 1024},
+		"kibibytes":          {in: "4K", want: 4 << 10},
+		"mebibytes":          {in: "512M", want: 512 << 20},
+		"gibibytes":          {in: "2G", want: 2 << 30},
+		"tebibytes":          {in: "1T", want: 1 << 40},
+		"empty":              {in: "", wantErr: true},
+		"zero":               {in: "0G", wantErr: true},
+		"unit only":          {in: "G", wantErr: true},
+		"unknown unit":       {in: "2X", wantErr: true},
+		"lower-case unit":    {in: "2g", wantErr: true},
+		"sign":               {in: "+2G", wantErr: true},
+		"negative":           {in: "-2G", wantErr: true},
+		"fraction":           {in: "1.5G", wantErr: true},
+		"overflow with unit": {in: "17179869184G", wantErr: true},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got, err := ParseSize(tc.in)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("ParseSize(%q) error = %v, want error %t", tc.in, err, tc.wantErr)
+			}
+			if got != tc.want {
+				t.Errorf("ParseSize(%q) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
 	}
 }

@@ -76,6 +76,16 @@
             10
           ]
         },
+        "memory-budget": {
+          "title": "Memory budget",
+          "description": "The memory that all the mutant test runs can use together, as a byte count with an optional K, M, G, or T binary unit. An empty value uses the smaller of 1G and half of the available memory",
+          "type": "string",
+          "default": "",
+          "pattern": "^([1-9][0-9]*[KMGT]?)?$",
+          "examples": [
+            "2G"
+          ]
+        },
         "threshold": {
           "title": "Thresholds",
           "description": "The thresholds under which Gremlins exits with an error",

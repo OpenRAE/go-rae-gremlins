@@ -44,3 +44,4 @@ Gremlins will report each mutation as:
 - `TIMED OUT`: The tests timed out while testing the mutation: the mutation actually made the tests fail, but not
   explicitly.
 - `NOT VIABLE`: The mutation makes the build fail.
+- `MEMORY ERROR`: The test run used more memory than its limit, so Gremlins stopped it.

@@ -161,6 +161,11 @@ func TestUnleash(t *testing.T) {
 			defValue: "0",
 		},
 		{
+			name:     "memory-budget",
+			flagType: "string",
+			defValue: "",
+		},
+		{
 			name:     "workers",
 			flagType: intType,
 			defValue: "0",

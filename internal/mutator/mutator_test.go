@@ -60,6 +60,11 @@ func TestStatusString(t *testing.T) {
 			expected:       "TIMED OUT",
 			mutationStatus: mutator.TimedOut,
 		},
+		{
+			name:           "MemoryError",
+			expected:       "MEMORY ERROR",
+			mutationStatus: mutator.MemoryError,
+		},
 	}
 	for _, tc := range testCases {
 		tc := tc
