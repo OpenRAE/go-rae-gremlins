@@ -66,7 +66,7 @@ func newProcessTree(cmd *exec.Cmd) (*processTree, error) {
 	// stays alive on this stack and is read only during the call.
 	if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation,
 		uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info))); err != nil {
-		return nil, errors.Join(fmt.Errorf("set the job object limits: %w", err), windows.CloseHandle(job))
+		return nil, closeHandle(fmt.Errorf("set the job object limits: %w", err), job, "job object")
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | windows.CREATE_SUSPENDED,
@@ -91,11 +91,7 @@ func (t *processTree) start() error {
 	if err != nil {
 		return fmt.Errorf("open the process: %w", err)
 	}
-	err = windows.AssignProcessToJobObject(t.job, process)
-	if closeErr := windows.CloseHandle(process); closeErr != nil {
-		err = errors.Join(err, fmt.Errorf("close the process handle: %w", closeErr))
-	}
-	if err != nil {
+	if err := closeHandle(windows.AssignProcessToJobObject(t.job, process), process, "process"); err != nil {
 		return fmt.Errorf("assign the process to the job object: %w", err)
 	}
 	t.inJob = true
@@ -124,19 +120,21 @@ func (t *processTree) close() error {
 
 // resumeProcess resumes the threads of the suspended process pid. A process
 // that starts suspended has only its main thread.
-func resumeProcess(pid uint32) (err error) {
+func resumeProcess(pid uint32) error {
 	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPTHREAD, 0)
 	if err != nil {
 		return fmt.Errorf("list the threads: %w", err)
 	}
-	defer func() {
-		if closeErr := windows.CloseHandle(snapshot); closeErr != nil {
-			err = errors.Join(err, fmt.Errorf("close the thread list: %w", closeErr))
-		}
-	}()
+
+	return closeHandle(resumeListedThreads(snapshot, pid), snapshot, "thread list")
+}
+
+// resumeListedThreads resumes the threads of process pid in snapshot.
+func resumeListedThreads(snapshot windows.Handle, pid uint32) error {
 	entry := windows.ThreadEntry32{Size: uint32(unsafe.Sizeof(windows.ThreadEntry32{}))}
 	resumed := false
-	for err = windows.Thread32First(snapshot, &entry); err == nil; err = windows.Thread32Next(snapshot, &entry) {
+	err := windows.Thread32First(snapshot, &entry)
+	for ; err == nil; err = windows.Thread32Next(snapshot, &entry) {
 		if entry.OwnerProcessID != pid {
 			continue
 		}
@@ -149,7 +147,7 @@ func resumeProcess(pid uint32) (err error) {
 		return fmt.Errorf("list the threads: %w", err)
 	}
 	if !resumed {
-		return errors.New("find the main thread of the process")
+		return fmt.Errorf("find a thread of process %d", pid)
 	}
 
 	return nil
@@ -159,15 +157,22 @@ func resumeProcess(pid uint32) (err error) {
 func resumeThread(id uint32) error {
 	thread, err := windows.OpenThread(windows.THREAD_SUSPEND_RESUME, false, id)
 	if err != nil {
-		return fmt.Errorf("open the thread: %w", err)
+		return fmt.Errorf("open thread %d: %w", id, err)
 	}
 	_, err = windows.ResumeThread(thread)
-	if closeErr := windows.CloseHandle(thread); closeErr != nil {
-		err = errors.Join(err, fmt.Errorf("close the thread handle: %w", closeErr))
-	}
-	if err != nil {
-		return fmt.Errorf("resume the thread: %w", err)
+	if err := closeHandle(err, thread, "thread"); err != nil {
+		return fmt.Errorf("resume thread %d: %w", id, err)
 	}
 
 	return nil
+}
+
+// closeHandle closes handle h and returns err joined with any close error.
+// what names the handle in the error.
+func closeHandle(err error, h windows.Handle, what string) error {
+	if closeErr := windows.CloseHandle(h); closeErr != nil {
+		return errors.Join(err, fmt.Errorf("close the %s handle: %w", what, closeErr))
+	}
+
+	return err
 }

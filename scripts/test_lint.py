@@ -392,16 +392,21 @@ class CLIExitTests(unittest.TestCase):
 class CoverageAdmissionTests(unittest.TestCase):
     def test_reports_are_admitted_and_invalid_inputs_are_rejected(self):
         script = lint.REPOSITORY / "scripts/check-coverage.sh"
-        for scenario in ("valid", "missing", "empty", "linked", "linked-directory", "extra", "doctype", "entity"):
+        for scenario in ("valid", "missing", "missing-windows", "empty", "linked", "linked-directory", "extra",
+                         "doctype", "entity"):
             with self.subTest(scenario=scenario), tempfile.TemporaryDirectory(dir=lint.REPOSITORY / ".git") as directory:
                 root = Path(directory)
                 reports = root / "coverage"
                 reports.mkdir()
                 (reports / "coverage.out").write_text("mode: atomic\n", encoding="utf-8")
+                windows = reports / "coverage-windows.out"
+                windows.write_text("mode: atomic\n", encoding="utf-8")
                 xml = reports / "python-coverage.xml"
                 xml.write_text('<coverage/>\n', encoding="utf-8")
                 if scenario == "missing":
                     xml.unlink()
+                elif scenario == "missing-windows":
+                    windows.unlink()
                 elif scenario == "empty":
                     xml.write_text("", encoding="utf-8")
                 elif scenario == "linked":
