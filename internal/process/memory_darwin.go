@@ -19,6 +19,7 @@
 package process
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -89,6 +90,57 @@ func treeResident(root int) (uint64, error) {
 	return total, nil
 }
 
+// sysctlCount reads the unsigned integer sysctl value name, which the kernel
+// stores in 4 or 8 bytes.
+func sysctlCount(name string) (uint64, error) {
+	mib, err := sysctlMIB(name)
+	if err != nil {
+		return 0, err
+	}
+	var value [8]byte
+	size := uintptr(len(value))
+	// #nosec G103 - Audited: the kernel writes at most size bytes to value,
+	// which stays alive during the call.
+	if err := sysctl(mib, unsafe.Pointer(&value[0]), &size, nil, 0); err != nil {
+		return 0, err
+	}
+	switch size {
+	case 4:
+		return uint64(binary.LittleEndian.Uint32(value[:4])), nil
+	case 8:
+		return binary.LittleEndian.Uint64(value[:]), nil
+	default:
+		return 0, fmt.Errorf("%s has %d bytes, want 4 or 8", name, size)
+	}
+}
+
+// sysctlMIB returns the numeric form of the sysctl name. The kernel returns
+// it when name is written to the sysctl {0, 3}, as sysctlnametomib does.
+func sysctlMIB(name string) ([]int32, error) {
+	var mib [12]int32
+	size := uintptr(len(mib) * 4)
+	nameBytes := []byte(name)
+	// #nosec G103 - Audited: the kernel reads len(name) bytes of nameBytes and
+	// writes at most size bytes to mib. Both stay alive during the call.
+	if err := sysctl([]int32{0, 3}, unsafe.Pointer(&mib[0]), &size, unsafe.Pointer(&nameBytes[0]), uintptr(len(nameBytes))); err != nil {
+		return nil, fmt.Errorf("find the sysctl %s: %w", name, err)
+	}
+
+	return mib[:size/4], nil
+}
+
+// sysctl calls the __sysctl system call.
+func sysctl(mib []int32, old unsafe.Pointer, oldSize *uintptr, value unsafe.Pointer, valueSize uintptr) error {
+	// #nosec G103 - Audited: mib and oldSize stay alive during the call.
+	_, _, errno := syscall.Syscall6(syscall.SYS___SYSCTL, uintptr(unsafe.Pointer(&mib[0])), uintptr(len(mib)),
+		uintptr(old), uintptr(unsafe.Pointer(oldSize)), uintptr(value), valueSize)
+	if errno != 0 {
+		return errno
+	}
+
+	return nil
+}
+
 // procInfo calls the proc_info system call and returns its result in bytes.
 func procInfo(call, pid, flavor int, buffer unsafe.Pointer, size int) (int, error) {
 	r, _, errno := syscall.Syscall6(syscall.SYS_PROC_INFO, uintptr(call), uintptr(pid), uintptr(flavor), 0,
@@ -105,11 +157,11 @@ func procInfo(call, pid, flavor int, buffer unsafe.Pointer, size int) (int, erro
 func AvailableMemory() (uint64, error) {
 	var pages uint64
 	for _, name := range []string{"vm.page_free_count", "vm.page_speculative_count", "vm.page_purgeable_count"} {
-		count, err := syscall.SysctlUint32(name)
+		count, err := sysctlCount(name)
 		if err != nil {
 			return 0, fmt.Errorf("read %s: %w", name, err)
 		}
-		pages += uint64(count)
+		pages += count
 	}
 	size := os.Getpagesize()
 	if size <= 0 {

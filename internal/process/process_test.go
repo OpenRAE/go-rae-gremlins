@@ -288,7 +288,7 @@ func TestFeatureRunBoundedStopsTheTreeOverTheLimit(t *testing.T) {
 				t.Fatalf("RunBounded(%s) still running after %s", role, helperLimit)
 			}
 			if !usage.OverLimit {
-				t.Errorf("RunBounded(%s, %d).OverLimit = false, want true", role, testLimit)
+				t.Errorf("RunBounded(%s, %d).OverLimit = false with error %v, want true", role, testLimit, err)
 			}
 			var exitErr *exec.ExitError
 			if !errors.As(err, &exitErr) {
