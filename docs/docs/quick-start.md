@@ -22,7 +22,8 @@ from the clause bodies that the tests ran:
 
 Go coverage profiles cannot show some code. Gremlins skips the mutations in this code:
 
-- Package-level constant declarations. The compiler evaluates them, so the profile has no blocks for them.
+- Package-level constant and type declarations, and the signatures of functions, methods, and function literals. The
+  compiler evaluates them, so the profile has no blocks for them.
 - Files that the file name or the build constraints exclude from the host build with the configured tags. For example,
   a `_windows.go` file on Linux.
 
@@ -31,7 +32,7 @@ when it initializes the package, before any other code of the package:
 
 - An initializer is covered when the tests ran other code of the same package.
 - Gremlins skips the mutations of an initializer when the tests ran no code of the package.
-- A function literal in an initializer has its own blocks in the profile.
+- The body of a function literal in an initializer has its own blocks in the profile.
 
 Gremlins will report each mutation as:
 

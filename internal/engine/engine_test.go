@@ -959,6 +959,51 @@ func TestRegressionPackageVarInitializerCoverage(t *testing.T) {
 	checkLineStatuses(t, res.Mutants, want)
 }
 
+// TestRegressionSkipTypeDeclarationsAndSignatures checks that a mutant in a
+// package-level type declaration or in the signature of a function, a method,
+// or a function literal of a package-level variable is skipped. The compiler
+// evaluates these expressions, so no test run can cover them. The mutants in
+// the function bodies follow the coverage profile.
+func TestRegressionSkipTypeDeclarationsAndSignatures(t *testing.T) {
+	const sigFile = "sig.go"
+	sys := fstest.MapFS{
+		sigFile: {Data: []byte("package p\n\n" +
+			"type Buf [4 * 2]byte\n\n" +
+			"var check = func(b [2 + 1]int) int {\n\treturn len(b) * 2\n}\n\n" +
+			"type T struct{}\n\n" +
+			"func (T) M(b [1 + 1]int) (r [3 - 1]int) {\n\treturn [2]int{b[0] * 2, b[1]}\n}\n")},
+	}
+	// observable maps each line with mutants to whether coverage can observe it.
+	observable := map[mutantLine]bool{
+		{sigFile, 3}:  false,
+		{sigFile, 5}:  false,
+		{sigFile, 6}:  true,
+		{sigFile, 11}: false,
+		{sigFile, 12}: true,
+	}
+	full := coverage.Profile{sigFile: {{StartLine: 1, StartCol: 1, EndLine: 100, EndCol: 1}}}
+	tests := []struct {
+		name          string
+		profile       coverage.Profile
+		observedState mutator.Status
+	}{
+		{name: "every line covered", profile: full, observedState: mutator.Runnable},
+		{name: "no coverage blocks", profile: coverage.Profile{}, observedState: mutator.NotCovered},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+			viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+			defer viperReset()
+
+			mut := engine.New(mod, engine.CodeData{Cov: tc.profile}, newJobDealerStub(t), engine.WithDirFs(sys))
+			res := runEngine(t, mut)
+
+			checkObservableStatuses(t, res.Mutants, observable, tc.observedState)
+		})
+	}
+}
+
 // lifecycleFS is a module file with eight mutants: each comparison has a
 // conditionals-boundary and a conditionals-negation mutant.
 var lifecycleFS = fstest.MapFS{
