@@ -885,29 +885,78 @@ func checkObservableStatuses(
 	t *testing.T, mutants []mutator.Mutator, observable map[mutantLine]bool, observedState mutator.Status,
 ) {
 	t.Helper()
+	want := make(map[mutantLine]mutator.Status, len(observable))
+	for at, obs := range observable {
+		want[at] = mutator.Skipped
+		if obs {
+			want[at] = observedState
+		}
+	}
+	checkLineStatuses(t, mutants, want)
+}
+
+// checkLineStatuses checks that each mutant is on a line of want and has the
+// status of that line, and that each line of want has a mutant.
+func checkLineStatuses(t *testing.T, mutants []mutator.Mutator, want map[mutantLine]mutator.Status) {
+	t.Helper()
 	found := make(map[mutantLine]bool)
 	for _, m := range mutants {
 		at := mutantLine{m.Position().Filename, m.Position().Line}
-		obs, ok := observable[at]
+		wantStatus, ok := want[at]
 		if !ok {
 			t.Errorf("got %s mutant at %s, want no mutant on that line", m.Type(), m.Position())
 
 			continue
 		}
 		found[at] = true
-		want := mutator.Skipped
-		if obs {
-			want = observedState
-		}
-		if m.Status() != want {
-			t.Errorf("%s mutant at %s: status = %s, want %s", m.Type(), m.Position(), m.Status(), want)
+		if m.Status() != wantStatus {
+			t.Errorf("%s mutant at %s: status = %s, want %s", m.Type(), m.Position(), m.Status(), wantStatus)
 		}
 	}
-	for at := range observable {
+	for at := range want {
 		if !found[at] {
 			t.Errorf("got no mutant at %s:%d, want at least one", at.file, at.line)
 		}
 	}
+}
+
+// TestRegressionPackageVarInitializerCoverage checks the status of a mutant
+// in a package-level variable initializer. The profile has blocks only for
+// function bodies, as a real profile does. An executed block in any file of
+// the package proves that the initializers ran, so the mutant is runnable.
+// Without such a block the profile cannot show the initializer, so the mutant
+// is skipped. A function literal in an initializer follows its own blocks.
+func TestRegressionPackageVarInitializerCoverage(t *testing.T) {
+	const (
+		ranFile  = "ran/vars.go"
+		onlyFile = "ran/only.go"
+		idleFile = "idle/vars.go"
+	)
+	sys := fstest.MapFS{
+		ranFile: {Data: []byte("package ran\n\nvar delay = 5 * 2\n\n" +
+			"var check = func(a int) bool { return a > 0 }\n\n" +
+			"func F() int { return delay * 3 }\n")},
+		onlyFile: {Data: []byte("package ran\n\nvar size = 2 + 3\n")},
+		idleFile: {Data: []byte("package idle\n\nvar size = 2 + 3\n\nfunc G(a int) int { return a - 1 }\n")},
+	}
+	// The block is the body of F. No test ran check or G.
+	profile := coverage.Profile{ranFile: {{StartLine: 7, StartCol: 14, EndLine: 7, EndCol: 34}}}
+	want := map[mutantLine]mutator.Status{
+		{ranFile, 3}:  mutator.Runnable,
+		{ranFile, 5}:  mutator.NotCovered,
+		{ranFile, 7}:  mutator.Runnable,
+		{onlyFile, 3}: mutator.Runnable,
+		{idleFile, 3}: mutator.Skipped,
+		{idleFile, 5}: mutator.NotCovered,
+	}
+	mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+	defer viperReset()
+
+	mut := engine.New(mod, engine.CodeData{Cov: profile}, newJobDealerStub(t), engine.WithDirFs(sys))
+	res := runEngine(t, mut)
+
+	checkLineStatuses(t, res.Mutants, want)
 }
 
 // lifecycleFS is a module file with eight mutants: each comparison has a

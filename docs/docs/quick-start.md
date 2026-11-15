@@ -26,6 +26,13 @@ Go coverage profiles cannot show some code. Gremlins skips the mutations in this
 - Files that the file name or the build constraints exclude from the host build with the configured tags. For example,
   a `_windows.go` file on Linux.
 
+Go coverage profiles also have no blocks for the initializers of package-level variables. Go runs these initializers
+when it initializes the package, before any other code of the package:
+
+- An initializer is covered when the tests ran other code of the same package.
+- Gremlins skips the mutations of an initializer when the tests ran no code of the package.
+- A function literal in an initializer has its own blocks in the profile.
+
 Gremlins will report each mutation as:
 
 - `RUNNABLE`: In _dry-run_ mode, a mutation that can be tested.
