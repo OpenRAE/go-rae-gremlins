@@ -33,8 +33,10 @@ import (
 // bodies that ran and from the Go evaluation order of the statements.
 //
 // fileCoverage also tells if the coverage profile can show a token position.
-// The profile has no block for a file that the host build excludes, and no
-// block for a package-level constant declaration.
+// The profile has no block for a file that the host build excludes. It also
+// has no block for the code that the compiler evaluates outside function
+// bodies: package-level constant and type declarations, and the signatures of
+// functions, methods, and function literals.
 //
 // The profile also has no block for the initializers of package-level
 // variables. Go runs these initializers when it initializes the package,
@@ -44,9 +46,9 @@ type fileCoverage struct {
 	set         *token.FileSet
 	profile     coverage.Profile
 	clauseExprs []exprSpan
-	constDecls  []exprSpan
+	compiled    []exprSpan
 	varDecls    []exprSpan
-	varFuncLits []exprSpan
+	varFuncBody []exprSpan
 	built       bool
 	pkgRan      bool
 }
@@ -63,17 +65,7 @@ func newFileCoverage(set *token.FileSet, file *ast.File, profile coverage.Profil
 	c := fileCoverage{set: set, profile: profile, built: built}
 	c.pkgRan = profile.IsDirCovered(path.Dir(set.Position(file.Package).Filename))
 	for _, decl := range file.Decls {
-		d, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
-		}
-		if d.Tok == token.CONST {
-			c.constDecls = append(c.constDecls, spanOf(d))
-		}
-		if d.Tok == token.VAR {
-			c.varDecls = append(c.varDecls, spanOf(d))
-			c.varFuncLits = append(c.varFuncLits, funcLitsOf(d)...)
-		}
+		addDecl(&c, decl)
 	}
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch n := node.(type) {
@@ -103,13 +95,13 @@ func (c fileCoverage) isCovered(pos token.Pos) bool {
 }
 
 // isObservable tells if a test run can cover pos. The tests of the host build
-// cannot run a file that the build excludes. A package-level constant
-// declaration has no coverage block because the compiler evaluates it. The
-// profile shows a package-level variable initializer only when the tests ran
-// other code of the package.
+// cannot run a file that the build excludes. The compiler evaluates the code
+// in the compiled spans, so no test run executes it. The profile shows a
+// package-level variable initializer only when the tests ran other code of
+// the package.
 func (c fileCoverage) isObservable(pos token.Pos) bool {
 	switch {
-	case !c.built, within(c.constDecls, pos):
+	case !c.built, within(c.compiled, pos):
 		return false
 	case c.inVarInitializer(pos):
 		return c.pkgRan
@@ -118,19 +110,49 @@ func (c fileCoverage) isObservable(pos token.Pos) bool {
 	}
 }
 
-// inVarInitializer tells if pos is in a package-level variable declaration
-// and not in a function literal of it. A function literal has its own
-// coverage blocks.
-func (c fileCoverage) inVarInitializer(pos token.Pos) bool {
-	return within(c.varDecls, pos) && !within(c.varFuncLits, pos)
+// addDecl records in c the spans of a package-level declaration that the
+// profile cannot show directly.
+func addDecl(c *fileCoverage, decl ast.Decl) {
+	switch d := decl.(type) {
+	case *ast.FuncDecl:
+		c.compiled = append(c.compiled, signatureSpan(d.Pos(), d.End(), d.Body))
+	case *ast.GenDecl:
+		if d.Tok == token.CONST || d.Tok == token.TYPE {
+			c.compiled = append(c.compiled, spanOf(d))
+		}
+		if d.Tok == token.VAR {
+			c.varDecls = append(c.varDecls, spanOf(d))
+			for _, f := range outerFuncLits(d) {
+				c.compiled = append(c.compiled, signatureSpan(f.Pos(), f.End(), f.Body))
+				c.varFuncBody = append(c.varFuncBody, spanOf(f.Body))
+			}
+		}
+	}
 }
 
-// funcLitsOf returns the outermost function literals of a declaration.
-func funcLitsOf(d *ast.GenDecl) []exprSpan {
-	var spans []exprSpan
-	ast.Inspect(d, func(node ast.Node) bool {
+// inVarInitializer tells if pos is in a package-level variable declaration
+// and not in the body of a function literal of it. A function literal body
+// has its own coverage blocks.
+func (c fileCoverage) inVarInitializer(pos token.Pos) bool {
+	return within(c.varDecls, pos) && !within(c.varFuncBody, pos)
+}
+
+// signatureSpan returns the span of a function signature from start to the
+// opening brace of body. A function without a body is all signature.
+func signatureSpan(start, end token.Pos, body *ast.BlockStmt) exprSpan {
+	if body != nil {
+		end = body.Lbrace
+	}
+
+	return exprSpan{start: start, end: end}
+}
+
+// outerFuncLits returns the outermost function literals of a node.
+func outerFuncLits(n ast.Node) []*ast.FuncLit {
+	var lits []*ast.FuncLit
+	ast.Inspect(n, func(node ast.Node) bool {
 		if f, ok := node.(*ast.FuncLit); ok {
-			spans = append(spans, spanOf(f))
+			lits = append(lits, f)
 
 			return false
 		}
@@ -138,7 +160,7 @@ func funcLitsOf(d *ast.GenDecl) []exprSpan {
 		return true
 	})
 
-	return spans
+	return lits
 }
 
 func spanOf(n ast.Node) exprSpan {
