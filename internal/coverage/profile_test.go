@@ -218,6 +218,30 @@ func TestIsCovered(t *testing.T) {
 	}
 }
 
+func TestFeatureProfileIsCoveredLookup(t *testing.T) {
+	position := token.Position{Filename: testFilename, Line: 20, Column: 5}
+	before := coverage.Block{StartLine: 10, StartCol: 1, EndLine: 12, EndCol: 1}
+	after := coverage.Block{StartLine: 30, StartCol: 1, EndLine: 32, EndCol: 1}
+	matching := coverage.Block{StartLine: 20, StartCol: 1, EndLine: 20, EndCol: 9}
+	testCases := []struct {
+		profile coverage.Profile
+		name    string
+		want    bool
+	}{
+		{name: "file not in the profile", profile: coverage.Profile{"other": {matching}}, want: false},
+		{name: "later block matches", profile: coverage.Profile{testFilename: {before, after, matching}}, want: true},
+		{name: "no block matches", profile: coverage.Profile{testFilename: {before, after}}, want: false},
+		{name: "file has no block", profile: coverage.Profile{testFilename: nil}, want: false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.profile.IsCovered(position); got != tc.want {
+				t.Errorf("IsCovered(%v) = %v, want %v", position, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestFeatureProfileIsDirCovered(t *testing.T) {
 	block := []coverage.Block{{StartLine: 1, StartCol: 1, EndLine: 2, EndCol: 1}}
 	profile := coverage.Profile{

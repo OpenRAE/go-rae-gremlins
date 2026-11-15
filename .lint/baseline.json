@@ -57,18 +57,6 @@
     },
     {
       "linter": "revive",
-      "file": "cmd/internal/flags/flags_test.go",
-      "fingerprint": "87e9709c9b938ab863ebc98cf0bbcbe34157fd4f46615bee3baf0092abd900fa",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "cmd/internal/flags/flags_test.go",
-      "fingerprint": "96361be6f2be480b4a2957cc96978a1ee2a10f1a77e88fcd8610264deafde820",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "cmd/unleash.go",
       "fingerprint": "f176b463fd9be3d2f091aa2ed5c390f43484a7fc2d64b49ca6ca45770548b87f",
       "count": 1
