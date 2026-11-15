@@ -19,6 +19,8 @@ package process_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"testing"
@@ -40,6 +42,8 @@ const (
 	treeParentBlock = "parent-block"
 	treeParentExit  = "parent-exit"
 	treeDescendant  = "descendant"
+	// pidParent starts a blocking descendant and writes its process ID.
+	pidParent = "pid-parent"
 	// inheritOutputEnv makes the descendant hold the output pipe of its parent.
 	inheritOutputEnv = "GO_TEST_PROCESS_INHERIT_OUTPUT"
 )
@@ -70,6 +74,8 @@ func runHelper(role string) int {
 		return runTreeParent(role)
 	case treeDescendant:
 		return runTreeDescendant()
+	case pidParent:
+		return runPIDParent()
 	default:
 		// An unknown role is a test defect; fail instead of passing silently.
 		return 2
@@ -125,6 +131,26 @@ func runTreeDescendant() int {
 		return 2
 	}
 	time.Sleep(helperLimit)
+
+	return 0
+}
+
+// runPIDParent starts a blocking descendant and writes its process ID to
+// stdout. Then it waits for one byte or EOF on stdin, and exits. It needs no
+// extra descriptors, so it also runs on Windows.
+func runPIDParent() int {
+	// #nosec G204 G702 - The helper starts the test binary itself.
+	cmd := exec.CommandContext(context.Background(), os.Args[0], helperRun)
+	cmd.Env = append(os.Environ(), helperRoleEnv+"=block")
+	if err := cmd.Start(); err != nil {
+		return 2
+	}
+	if _, err := fmt.Fprintln(os.Stdout, cmd.Process.Pid); err != nil {
+		return 2
+	}
+	if _, err := os.Stdin.Read(make([]byte, 1)); err != nil && !errors.Is(err, io.EOF) {
+		return 2
+	}
 
 	return 0
 }

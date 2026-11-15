@@ -103,8 +103,8 @@ PID probes must distinguish permission errors, PID reuse, and zombie state; proc
 
 Unix tests may assert process-group cleanup for descendants that remain in the owned group.
 They must not claim cleanup of detached sessions or groups.
-Windows currently requests a new process group but kills only the direct process.
-Do not assert Unix descendant guarantees on Windows or add job objects as incidental test infrastructure.
+Windows puts the command and its descendants in a job object (#128).
+Windows tests may assert cleanup of descendants in that job. Do not assert Unix signal or group behavior on Windows.
 
 Use portable cases on every existing CI platform and build-tagged cleanup/signal cases on the platform they describe.
 Unsupported signal delivery needs a specific skip reason; a skip or successful cross-compilation supplies no runtime evidence.
@@ -153,10 +153,10 @@ ADR 0002 preserves the `gremlins` binary contract; ADR 0004 governs the design c
 
 | Step | Unix | Windows |
 | --- | --- | --- |
-| Start | Start the command in a new process group (`Setpgid`). | Start the command in a new process group (`CREATE_NEW_PROCESS_GROUP`). |
-| Context done | `Cmd.Cancel` sends `SIGKILL` to the complete group. | `Cmd.Cancel` kills the direct process only (#128). |
+| Start | Start the command in a new process group (`Setpgid`). | Start the command suspended in a new process group. Put it in a new job object, then resume it. |
+| Context done | `Cmd.Cancel` sends `SIGKILL` to the complete group. | `Cmd.Cancel` terminates the job. |
 | Open output pipes | `Cmd.WaitDelay` bounds the wait for pipes that a descendant holds. | Same. |
-| After exit | Send `SIGKILL` to the group to stop remaining descendants. | No action. Windows cannot address the descendants (#128). |
+| After exit | Send `SIGKILL` to the group to stop remaining descendants. | Terminate the job to stop remaining descendants. The job also stops its processes when Gremlins releases it. |
 
 A group kill that finds no process returns `os.ErrProcessDone`, so `Wait` does not report a false error.
 The coverage runner previously killed only the `go` process. Its test binary then continued after a cancelled run.
@@ -185,7 +185,6 @@ flowchart LR
 
 Residual risks:
 
-- On Windows, descendants of a cancelled command can continue. Issue #128 owns that repair.
 - When no group member remains, the operating system can reuse the group ID before the kill after exit.
   The existing engine runner has the same exposure.
 

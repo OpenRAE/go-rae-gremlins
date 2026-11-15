@@ -26,28 +26,56 @@ import (
 	"time"
 )
 
-// Run starts cmd in a new process group and waits for it to complete.
-// When the context of cmd is done, Run kills the process group. After cmd
-// exits, Run kills any process that remains in the group. On Windows, Run
-// kills only the direct process, and only when the context is done.
+// Run starts cmd with the processes that it starts in one process tree and
+// waits for cmd to complete. When the context of cmd is done, Run stops the
+// complete tree. After cmd exits, Run stops any process that remains in the
+// tree. On Unix the tree is a new process group. On Windows it is a new job
+// object, and cmd starts suspended until it is in the job.
 //
 // Run waits at most five seconds for output pipes after cmd exits or its
 // context is done, so a descendant that holds a pipe open cannot block it.
 //
 // cmd must come from exec.CommandContext. Run sets cmd.SysProcAttr,
 // cmd.Cancel, and cmd.WaitDelay. It returns the error of cmd.Run, joined with
-// any error of the kill after the exit.
-func Run(cmd *exec.Cmd) error {
-	setProcessGroup(cmd)
-	cmd.Cancel = func() error { return killProcessGroup(cmd) }
+// any error of the tree control.
+func Run(cmd *exec.Cmd) (err error) {
+	tree, err := newProcessTree(cmd)
+	if err != nil {
+		return fmt.Errorf("prepare the process tree of %s: %w", cmd.Path, err)
+	}
+	defer func() {
+		if closeErr := tree.close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("release the process tree of %s: %w", cmd.Path, closeErr))
+		}
+	}()
+	cmd.Cancel = tree.kill
 	cmd.WaitDelay = 5 * time.Second
-	err := cmd.Run()
-	if cmd.Process == nil {
+	if err := cmd.Start(); err != nil {
 		return err
 	}
-	if killErr := killRemaining(cmd); killErr != nil && !errors.Is(killErr, os.ErrProcessDone) {
+	if err := tree.start(); err != nil {
+		return stopOutsideTree(cmd, fmt.Errorf("start the process tree of %s: %w", cmd.Path, err))
+	}
+	err = cmd.Wait()
+	if killErr := tree.kill(); killErr != nil && !errors.Is(killErr, os.ErrProcessDone) {
 		return errors.Join(err, fmt.Errorf("stop the remaining processes of %s: %w", cmd.Path, killErr))
 	}
 
 	return err
+}
+
+// stopOutsideTree kills cmd, which must not run outside its process tree,
+// and waits for it. It returns cause joined with any kill or wait error. The
+// exit of the killed process is expected, so it is not an error; it must not
+// make cause look like a test result.
+func stopOutsideTree(cmd *exec.Cmd, cause error) error {
+	if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		cause = errors.Join(cause, fmt.Errorf("kill %s: %w", cmd.Path, err))
+	}
+	var exitErr *exec.ExitError
+	if err := cmd.Wait(); err != nil && !errors.As(err, &exitErr) {
+		cause = errors.Join(cause, fmt.Errorf("wait for %s: %w", cmd.Path, err))
+	}
+
+	return cause
 }

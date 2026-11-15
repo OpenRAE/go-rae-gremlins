@@ -25,18 +25,29 @@ import (
 	"syscall"
 )
 
-// setProcessGroup makes the command the leader of a new process group, so
-// its descendants, for example the test binaries of go test, can be killed
-// together with it.
-func setProcessGroup(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+// processTree is a new process group that cmd leads, so its descendants,
+// for example the test binaries of go test, stop together with it.
+type processTree struct {
+	cmd *exec.Cmd
 }
 
-// killProcessGroup sends SIGKILL to every process in the group of cmd. It
-// returns os.ErrProcessDone when no process remains in the group.
-func killProcessGroup(cmd *exec.Cmd) error {
+// newProcessTree makes cmd the leader of a new process group when it starts.
+func newProcessTree(cmd *exec.Cmd) (*processTree, error) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	return &processTree{cmd: cmd}, nil
+}
+
+// start does nothing. The group exists from the start of cmd.
+func (*processTree) start() error {
+	return nil
+}
+
+// kill sends SIGKILL to every process in the group of cmd. It returns
+// os.ErrProcessDone when no process remains in the group.
+func (t *processTree) kill() error {
 	// A negative PID addresses the process group.
-	err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	err := syscall.Kill(-t.cmd.Process.Pid, syscall.SIGKILL)
 	if errors.Is(err, syscall.ESRCH) {
 		return os.ErrProcessDone
 	}
@@ -44,8 +55,7 @@ func killProcessGroup(cmd *exec.Cmd) error {
 	return err
 }
 
-// killRemaining kills the processes that remain in the group of cmd after
-// cmd exits.
-func killRemaining(cmd *exec.Cmd) error {
-	return killProcessGroup(cmd)
+// close does nothing. A process group holds no resource of Gremlins.
+func (*processTree) close() error {
+	return nil
 }
