@@ -102,7 +102,7 @@ func TestNewTokenNode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tn, ok := engine.NewTokenNode(tc.node)
 			if ok != tc.supported {
-				t.Fatal("expected to receive a token")
+				t.Fatalf("NewTokenNode() ok = %t, want %t", ok, tc.supported)
 			}
 			if !tc.supported {
 				return
@@ -112,10 +112,10 @@ func TestNewTokenNode(t *testing.T) {
 			gotPos := tn.TokPos
 
 			if gotTok != tc.wantTok {
-				t.Errorf("want %s, got %s", gotTok, tc.wantTok)
+				t.Errorf("NewTokenNode().Tok() = %s, want %s", gotTok, tc.wantTok)
 			}
 			if gotPos != tc.wantPos {
-				t.Errorf("want %d, got %d", gotPos, tc.wantPos)
+				t.Errorf("NewTokenNode().TokPos = %d, want %d", gotPos, tc.wantPos)
 			}
 		})
 	}

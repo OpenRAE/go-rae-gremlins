@@ -134,11 +134,11 @@ func TestApplyAndRollback(t *testing.T) {
 		startExecutor(t, executor, w, outCh, &wg, "executor")
 
 		if !mut.applyCalled {
-			t.Error("expected apply to be called")
+			t.Error("executor did not call Apply(), want one call")
 		}
 
 		if !mut.rollbackCalled {
-			t.Error("expected rollback to be called")
+			t.Error("executor did not call Rollback(), want one call")
 		}
 	})
 }
@@ -203,7 +203,7 @@ func TestMutatorTestExecution(t *testing.T) {
 			got := startExecutor(t, executor, w, outCh, &wg, "executor").Mutant
 
 			if got.Status() != tc.wantMutStatus {
-				t.Errorf("expected mutation to be %v, but got: %v", tc.wantMutStatus, got.Status())
+				t.Errorf("executor result Status() = %v, want %v", got.Status(), tc.wantMutStatus)
 			}
 
 			if tc.mutantStatus != mutator.NotCovered {
@@ -217,7 +217,7 @@ func TestMutatorTestExecution(t *testing.T) {
 					}
 				}
 				if goTmpDirEnv != actualGoTmpDir {
-					t.Errorf("expected GOTMPDIR to be %s, got %s", goTmpDirEnv, actualGoTmpDir)
+					t.Errorf("go test command GOTMPDIR entry = %q, want %q", actualGoTmpDir, goTmpDirEnv)
 				}
 			}
 		})
@@ -527,7 +527,7 @@ func TestMutatorRun(t *testing.T) {
 			timeoutDifference := absTimeDiff(holder.timeout, expectedTimeout*2)
 			diffThreshold := 100 * time.Second
 			if timeoutDifference > diffThreshold {
-				t.Errorf("expected timeout to be within %s from the set timeout, got %s", diffThreshold, timeoutDifference)
+				t.Errorf("go test command timeout = %s, want within %s of %s", holder.timeout, diffThreshold, expectedTimeout*2)
 			}
 		})
 	}
@@ -599,7 +599,7 @@ func TestCPU(t *testing.T) {
 
 			for _, arg := range holder.args {
 				if !tc.cpuPresent && strings.Contains(arg, "-cpu") {
-					t.Fatal("didn't expect to have -cpu flag")
+					t.Fatalf("go test command args = %q, want no -cpu flag", holder.args)
 				}
 				if !tc.cpuPresent {
 					return
@@ -610,7 +610,7 @@ func TestCPU(t *testing.T) {
 					// PASS
 					return
 				}
-				t.Fatalf("want flag %q, got args %s", cpuFlag, holder.args)
+				t.Fatalf("go test command args = %q, want flag %q", holder.args, cpuFlag)
 			}
 
 		})
@@ -667,7 +667,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		startExecutor(t, executor, w, outCh, &wg, "executor")
 
 		if mut.Workdir() != holder.cmd.Dir {
-			t.Errorf("expected working dir to be %s, got %s", holder.cmd.Dir, mut.Workdir())
+			t.Errorf("go test command Dir = %q, want the mutant workdir %q", holder.cmd.Dir, mut.Workdir())
 		}
 	})
 	t.Run("integration mode: mutation should run in the wd root folder", func(t *testing.T) {
@@ -708,7 +708,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		startExecutor(t, executor, w, outCh, &wg, "executor")
 
 		if wantRootDir != holder.cmd.Dir {
-			t.Errorf("expected working dir to be %q, got %q", wantRootDir, holder.cmd.Dir)
+			t.Errorf("go test command Dir = %q, want %q", holder.cmd.Dir, wantRootDir)
 		}
 	})
 }

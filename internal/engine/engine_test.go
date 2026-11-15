@@ -505,7 +505,7 @@ func TestMutations(t *testing.T) {
 			got := res.Mutants
 
 			if res.Module != expectedModule {
-				t.Errorf("expected module to be %q, got %q", expectedModule, res.Module)
+				t.Errorf("Run() Module = %q, want %q", res.Module, expectedModule)
 			}
 
 			for _, g := range got {
@@ -515,8 +515,7 @@ func TestMutations(t *testing.T) {
 				}
 			}
 
-			t.Errorf("expected tokenMutations list to contain the found mutation")
-			t.Log(got)
+			t.Errorf("Run() mutants = %v, want a %v mutant with status %v and a position", got, tc.mutantType, tc.mutStatus)
 		})
 	}
 }
@@ -541,7 +540,7 @@ func TestMutantSkipDisabled(t *testing.T) {
 
 			for _, m := range got {
 				if m.Type() == mt {
-					t.Fatalf("expected %q not to be in the found tokens", mt)
+					t.Fatalf("Run() with %v disabled returned a %v mutant, want none", mt, mt)
 				}
 			}
 		})
@@ -572,10 +571,10 @@ func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 	}
 
 	if !hasNegation {
-		t.Fatal("expected ConditionalsNegation mutants to still be produced")
+		t.Fatal("Run() returned no ConditionalsNegation mutants, want at least one")
 	}
 	if hasBoundary {
-		t.Fatal("expected ConditionalsBoundary mutants to be disabled")
+		t.Fatal("Run() returned a ConditionalsBoundary mutant, want none")
 	}
 }
 
@@ -1045,7 +1044,7 @@ func TestStopsOnCancel(t *testing.T) {
 		}
 
 		if len(res.Mutants) > 0 {
-			t.Errorf("expected to receive no mutants, got %d", len(res.Mutants))
+			t.Errorf("Run() returned %d mutants, want 0", len(res.Mutants))
 		}
 	})
 }
@@ -1157,7 +1156,7 @@ func TestPackageDiscovery(t *testing.T) {
 			got := jds.gotMutants[0].Pkg()
 
 			if got != tc.wantPath {
-				t.Errorf("want %q, got %q", tc.wantPath, got)
+				t.Errorf("mutant Pkg() = %q, want %q", got, tc.wantPath)
 			}
 		})
 	}

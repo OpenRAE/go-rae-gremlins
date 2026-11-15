@@ -98,14 +98,14 @@ func checkForDifferentFile(t *testing.T, srcDir string, dstDir string) func(path
 
 		sameFile := os.SameFile(dstFileInfo, srcFileInfo)
 		if sameFile {
-			t.Error("expected file to be different, got the same file")
+			t.Errorf("os.SameFile(%q, %q) = true, want a separate copy", dstPath, path)
 		}
 
 		if !cmp.Equal(dstFileInfo.Name(), srcFileInfo.Name()) {
-			t.Errorf("expected Name to be %v, got %v", srcFileInfo.Name(), dstFileInfo.Name())
+			t.Errorf("copy %q Name() = %q, want %q", dstPath, dstFileInfo.Name(), srcFileInfo.Name())
 		}
 		if !cmp.Equal(dstFileInfo.Mode(), srcFileInfo.Mode()) {
-			t.Error(cmp.Diff(srcFileInfo.Mode(), dstFileInfo.Mode()))
+			t.Errorf("copy %q Mode() = %v, want %v", dstPath, dstFileInfo.Mode(), srcFileInfo.Mode())
 		}
 
 		return nil
@@ -137,10 +137,10 @@ func TestCachesFolder(t *testing.T) {
 		}
 
 		if firstDir != secondDir {
-			t.Errorf("expected dirs to be cached, got %s", cmp.Diff(firstDir, secondDir))
+			t.Errorf(`second Get("worker-1") = %q, want the cached %q`, secondDir, firstDir)
 		}
 		if firstDir == thirdDir {
-			t.Errorf("expected a new dir to be instanciated")
+			t.Errorf(`Get("worker-2") = %q, want a directory other than %q`, thirdDir, firstDir)
 		}
 	})
 
@@ -164,7 +164,7 @@ func TestCachesFolder(t *testing.T) {
 		}
 
 		if firstDir == secondDir {
-			t.Errorf("expected manager to be cleaned up")
+			t.Errorf(`Get("worker-1") after Clean() = %q, want a new directory`, secondDir)
 		}
 	})
 
@@ -187,7 +187,7 @@ func TestCachesFolder(t *testing.T) {
 				defer wg.Done()
 				f, err := dealer.Get(fmt.Sprintf("test-%d", i))
 				if err != nil {
-					t.Errorf("unexpected error: %s", err)
+					t.Errorf("Get(%q) error = %v, want nil", fmt.Sprintf("test-%d", i), err)
 				}
 				foldersLock.Lock()
 				defer foldersLock.Unlock()
@@ -200,7 +200,7 @@ func TestCachesFolder(t *testing.T) {
 		occurred := make(map[string]bool)
 		for _, v := range folders {
 			if occurred[v] == true {
-				t.Fatal("expected values to be unique")
+				t.Fatalf("parallel Get() returned directory %q more than once, want unique directories", v)
 			}
 			occurred[v] = true
 		}
@@ -216,7 +216,7 @@ func TestErrors(t *testing.T) {
 
 		_, err := dealer.Get("test")
 		if err == nil {
-			t.Error("expected an error")
+			t.Errorf("Get() with source %q error = nil, want an error", srcDir)
 		}
 	})
 
@@ -234,7 +234,7 @@ func TestErrors(t *testing.T) {
 
 		_, err := mngr.Get("test")
 		if err == nil {
-			t.Error("expected an error")
+			t.Error("Get() with an unreadable source error = nil, want an error")
 		}
 	})
 
@@ -254,7 +254,7 @@ func TestErrors(t *testing.T) {
 
 		_, err := dealer.Get("test")
 		if err == nil {
-			t.Error("expected an error")
+			t.Error("Get() with an unwritable destination error = nil, want an error")
 		}
 	})
 }
@@ -295,7 +295,7 @@ func TestWorkDirReturnsTheRootWorkingDir(t *testing.T) {
 
 	rootWorkingDir := dealer.WorkDir()
 	if rootWorkingDir != wdDir {
-		t.Errorf("expected working dir to be %s, got: %s", wdDir, rootWorkingDir)
+		t.Errorf("WorkDir() = %q, want %q", rootWorkingDir, wdDir)
 	}
 }
 

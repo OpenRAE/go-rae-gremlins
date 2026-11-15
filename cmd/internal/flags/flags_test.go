@@ -166,15 +166,15 @@ func TestSet(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.flag.Name, func(t *testing.T) {
-			checkSetter(t, Set, tc)
-			checkSetter(t, SetPersistent, tc)
+			checkSetter(t, "Set", Set, tc)
+			checkSetter(t, "SetPersistent", SetPersistent, tc)
 		})
 	}
 }
 
-// checkSetter registers tc.flag with set on a new command and a reset Viper,
-// so a check cannot read the binding of an earlier check.
-func checkSetter(t *testing.T, set func(*cobra.Command, *Flag) error, tc testCase) {
+// checkSetter registers tc.flag with set, the function named op, on a new
+// command and a reset Viper, so a check cannot read the binding of an earlier check.
+func checkSetter(t *testing.T, op string, set func(*cobra.Command, *Flag) error, tc testCase) {
 	t.Helper()
 
 	viper.Reset()
@@ -183,40 +183,43 @@ func checkSetter(t *testing.T, set func(*cobra.Command, *Flag) error, tc testCas
 	flag := tc.flag
 
 	err := set(cmd, &flag)
-	checkFlag(t, err, cmd, tc)
+	checkFlag(t, op, err, cmd, tc)
 }
 
-func checkFlag(t *testing.T, err error, cmd *cobra.Command, tc testCase) {
+// checkFlag checks the result of op, the Set or SetPersistent call that
+// registered tc.flag on cmd.
+func checkFlag(t *testing.T, op string, err error, cmd *cobra.Command, tc testCase) {
 	t.Helper()
 
 	if tc.expectError {
 		if err == nil {
-			t.Fatalf("set %q: got nil error, want an error", tc.flag.Name)
+			t.Fatalf("%s(%q) error = nil, want an error", op, tc.flag.Name)
 		}
 
 		return
 	}
 	if err != nil {
-		t.Fatalf("set %q: got error %v, want nil", tc.flag.Name, err)
+		t.Fatalf("%s(%q) error = %v, want nil", op, tc.flag.Name, err)
 	}
 
 	flag := cmd.Flag(tc.flag.Name)
 	if flag == nil {
-		t.Fatalf("flag %q: not registered", tc.flag.Name)
+		t.Fatalf("%s(%q): cmd.Flag(%q) = nil, want a registered flag", op, tc.flag.Name, tc.flag.Name)
 	}
 	if flag.Shorthand != tc.flag.Shorthand {
-		t.Errorf("flag %q shorthand: got %q, want %q", tc.flag.Name, flag.Shorthand, tc.flag.Shorthand)
+		t.Errorf("%s(%q): shorthand = %q, want %q", op, tc.flag.Name, flag.Shorthand, tc.flag.Shorthand)
 	}
 
 	if diff := cmp.Diff(tc.flag.DefaultV, configValue(tc.flag.CfgKey, tc.want)); diff != "" {
-		t.Errorf("key %q before parse: default mismatch (-want +got):\n%s", tc.flag.CfgKey, diff)
+		t.Errorf("%s(%q): key %q before parse: default mismatch (-want +got):\n%s", op, tc.flag.Name, tc.flag.CfgKey, diff)
 	}
 
-	if err := cmd.ParseFlags([]string{"--" + tc.flag.Name + "=" + tc.arg}); err != nil {
-		t.Fatalf("parse --%s=%s: %v", tc.flag.Name, tc.arg, err)
+	arg := "--" + tc.flag.Name + "=" + tc.arg
+	if err := cmd.ParseFlags([]string{arg}); err != nil {
+		t.Fatalf("%s(%q): ParseFlags(%s) error = %v, want nil", op, tc.flag.Name, arg, err)
 	}
 	if diff := cmp.Diff(tc.want, configValue(tc.flag.CfgKey, tc.want)); diff != "" {
-		t.Errorf("key %q after --%s=%s: value mismatch (-want +got):\n%s", tc.flag.CfgKey, tc.flag.Name, tc.arg, diff)
+		t.Errorf("%s(%q): key %q after %s: value mismatch (-want +got):\n%s", op, tc.flag.Name, tc.flag.CfgKey, arg, diff)
 	}
 }
 

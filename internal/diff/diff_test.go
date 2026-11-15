@@ -120,9 +120,7 @@ func Test_newDiff(t *testing.T) {
 
 	result := newDiff(files)
 	if !reflect.DeepEqual(result, expected) {
-		t.Log("want", expected)
-		t.Log("got", result)
-		t.Fatalf("unexpected newDiff result")
+		t.Fatalf("newDiff() = %v, want %v", result, expected)
 	}
 }
 
@@ -149,12 +147,10 @@ func Test_newChanges(t *testing.T) {
 	name, changes := newChanges(file)
 
 	if name != testFile {
-		t.Fatalf("name %s unexpected", name)
+		t.Fatalf("newChanges() name = %q, want %q", name, testFile)
 	}
 	if !reflect.DeepEqual(changes, expect) {
-		t.Log("want", expect)
-		t.Log("got", changes)
-		t.Fatalf("unexpected newChanges result")
+		t.Fatalf("newChanges() = %v, want %v", changes, expect)
 	}
 }
 
@@ -226,11 +222,9 @@ func TestFeature_newChanges_separateEditsInOneFragment(t *testing.T) {
 	name, changes := newChanges(file)
 
 	if name != testFile {
-		t.Fatalf("name %s unexpected", name)
+		t.Fatalf("newChanges() name = %q, want %q", name, testFile)
 	}
 	if !reflect.DeepEqual(changes, expect) {
-		t.Log("want", expect)
-		t.Log("got", changes)
-		t.Fatal("unexpected newChanges result for a hunk with two separate edits")
+		t.Fatalf("newChanges() for a hunk with two separate edits = %v, want %v", changes, expect)
 	}
 }

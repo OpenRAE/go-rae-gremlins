@@ -113,7 +113,10 @@ func TestConfiguration(t *testing.T) {
 			}
 			err := Init(tc.configPaths)
 			if tc.expectErr && err == nil {
-				t.Fatal("expected error")
+				t.Fatalf("Init(%q) error = nil, want an error", tc.configPaths)
+			}
+			if !tc.expectErr && err != nil {
+				t.Fatalf("Init(%q) error = %v, want nil", tc.configPaths, err)
 			}
 			if tc.expectErr {
 				return
@@ -122,7 +125,7 @@ func TestConfiguration(t *testing.T) {
 			for key, wanted := range tc.wantedConfig {
 				got := Get[any](key)
 				if got != wanted {
-					t.Error(cmp.Diff(got, wanted))
+					t.Errorf("Get[any](%q) = %v, want %v", key, got, wanted)
 				}
 			}
 		})
@@ -200,10 +203,10 @@ func runInitCases(t *testing.T, testCases []initCase) {
 			err := Init(paths)
 
 			if tc.expectErr && err == nil {
-				t.Fatal("expected error, got nil")
+				t.Fatal("Init() error = nil, want an error")
 			}
 			if !tc.expectErr && err != nil {
-				t.Fatalf("expected no error, got %v", err)
+				t.Fatalf("Init() error = %v, want nil", err)
 			}
 		})
 	}
@@ -253,8 +256,8 @@ func TestConfigPaths(t *testing.T) {
 
 		got := defaultConfigPaths()
 
-		if !cmp.Equal(got, want) {
-			t.Error(cmp.Diff(got, want))
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
 		}
 	})
 
@@ -279,8 +282,8 @@ func TestConfigPaths(t *testing.T) {
 
 		got := defaultConfigPaths()
 
-		if !cmp.Equal(got, want) {
-			t.Error(cmp.Diff(got, want))
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
 		}
 	})
 
@@ -314,8 +317,8 @@ func TestConfigPaths(t *testing.T) {
 
 		got := defaultConfigPaths()
 
-		if !cmp.Equal(got, want) {
-			t.Error(cmp.Diff(got, want))
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
 		}
 	})
 }
@@ -327,7 +330,7 @@ func TestGeneratesMutantTypeEnabledKey(t *testing.T) {
 	got := MutantTypeEnabledKey(mt)
 
 	if got != want {
-		t.Errorf("expected %q, got %q", mt, want)
+		t.Errorf("MutantTypeEnabledKey(%v) = %q, want %q", mt, got, want)
 	}
 }
 
@@ -375,7 +378,7 @@ func TestViperSynchronisedAccess(t *testing.T) {
 			got := Get[any](tc.key)
 
 			if !cmp.Equal(got, tc.value) {
-				t.Errorf("expected %v, got %v", tc.value, got)
+				t.Errorf("Get[any](%q) = %v, want %v", tc.key, got, tc.value)
 			}
 		})
 	}
@@ -390,6 +393,6 @@ func TestReset(t *testing.T) {
 	got := Get[bool]("test.key")
 
 	if got != false {
-		t.Errorf("expected config to be reset")
+		t.Errorf(`Get[bool]("test.key") after Reset() = %t, want false`, got)
 	}
 }

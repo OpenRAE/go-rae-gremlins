@@ -212,7 +212,7 @@ func TestIsCovered(t *testing.T) {
 			got := profile.IsCovered(position)
 
 			if got != tCase.expected {
-				t.Errorf("expected coverage to be %v, got %v", tCase.expected, got)
+				t.Errorf("IsCovered(%v) = %v, want %v", position, got, tCase.expected)
 			}
 		})
 	}

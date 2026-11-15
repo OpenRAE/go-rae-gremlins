@@ -51,10 +51,10 @@ func TestExitErr(t *testing.T) {
 			exitMessage := err.Error()
 
 			if exitCode != tc.wantExitCode {
-				t.Errorf("want %d, got %d", tc.wantExitCode, exitCode)
+				t.Errorf("NewExitErr(%v).ExitCode() = %d, want %d", tc.errorType, exitCode, tc.wantExitCode)
 			}
 			if exitMessage != tc.wantExitMsg {
-				t.Errorf("want %q, got %q", tc.wantExitMsg, exitMessage)
+				t.Errorf("NewExitErr(%v).Error() = %q, want %q", tc.errorType, exitMessage, tc.wantExitMsg)
 			}
 		})
 	}

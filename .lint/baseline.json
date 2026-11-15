@@ -45,12 +45,6 @@
     },
     {
       "linter": "errcheck",
-      "file": "internal/report/report_test.go",
-      "fingerprint": "b296f73b507db632f792eb605bbd5727ae18fee02f7d854d25f37ae768e63517",
-      "count": 2
-    },
-    {
-      "linter": "errcheck",
       "file": "tools/architecture/input.go",
       "fingerprint": "97e3b6144fb8694a1d644217e2b83f80a923fd0784c9a48fcd6d679e69772c21",
       "count": 1
@@ -63,62 +57,14 @@
     },
     {
       "linter": "revive",
-      "file": "cmd/gremlins_test.go",
-      "fingerprint": "3c82302f20315357c457e747a9aa93974df58fc89ed3e73e04d204d10db3fbc6",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "cmd/gremlins_test.go",
-      "fingerprint": "fb383aef9e1c8743a96e977c9896b8988d3f5b5e2a105453d81ccd5f7f2f7fc7",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "cmd/unleash.go",
       "fingerprint": "f176b463fd9be3d2f091aa2ed5c390f43484a7fc2d64b49ca6ca45770548b87f",
       "count": 1
     },
     {
       "linter": "revive",
-      "file": "internal/configuration/configuration_test.go",
-      "fingerprint": "90ed0b1b5d347cc541cea9f439c4d4e5b1b8d3ef0ca61093b3582db71064ad21",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/diff/diff_test.go",
-      "fingerprint": "79b1c6945f7411f72d4677684139c4afae18ca28122eb9030c834fa8de87a90a",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/diff/diff_test.go",
-      "fingerprint": "a824f9bccbd096d6debf7905abc5774a6458d8a6bbcc1a21e4413f6d48b87fb1",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "internal/engine/engine_test.go",
       "fingerprint": "3cbcfc73b3b11c1ceea92bf8de084fd1603ddcf1c430ce16b10566204270aca2",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/engine_test.go",
-      "fingerprint": "6af2652e58f9aeb00eb051a7aab74258ff0d188bd9a04058e279901b60c47a16",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/workdir/workdir_test.go",
-      "fingerprint": "3ce0d67e97cdcf9098c0b5687746002c9924d05f31a894190974ca6b7201f4f6",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/engine/workdir/workdir_test.go",
-      "fingerprint": "4f1e338f52a56deecc8bfe38bb46a933816ecff2bf1289924ce9a7edffbbc51b",
       "count": 1
     },
     {
@@ -135,26 +81,8 @@
     },
     {
       "linter": "revive",
-      "file": "internal/log/log_test.go",
-      "fingerprint": "2e67ee4c54d0892044468cbf2f9f364164b50be6474fcb77671f10eb6ea6f311",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/log/log_test.go",
-      "fingerprint": "cbaaa77f225c9e882c77a0cdcac6968252020ac69433fcff9e0595555ebaedcf",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "internal/report/report_test.go",
       "fingerprint": "13f8bd567308324c5cbf210d04de36c272f99a5f4e3b95dff42aefa201057df0",
-      "count": 1
-    },
-    {
-      "linter": "revive",
-      "file": "internal/report/report_test.go",
-      "fingerprint": "b081879c022bd491c6901f8fca1b4eca755cbf1ec112a549bdf4850c42b7ec4a",
       "count": 1
     },
     {
