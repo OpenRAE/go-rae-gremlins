@@ -71,11 +71,7 @@ func TestFeatureRunStopsDescendants(t *testing.T) {
 			if event, err := windows.WaitForSingleObject(descendant, 0); event != uint32(windows.WAIT_TIMEOUT) {
 				t.Fatalf("descendant state before the stop = %d, %v, want running", event, err)
 			}
-			if tc.cancel {
-				cancel()
-			} else if _, err := stdinW.Write([]byte{1}); err != nil {
-				t.Fatalf("release the parent: %v", err)
-			}
+			stopParent(t, tc.cancel, cancel, stdinW)
 			var err error
 			select {
 			case err = <-done:
@@ -90,6 +86,20 @@ func TestFeatureRunStopsDescendants(t *testing.T) {
 				t.Errorf("descendant state after Run = %d, %v, want exited", event, err)
 			}
 		})
+	}
+}
+
+// stopParent cancels the run when cancel is set. Otherwise it releases the
+// parent helper, which then exits normally.
+func stopParent(t *testing.T, cancel bool, cancelRun context.CancelFunc, stdinW *os.File) {
+	t.Helper()
+	if cancel {
+		cancelRun()
+
+		return
+	}
+	if _, err := stdinW.Write([]byte{1}); err != nil {
+		t.Fatalf("release the parent: %v", err)
 	}
 }
 
