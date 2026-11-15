@@ -33,10 +33,10 @@ const (
 	internalWait    = 10 * time.Second
 )
 
-// TestStopOutsideTreeReturnsOnlyTheCause checks the stop of a command whose
+// TestFeatureStopOutsideTreeReturnsOnlyTheCause checks the stop of a command whose
 // process tree did not start. The expected exit of the command must not join
 // the cause, so the cause cannot look like a test result.
-func TestStopOutsideTreeReturnsOnlyTheCause(t *testing.T) {
+func TestFeatureStopOutsideTreeReturnsOnlyTheCause(t *testing.T) {
 	testCases := []struct {
 		name   string
 		role   string
