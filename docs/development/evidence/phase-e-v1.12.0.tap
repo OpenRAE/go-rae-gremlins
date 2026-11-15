@@ -1,0 +1,106 @@
+TAP version 13
+# Subtest: pull_request/dev: actual workflow-to-CLI path finalizes the correct issue and retries without duplicate writes
+ok 1 - pull_request/dev: actual workflow-to-CLI path finalizes the correct issue and retries without duplicate writes
+  ---
+  duration_ms: 2214.900202
+  type: 'test'
+  ...
+# Subtest: pull_request/main: actual workflow-to-CLI path finalizes the correct issue and retries without duplicate writes
+ok 2 - pull_request/main: actual workflow-to-CLI path finalizes the correct issue and retries without duplicate writes
+  ---
+  duration_ms: 2247.319693
+  type: 'test'
+  ...
+# Subtest: workflow_dispatch/dev: actual workflow-to-CLI path finalizes the correct issue and retries without duplicate writes
+ok 3 - workflow_dispatch/dev: actual workflow-to-CLI path finalizes the correct issue and retries without duplicate writes
+  ---
+  duration_ms: 2335.598137
+  type: 'test'
+  ...
+# Subtest: workflow_dispatch/main: actual workflow-to-CLI path finalizes the correct issue and retries without duplicate writes
+ok 4 - workflow_dispatch/main: actual workflow-to-CLI path finalizes the correct issue and retries without duplicate writes
+  ---
+  duration_ms: 2294.623027
+  type: 'test'
+  ...
+# Subtest: quickfix lane: the pickup record selects the lane and the issue closes
+ok 5 - quickfix lane: the pickup record selects the lane and the issue closes
+  ---
+  duration_ms: 1132.039954
+  type: 'test'
+  ...
+# Subtest: promotion from dev into main resolves without required checks and is not a delivery
+ok 6 - promotion from dev into main resolves without required checks and is not a delivery
+  ---
+  duration_ms: 472.722731
+  type: 'test'
+  ...
+# Subtest: actual CLI skips a delivery with no pickup record without a final report or closure
+ok 7 - actual CLI skips a delivery with no pickup record without a final report or closure
+  ---
+  duration_ms: 450.815371
+  type: 'test'
+  ...
+# Subtest: actual CLI skips a delivery with a pickup record for another branch without a final report or closure
+ok 8 - actual CLI skips a delivery with a pickup record for another branch without a final report or closure
+  ---
+  duration_ms: 507.477099
+  type: 'test'
+  ...
+# Subtest: actual CLI skips a delivery with an untrusted pickup author without a final report or closure
+ok 9 - actual CLI skips a delivery with an untrusted pickup author without a final report or closure
+  ---
+  duration_ms: 516.384552
+  type: 'test'
+  ...
+# Subtest: actual workflow and CLI refuse an unmerged delivery without a final report or closure
+ok 10 - actual workflow and CLI refuse an unmerged delivery without a final report or closure
+  ---
+  duration_ms: 519.283112
+  type: 'test'
+  ...
+# Subtest: declared issue-write permission is necessary: a read-only installation cannot report or close
+ok 11 - declared issue-write permission is necessary: a read-only installation cannot report or close
+  ---
+  duration_ms: 1013.709658
+  type: 'test'
+  ...
+# Subtest: actual download step rejects a tampered release before installation
+ok 12 - actual download step rejects a tampered release before installation
+  ---
+  duration_ms: 129.028417
+  type: 'test'
+  ...
+# Subtest: actual verified download and locked-install steps install the pinned executable
+ok 13 - actual verified download and locked-install steps install the pinned executable
+  ---
+  duration_ms: 1793.392778
+  type: 'test'
+  ...
+# Subtest: mismatched Actions provenance fails before the CLI can report or close
+ok 14 - mismatched Actions provenance fails before the CLI can report or close
+  ---
+  duration_ms: 172.539704
+  type: 'test'
+  ...
+# Subtest: fork/dev: trusted dispatcher starts the supported workflow-dispatch finalizer
+ok 15 - fork/dev: trusted dispatcher starts the supported workflow-dispatch finalizer
+  ---
+  duration_ms: 1212.490581
+  type: 'test'
+  ...
+# Subtest: fork/main: trusted dispatcher starts the supported workflow-dispatch finalizer
+ok 16 - fork/main: trusted dispatcher starts the supported workflow-dispatch finalizer
+  ---
+  duration_ms: 1223.233428
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 20002.7301

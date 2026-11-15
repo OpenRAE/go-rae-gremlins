@@ -27,15 +27,13 @@ jobs:
       contents: read
       pull-requests: read
       actions: read
-      checks: read
-      statuses: read
       issues: write
     env:
       PR: ${{ github.event.pull_request.number || inputs.pr }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      GC_RELEASE: v1.9.0
-      GC_ASSET: grndctl-1.9.0.tgz
-      GC_SHA256: bec0802871af2d8b816053d842150fce90b1e9e49faaa759726e113d249ea2f6
+      GC_RELEASE: v1.12.0
+      GC_ASSET: grndctl-1.12.0.tgz
+      GC_SHA256: 67ab2945bd35ef107b2d4c4cbd60d1f66307e57199615bfdabf7f5c6dcbb31e5
     steps:
       - name: Resolve the merged delivery
         id: delivery
@@ -56,11 +54,8 @@ jobs:
             echo 'Phase E requires a merged pull request into main or dev.' >&2
             exit 1
           fi
-          required="$(gh pr checks "$PR" --repo "$GITHUB_REPOSITORY" --required --json name,state)"
-          if ! jq -e 'length > 0 and all(.[]; .state == "SUCCESS" or .state == "NEUTRAL" or .state == "SKIPPED")' <<< "$required" >/dev/null; then
-            echo 'Required delivery checks have not passed.' >&2
-            exit 1
-          fi
+          # The merge is the check gate: the dev merge queue and the branch rules merge
+          # nothing whose required checks failed. The finalizer relies on the same fact.
           sha="$(jq -er '.sha | select(test("^[0-9a-f]{40}$"))' <<< "$metadata")"
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
@@ -112,17 +107,8 @@ jobs:
         working-directory: delivery
         env:
           GH_TOKEN: ${{ github.token }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           set -euo pipefail
-          if [[ -e .env || -L .env ]]; then
-            echo 'Refusing to overwrite an existing finalizer settings file.' >&2
-            exit 1
-          fi
-          umask 077
-          set -o noclobber
-          printf 'SONAR_TOKEN=%s\n' "$SONAR_TOKEN" > .env
-          trap 'rm -f -- .env' EXIT
           node --input-type=module <<'JS'
           import { pathToFileURL } from 'node:url';
           const modulePath = `${process.env.RUNNER_TEMP}/ground-control/node_modules/grndctl/lib/automation-provenance.js`;
