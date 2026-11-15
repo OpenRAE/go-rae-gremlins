@@ -34,8 +34,11 @@ func TestRules_IsFileExcluded(t *testing.T) {
 		setExcludeFiles(t, ss)
 
 		rules, err := New()
-		if err != nil || countTrue(testPath, rules.IsFileExcluded) != 2 {
-			t.Error("must match 2 paths")
+		if err != nil {
+			t.Errorf("New() error = %v, want nil", err)
+		}
+		if got := countTrue(testPath, rules.IsFileExcluded); got != 2 {
+			t.Errorf("IsFileExcluded matches for %q = %d, want 2", testPath, got)
 		}
 	})
 
@@ -44,8 +47,11 @@ func TestRules_IsFileExcluded(t *testing.T) {
 		setExcludeFiles(t, ss)
 
 		rules, err := New()
-		if err == nil || rules != nil {
-			t.Error("must return error")
+		if err == nil {
+			t.Error("New() error = nil, want a parsing error")
+		}
+		if rules != nil {
+			t.Errorf("New() rules = %v, want nil", rules)
 		}
 	})
 
@@ -53,12 +59,15 @@ func TestRules_IsFileExcluded(t *testing.T) {
 		setExcludeFiles(t, []string(nil))
 
 		rules, err := New()
-		if err != nil || len(rules) != 0 {
-			t.Error("must return empty rules")
+		if err != nil {
+			t.Errorf("New() error = %v, want nil", err)
+		}
+		if len(rules) != 0 {
+			t.Errorf("New() rules = %v, want empty", rules)
 		}
 
-		if countTrue(testPath, rules.IsFileExcluded) != 0 {
-			t.Error("must not match any")
+		if got := countTrue(testPath, rules.IsFileExcluded); got != 0 {
+			t.Errorf("IsFileExcluded matches for %q = %d, want 0", testPath, got)
 		}
 	})
 }

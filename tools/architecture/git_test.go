@@ -55,13 +55,13 @@ func TestFeatureGitBaselineHistory(t *testing.T) {
 	root := gitFixture(t)
 	b, revision, err := targetBaseline(root, "HEAD")
 	if err != nil || b.Version != 1 || len(b.Findings) != 0 || revision == "" {
-		t.Fatalf("first adoption: %v %q %v", b, revision, err)
+		t.Fatalf("targetBaseline(HEAD) on first adoption = %+v, %q, %v; want version 1, no findings, a revision, nil", b, revision, err)
 	}
 	writeFile(t, root, baselineFile, `{"version":1,"findings":[{"rule":"DEP","file":"core/a.go","subject":"app"}]}`)
 	commitFixture(t, root)
 	b, _, err = targetBaseline(root, "HEAD")
 	if err != nil || len(b.Findings) != 1 {
-		t.Fatalf("baseline: %v %v", b, err)
+		t.Fatalf("targetBaseline(HEAD) = %+v, %v; want one finding, nil", b, err)
 	}
 	for _, ref := range []string{"missing-history", "--help", "HEAD:README.md"} {
 		if _, _, err := targetBaseline(root, ref); err == nil {
@@ -189,7 +189,7 @@ func TestFeaturePreCodeDesignStep(t *testing.T) {
 			cmd.Dir = root
 			output, err := cmd.CombinedOutput()
 			if (err != nil) != tc.bad {
-				t.Fatalf("error=%v output=%s", err, output)
+				t.Fatalf("check-design.sh %s error = %v, want error %t; output:\n%s", tc.input, err, tc.bad, output)
 			}
 			if tc.bad && !strings.Contains(string(output), tc.rule) {
 				t.Fatalf("design step did not evaluate the import rule: %s", output)

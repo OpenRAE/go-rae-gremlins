@@ -52,11 +52,11 @@ func TestFeatureRunRejectsBadInputAndWriteFailure(t *testing.T) {
 	t.Parallel()
 	for _, input := range []string{"invalid JSON", `{"a.go":"package p\nfunc broken("}`} {
 		if err := run(strings.NewReader(input), io.Discard); err == nil {
-			t.Error("run() accepted invalid input")
+			t.Errorf("run(%q) error = nil, want an error", input)
 		}
 	}
 	if err := run(strings.NewReader("{}"), failingWriter{}); !errors.Is(err, io.ErrClosedPipe) {
-		t.Errorf("run() = %v, want closed-pipe error", err)
+		t.Errorf("run() with a failing writer error = %v, want %v", err, io.ErrClosedPipe)
 	}
 }
 

@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "issue": 120,
+  "summary": "Correct misleading diagnostics in existing Go tests. Keep testing.T as the diagnostic surface. Failure messages name the operation or case and put the actual result before the expected result. Every cmp.Diff call uses cmp.Diff(want, got) with a matching (-want +got) legend and the options of its comparison. Named table cases carry the variation context, including invalid architecture-model and lint-input cases. Preserve each assertion's comparison, Error/Fatal behavior, setup, and cleanup. TestConfiguration checks the Init error of valid cases, and TestReport checks the Do error, so the edited declarations add no lint debt. The repairs remove existing lint findings, so make lint-shrink removes their entries from .lint/baseline.json. The baseline only shrinks. The change edits test files only in the declared packages and records the G02 repair in docs/development/test-assessment.md. It adds no helper, dependency, production code, CLI flag, configuration key, JSON report field, exit code, persistence, network flow, or source execution.",
+  "changes": [
+    {
+      "package": "cmd"
+    },
+    {
+      "package": "cmd/internal/flags"
+    },
+    {
+      "package": "internal/configuration"
+    },
+    {
+      "package": "internal/coverage"
+    },
+    {
+      "package": "internal/diff"
+    },
+    {
+      "package": "internal/engine"
+    },
+    {
+      "package": "internal/engine/workdir"
+    },
+    {
+      "package": "internal/engine/workerpool"
+    },
+    {
+      "package": "internal/exclusion"
+    },
+    {
+      "package": "internal/execution"
+    },
+    {
+      "package": "internal/log"
+    },
+    {
+      "package": "internal/mutator"
+    },
+    {
+      "package": "internal/report"
+    },
+    {
+      "package": "tools/architecture"
+    },
+    {
+      "package": "tools/lintcontext"
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The tests run locally and in existing CI. Diagnostics contain only operation names, named cases, and controlled test values; they do not add source, configuration, environment, secret, or raw subprocess output. The change adds no network call or source execution and keeps the development-check, delivery-finalization, and merge-queue-policy boundaries unchanged.",
+  "conflicts": [],
+  "policies": [
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

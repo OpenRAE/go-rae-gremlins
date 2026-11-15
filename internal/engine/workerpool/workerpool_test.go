@@ -99,14 +99,14 @@ func TestWorker(t *testing.T) {
 	m := recvWithin(t, outCh, "worker result")
 	got, ok := m.(fakeMutant)
 	if !ok {
-		t.Fatal("it should be a fakeMutant")
+		t.Fatalf("worker result type = %T, want fakeMutant", m)
 	}
 
 	if got.name != "test" {
-		t.Errorf("want %q, got %q", "test", got.name)
+		t.Errorf("worker result name = %q, want %q", got.name, "test")
 	}
 	if got.id != 1 {
-		t.Errorf("want %d, got %d", 1, got.id)
+		t.Errorf("worker result id = %d, want %d", got.id, 1)
 	}
 }
 
@@ -132,14 +132,14 @@ func TestPool(t *testing.T) {
 		m := recvWithin(t, outCh, "pool result")
 		got, ok := m.(fakeMutant)
 		if !ok {
-			t.Fatal("it should be a fakeMutant")
+			t.Fatalf("worker result type = %T, want fakeMutant", m)
 		}
 
 		if got.name != "test" {
-			t.Errorf("want %q, got %q", "test", got.name)
+			t.Errorf("pool result name = %q, want %q", got.name, "test")
 		}
 		if got.id != 0 {
-			t.Errorf("want %d, got %d", 0, got.id)
+			t.Errorf("pool result id = %d, want %d", got.id, 0)
 		}
 	})
 
@@ -152,7 +152,7 @@ func TestPool(t *testing.T) {
 		defer pool.Stop()
 
 		if pool.ActiveWorkers() != runtime.NumCPU() {
-			t.Errorf("want %d, got %d", runtime.NumCPU(), pool.ActiveWorkers())
+			t.Errorf("ActiveWorkers() = %d, want %d", pool.ActiveWorkers(), runtime.NumCPU())
 		}
 	})
 
@@ -166,7 +166,7 @@ func TestPool(t *testing.T) {
 		defer pool.Stop()
 
 		if pool.ActiveWorkers() != runtime.NumCPU()/2 {
-			t.Errorf("want %d, got %d", runtime.NumCPU()/2, pool.ActiveWorkers())
+			t.Errorf("ActiveWorkers() = %d, want %d", pool.ActiveWorkers(), runtime.NumCPU()/2)
 		}
 	})
 
@@ -179,7 +179,7 @@ func TestPool(t *testing.T) {
 		defer pool.Stop()
 
 		if pool.ActiveWorkers() != 3 {
-			t.Errorf("want %d, got %d", 3, pool.ActiveWorkers())
+			t.Errorf("ActiveWorkers() = %d, want %d", pool.ActiveWorkers(), 3)
 		}
 	})
 
@@ -193,7 +193,7 @@ func TestPool(t *testing.T) {
 		defer pool.Stop()
 
 		if pool.ActiveWorkers() != 1 {
-			t.Errorf("want %d, got %d", 1, pool.ActiveWorkers())
+			t.Errorf("ActiveWorkers() = %d, want %d", pool.ActiveWorkers(), 1)
 		}
 	})
 }

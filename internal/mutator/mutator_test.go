@@ -19,8 +19,6 @@ package mutator_test
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
@@ -64,8 +62,8 @@ func TestStatusString(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.mutationStatus.String() != tc.expected {
-				t.Error(cmp.Diff(tc.mutationStatus.String(), tc.expected))
+			if got := tc.mutationStatus.String(); got != tc.expected {
+				t.Errorf("Status.String() = %q, want %q", got, tc.expected)
 			}
 		})
 	}
@@ -136,8 +134,8 @@ func TestTypeString(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.mutantType.String() != tc.expected {
-				t.Error(cmp.Diff(tc.mutantType.String(), tc.expected))
+			if got := tc.mutantType.String(); got != tc.expected {
+				t.Errorf("Type.String() = %q, want %q", got, tc.expected)
 			}
 		})
 	}

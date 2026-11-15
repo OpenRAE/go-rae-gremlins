@@ -33,13 +33,13 @@ func TestNewWithCmd(t *testing.T) {
 		d, err := NewWithCmd(m.call)
 
 		if err != nil {
-			t.Errorf("NewWithCmd() with empty diff ref: want nil error, got %v", err)
+			t.Errorf("NewWithCmd() with empty diff ref error = %v, want nil", err)
 		}
 		if d != nil {
-			t.Errorf("NewWithCmd() with empty diff ref: want nil Diff, got %#v", d)
+			t.Errorf("NewWithCmd() with empty diff ref = %#v, want nil Diff", d)
 		}
 		if m.calls != 0 {
-			t.Errorf("NewWithCmd() with empty diff ref: want 0 git calls, got %d", m.calls)
+			t.Errorf("NewWithCmd() with empty diff ref made %d git calls, want 0", m.calls)
 		}
 	})
 
@@ -52,19 +52,17 @@ func TestNewWithCmd(t *testing.T) {
 
 		_, err := NewWithCmd(m.call)
 		if err == nil {
-			t.Error("must return error")
+			t.Error("NewWithCmd() with a failing git command error = nil, want an error")
 		}
 
 		if m.calls != 1 {
-			t.Fatal("cmd not called")
+			t.Fatalf("NewWithCmd() made %d git calls, want 1", m.calls)
 		}
 
 		expectedArgs := []string{"diff", "--merge-base", "test"}
 
 		if m.callName != "git" || !reflect.DeepEqual(m.callArgs, expectedArgs) {
-			t.Log("name", m.callName)
-			t.Log("args", m.callArgs)
-			t.Error("cmd not called properly")
+			t.Errorf("NewWithCmd() ran %q %q, want %q %q", m.callName, m.callArgs, "git", expectedArgs)
 		}
 	})
 
@@ -77,7 +75,7 @@ func TestNewWithCmd(t *testing.T) {
 
 		_, err := NewWithCmd(m.call)
 		if err == nil {
-			t.Error("must return error")
+			t.Error("NewWithCmd() with an invalid diff error = nil, want an error")
 		}
 	})
 
@@ -94,10 +92,11 @@ func TestNewWithCmd(t *testing.T) {
 
 		result, err := NewWithCmd(m.call)
 
-		if err != nil || !reflect.DeepEqual(result, expected) {
-			t.Log("err", err)
-			t.Log("result", result)
-			t.Error("unexpected result")
+		if err != nil {
+			t.Errorf("NewWithCmd() error = %v, want nil", err)
+		}
+		if !reflect.DeepEqual(result, expected) {
+			t.Errorf("NewWithCmd() = %v, want %v", result, expected)
 		}
 	})
 }

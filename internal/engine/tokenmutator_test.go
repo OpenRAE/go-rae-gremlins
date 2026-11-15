@@ -49,8 +49,8 @@ func TestTokenMutator_Apply_SetsSnippets(t *testing.T) {
 					t.Fatal(err)
 				}
 				want := []byte("package main\n\nfunc main() {\n\ta := 1 + 2\n}\n")
-				if !cmp.Equal(want, mut.OrigSnippet()) {
-					t.Fatal(cmp.Diff(string(want), string(mut.OrigSnippet())))
+				if diff := cmp.Diff(string(want), string(mut.OrigSnippet())); diff != "" {
+					t.Fatalf("OrigSnippet() after Apply() mismatch (-want +got):\n%s", diff)
 				}
 			},
 		},
@@ -61,8 +61,8 @@ func TestTokenMutator_Apply_SetsSnippets(t *testing.T) {
 					t.Fatal(err)
 				}
 				want := []byte("package main\n\nfunc main() {\n\ta := 1 - 2\n}\n")
-				if !cmp.Equal(want, mut.MutatedSnippet()) {
-					t.Fatal(cmp.Diff(string(want), string(mut.MutatedSnippet())))
+				if diff := cmp.Diff(string(want), string(mut.MutatedSnippet())); diff != "" {
+					t.Fatalf("MutatedSnippet() after Apply() mismatch (-want +got):\n%s", diff)
 				}
 			},
 		},
@@ -149,7 +149,7 @@ func TestMutantApplyAndRollback(t *testing.T) {
 	for i, node := range nodes {
 		n, ok := engine.NewTokenNode(node)
 		if !ok {
-			t.Fatal("new actualToken node should be created")
+			t.Fatalf("NewTokenNode(node %d) ok = false, want true", i)
 		}
 		mut := engine.NewTokenMutant("example.com/test", set, f, n)
 		mut.SetType(mutator.ArithmeticBase)
@@ -166,8 +166,8 @@ func TestMutantApplyAndRollback(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !cmp.Equal(string(got), want[i]) {
-			t.Fatal(cmp.Diff(want[i], string(got)))
+		if diff := cmp.Diff(want[i], string(got)); diff != "" {
+			t.Fatalf("source after Apply() of node %d mismatch (-want +got):\n%s", i, diff)
 		}
 
 		err = mut.Rollback()
@@ -180,8 +180,8 @@ func TestMutantApplyAndRollback(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !cmp.Equal(string(got), rollbackWant) {
-			t.Fatal(cmp.Diff(rollbackWant, string(got)))
+		if diff := cmp.Diff(rollbackWant, string(got)); diff != "" {
+			t.Fatalf("source after Rollback() of node %d mismatch (-want +got):\n%s", i, diff)
 		}
 	}
 }

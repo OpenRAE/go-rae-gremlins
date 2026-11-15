@@ -148,33 +148,38 @@ func TestSet(t *testing.T) {
 
 			// #nosec G601 - We are in tests, we don't care
 			err := Set(cmd, &tc.flag)
-			checkFlag(t, err, cmd, tc)
+			checkFlag(t, "Set", err, cmd, tc)
 
 			tc.flag.Name += "_persistent"
 			// #nosec G601 - We are in tests, we don't care
 			err = SetPersistent(cmd, &tc.flag)
-			checkFlag(t, err, cmd, tc)
+			checkFlag(t, "SetPersistent", err, cmd, tc)
 		})
 	}
 }
 
-func checkFlag(t *testing.T, err error, cmd *cobra.Command, tc testCase) {
+// checkFlag checks the result of op, the Set or SetPersistent call that
+// registered tc.flag on cmd.
+func checkFlag(t *testing.T, op string, err error, cmd *cobra.Command, tc testCase) {
 	t.Helper()
 
-	if (tc.expectError && err == nil) || (!tc.expectError && err != nil) {
-		t.Fatal("error not expected")
+	if tc.expectError && err == nil {
+		t.Fatalf("%s(%q) error = nil, want an error", op, tc.flag.Name)
+	}
+	if !tc.expectError && err != nil {
+		t.Fatalf("%s(%q) error = %v, want nil", op, tc.flag.Name, err)
 	}
 	if !tc.expectError {
 		flag := cmd.Flag(tc.flag.Name)
 
 		if flag == nil {
-			t.Errorf("expected flag to be present")
+			t.Errorf("%s(%q): cmd.Flag(%q) = nil, want a registered flag", op, tc.flag.Name, tc.flag.Name)
 
 			return
 		}
 
 		if tc.flag.Shorthand != flag.Shorthand {
-			t.Errorf("expected configured shorthand")
+			t.Errorf("%s(%q): shorthand = %q, want %q", op, tc.flag.Name, flag.Shorthand, tc.flag.Shorthand)
 		}
 	}
 }

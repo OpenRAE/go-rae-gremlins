@@ -33,39 +33,39 @@ const (
 func TestGremlins(t *testing.T) {
 	c, err := newRootCmd(context.Background(), "1.2.3")
 	if err != nil {
-		t.Fatal("newRootCmd should not fail")
+		t.Fatalf("newRootCmd() error = %v, want nil", err)
 	}
 	cmd := c.cmd
 	// Explicit arguments stop cobra from reading the go test flags in os.Args.
 	cmd.SetArgs([]string{"help"})
 	if err := c.execute(); err != nil {
-		t.Fatalf("execute() with args [help]: want nil error, got %v", err)
+		t.Fatalf("execute() with args [help] error = %v, want nil", err)
 	}
 
 	if cmd.Version != "1.2.3" {
-		t.Errorf("expected %q, got %q", "1.2.3", cmd.Version)
+		t.Errorf("newRootCmd().Version = %q, want %q", cmd.Version, "1.2.3")
 	}
 
 	cfgFile := cmd.Flag("config")
 	if cfgFile == nil {
-		t.Fatal("expected to have a config flag")
+		t.Fatal(`Flag("config") = nil, want a registered flag`)
 	}
 	if cfgFile.Value.Type() != stringType {
-		t.Errorf("expected value type to be 'string', got %v", cfgFile.Value.Type())
+		t.Errorf("flag \"config\" type = %q, want %q", cfgFile.Value.Type(), stringType)
 	}
 	if cfgFile.DefValue != "" {
-		t.Errorf("expected default value to be empty, got %v", cfgFile.DefValue)
+		t.Errorf("flag \"config\" default = %q, want empty", cfgFile.DefValue)
 	}
 
 	silentFlag := cmd.Flag("silent")
 	if silentFlag == nil {
-		t.Fatal("expected to have a config flag")
+		t.Fatal(`Flag("silent") = nil, want a registered flag`)
 	}
 	if silentFlag.Value.Type() != boolType {
-		t.Errorf("expected value type to be 'bool', got %v", silentFlag.Value.Type())
+		t.Errorf("flag \"silent\" type = %q, want %q", silentFlag.Value.Type(), boolType)
 	}
 	if silentFlag.DefValue != falseValue {
-		t.Errorf("expected default value to be false, got %v", silentFlag.DefValue)
+		t.Errorf("flag \"silent\" default = %q, want %q", silentFlag.DefValue, falseValue)
 	}
 }
 
@@ -73,14 +73,14 @@ func TestExecute(t *testing.T) {
 	t.Run("should not fail", func(t *testing.T) {
 		err := Execute(context.Background(), "1.2.3")
 		if err != nil {
-			t.Errorf("execute should not fail")
+			t.Errorf("Execute(version %q) error = %v, want nil", "1.2.3", err)
 		}
 	})
 
 	t.Run("should fail if version is not set", func(t *testing.T) {
 		err := Execute(context.Background(), "")
 		if err == nil {
-			t.Errorf("expected failure")
+			t.Error("Execute(empty version) error = nil, want an error")
 		}
 
 	})
