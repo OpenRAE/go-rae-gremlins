@@ -218,7 +218,7 @@ func TestIsCovered(t *testing.T) {
 	}
 }
 
-func TestIsDirCovered(t *testing.T) {
+func TestFeatureProfileIsDirCovered(t *testing.T) {
 	block := []coverage.Block{{StartLine: 1, StartCol: 1, EndLine: 2, EndCol: 1}}
 	profile := coverage.Profile{
 		"root.go":         block,
