@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "issue": 117,
+  "summary": "Bound the waits in the concurrent tests of internal/engine, internal/engine/workerpool, and internal/engine/workdir. Add small local test helpers that wait on a channel receive, a WaitGroup join, or a function call with a fixed bound, and fail with the blocked operation name instead of consuming the package timeout. The executor tests run the executor in its own goroutine, receive the single result within the bound, and then join within the bound, so a blocked send or join reports the operation. The workerpool and workdir tests wrap their channel receives and WaitGroup joins the same way. A new focused workerpool test withholds a worker result, drains it as owned cleanup, and proves pool.Stop returns within the bound with no worker left running. The change touches test files only. No package import, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/engine"
+    },
+    {
+      "package": "internal/engine/workerpool"
+    },
+    {
+      "package": "internal/engine/workdir"
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The change edits test files that run locally and in existing CI. It adds no data flow, network access, or source execution. The trust_changes entries restate the existing model boundaries.",
+  "policies": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

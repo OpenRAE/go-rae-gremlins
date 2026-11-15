@@ -46,6 +46,36 @@
             "output.json"
           ]
         },
+        "workers": {
+          "title": "Workers",
+          "description": "The number of workers that run mutants in parallel. 0 uses the number of CPUs",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "examples": [
+            4
+          ]
+        },
+        "test-cpu": {
+          "title": "Test CPU",
+          "description": "The number of CPUs that each test run can use. 0 does not set a limit",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "examples": [
+            1
+          ]
+        },
+        "timeout-coefficient": {
+          "title": "Timeout coefficient",
+          "description": "The coefficient that multiplies the coverage run time to give the test timeout. 0 uses the default of 5",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "examples": [
+            10
+          ]
+        },
         "threshold": {
           "title": "Thresholds",
           "description": "The thresholds under which Gremlins exits with an error",

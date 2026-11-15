@@ -17,7 +17,6 @@
 package engine_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -153,12 +152,11 @@ func TestFeatureClauseExpressionCoverage(t *testing.T) {
 			viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 			defer viperReset()
 
-			mapFS, mod, c := loadFixture(clausesFixture, ".")
-			defer c()
+			mapFS, mod := loadFixture(t, clausesFixture, ".")
 			profile := coverage.Profile{filenameFromFixture(clausesFixture): tc.blocks}
 
 			mut := engine.New(mod, engine.CodeData{Cov: profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := mut.Run(context.Background())
+			res := runEngine(t, mut)
 
 			got := make(map[string]mutator.Status)
 			for _, m := range res.Mutants {

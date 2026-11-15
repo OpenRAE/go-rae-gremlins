@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "issue": 176,
+  "summary": "Restore the designs that issue #166 removed, and prove regression tests per change for the dev to main promotion. The promotion compares all dev changes against main. A later dev change can alter an API that an earlier regression test calls, so the test does not compile against main. .github/scripts/regression_proof.py gets a --per-change option. It discovers and classifies new tests against main as before. Then it proves each new regression case at the first-parent dev change that adds it, against the parent of that change. A case that no change adds and proves fails the check. The Regression proof job in .github/workflows/gremlins.yml sets the option only for a pull request from dev into main in this repository. docs/CONTRIBUTING.md describes the option. No Go package, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The helper reads Git history with fixed commands and runs the repository tests in temporary snapshots, as before. It starts no new network call and adds no destination. The development-check, delivery-finalization, and merge-queue-policy boundaries do not change.",
+  "policies": [
+    "contributing"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

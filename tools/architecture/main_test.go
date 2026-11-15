@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Gremlins Authors
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 package main
 
 import (
@@ -15,6 +31,7 @@ const appFile = "app/a.go"
 const changeSummary = "change"
 const contractKind = "contract"
 const cliContract = "cli"
+const proposalFile = ".architecture/designs/76.json"
 
 func testModel(t *testing.T) *compiledModel {
 	t.Helper()
@@ -296,7 +313,7 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 		bad                  bool
 	}{
 		{name: "source", base: "HEAD"},
-		{name: "design", proposed: designFile},
+		{name: "design", proposed: proposalFile},
 		{name: "first adoption"},
 		{name: "missing history", base: "unavailable", bad: true},
 		{
@@ -324,15 +341,21 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 		{name: "broken source", edit: func(t *testing.T, r string) { t.Helper(); writeFile(t, r, "core/a.go", "not Go") }, bad: true},
 		{
 			name:     "invalid design",
-			proposed: designFile,
-			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, designFile, `{"version":2}`) },
-			bad:      true,
+			proposed: proposalFile,
+			edit: func(t *testing.T, r string) {
+				t.Helper()
+				writeFile(t, r, proposalFile, `{"version":2}`)
+			},
+			bad: true,
 		},
 		{
 			name:     "malformed design",
-			proposed: designFile,
-			edit:     func(t *testing.T, r string) { t.Helper(); writeFile(t, r, designFile, `{`) },
-			bad:      true,
+			proposed: proposalFile,
+			edit: func(t *testing.T, r string) {
+				t.Helper()
+				writeFile(t, r, proposalFile, `{`)
+			},
+			bad: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -344,7 +367,7 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 			}
 			writeFile(t, root, modelFile, string(data))
 			writeFile(t, root, baselineFile, `{"version":1,"findings":[]}`)
-			writeFile(t, root, designFile, `{
+			writeFile(t, root, proposalFile, `{
   "version": 1,
   "issue": 76,
   "summary": "planned",
@@ -376,7 +399,7 @@ func TestFeatureRunEndToEnd(t *testing.T) {
 				tc.edit(t, root)
 			}
 			t.Chdir(root)
-			if err := run(tc.base, tc.proposed); (err != nil) != tc.bad {
+			if err := run(tc.base, tc.proposed, false); (err != nil) != tc.bad {
 				t.Fatalf("error=%v", err)
 			}
 		})

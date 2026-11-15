@@ -87,6 +87,8 @@ linters:
             - github.com/spf13/cobra$
             - github.com/spf13/pflag$
             - github.com/spf13/viper$
+            - golang.org/x/mod/modfile$
+            - golang.org/x/mod/module$
             - golang.org/x/tools/cover$
     errcheck:
       check-type-assertions: true

@@ -25,6 +25,8 @@ The configuration file can be placed in (in order of precedence)
 4. `$XDG_CONFIG_HOME/gremlins/.gremlins.yaml`
 5. `$HOME/.gremlins.yaml`
 
+The configuration file is optional. If Gremlins finds a file that it cannot read or parse, it stops with an error.
+
 [//]: # (@formatter:off)
 !!! hint
     `XDG_CONFIG_HOME` is usually `~/.config`.
@@ -86,10 +88,10 @@ mutants:
 
 ```
 
-1. By default `0`, which means that Gremlins will use the system CPUs number.
-2. By default `0`, which means that no test process CPU will be enforced.
-3. By default `0`, which means a default coefficient of `5` will be enforced.
-4. Thresholds are set by default to `0`, which means they are not enforced.
+1. By default `0`, which means that Gremlins will use the system CPUs number. Negative values are not valid.
+2. By default `0`, which means that no test process CPU will be enforced. Negative values are not valid.
+3. By default `0`, which means a default coefficient of `5` will be enforced. Negative values are not valid.
+4. Thresholds are set by default to `0`, which means they are not enforced. A threshold must be from `0` to `100`.
 5. Excluded files are set by default to empty list, which means no files skipped except tests.
 
 For further information check the specific command documentation.
@@ -117,5 +119,10 @@ mutants:
 Can be set with:
 
 ```shell
-export GREMLINS_MUTANTS_ARITHMETIC_BASE=true
+export GREMLINS_MUTANTS_ARITHMETIC_BASE_ENABLED=true
 ```
+
+Gremlins converts each value to the type of its key: boolean, integer, number, string, or list of strings.
+For a list, separate the items with spaces. For example, `GREMLINS_UNLEASH_EXCLUDE_FILES="_mock.go$ ^gen/"`.
+If a value does not convert, `unleash` stops with an error that names the configuration key.
+This check also applies to values from flags and from the configuration file.

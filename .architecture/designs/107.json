@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "issue": 107,
+  "summary": "Return source discovery errors instead of partial success. Engine.Run now returns its results and an error. A walk, open, or parse failure stops the discovery, and Run returns the error after the running mutants finish. The discovery stops without an error when the context is done, and the mutant send no longer blocks after a cancel. cmd/unleash.go returns the Run error through the existing command error path, so the run does not write a report. Engine feature tests cover a malformed source, an illegal token, a failed file open, a failed directory read, and a directory named directory.go. A command regression test runs unleash on a module with an unparsable file outside the build and expects the parse error. The lint baseline shrinks because the change fixes two engine test findings. No dependency, CLI flag, configuration key, JSON report field, or exit code value changes.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "cmd/internal/flags",
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    },
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": []
+    }
+  ],
+  "contracts": [
+    "cli"
+  ],
+  "trust_boundaries": "The module source crosses into the process at the file system boundary. The change rejects a source tree that the process cannot walk, open, or parse, instead of a silent partial result. It adds no new data flow, network access, or source execution. The trust_changes entries restate the model's existing development-check and delivery-finalization boundaries.",
+  "conflicts": [],
+  "policies": [
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {
+    "cli": "compatible"
+  }
+}

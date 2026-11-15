@@ -5,6 +5,9 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  # The dev merge queue requires PR Gate on each merge group commit.
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
@@ -25,7 +28,7 @@ jobs:
           cache: false
       - name: Check model, design, and shrink-only baseline
         env:
-          COMPARISON: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
+          COMPARISON: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
         run: |
           if [ "$COMPARISON" = 0000000000000000000000000000000000000000 ]; then
             COMPARISON=''
@@ -44,18 +47,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      # golangci-lint at the version that mise.toml pins.
+      # golangci-lint and Go at the versions that mise.toml pins.
       - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           version: 2026.10.25
-          install_args: aqua:golangci/golangci-lint
+          install_args: aqua:golangci/golangci-lint go
           cache: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
       - name: Provision Go modules before offline analysis
         run: go mod download
-      - run: "python -m pip install --only-binary :all: 'coverage==7.16.0'"
+      - run: "python -m pip install --only-binary :all: 'coverage==7.16.0' 'pyyaml==6.0.3'"
       - run: make lint-cover
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -66,7 +69,7 @@ jobs:
       - name: Check lint with the pinned lint comparison
         env:
           LINT_ADOPTION_BASE: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && 'origin/dev' || '' }}
-          COMPARISON: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
+          COMPARISON: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
         run: |
           if [ "$COMPARISON" = 0000000000000000000000000000000000000000 ]; then
             COMPARISON=origin/dev
@@ -114,24 +117,77 @@ jobs:
       - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           version: 2026.10.25
-          install_args: aqua:golangci/golangci-lint
+          install_args: aqua:golangci/golangci-lint go
           cache: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
-      - run: "python -m pip install --only-binary :all: 'pre-commit==4.3.0'"
+      - run: "python -m pip install --only-binary :all: 'pre-commit==4.3.0' 'pyyaml==6.0.3'"
       - name: Provision Go modules before offline analysis
         run: go mod download
       - name: Check policy with the pinned lint comparison
         env:
           LINT_ADOPTION_BASE: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && 'origin/dev' || '' }}
-          COMPARISON: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
+          COMPARISON: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
         run: |
           if [ "$COMPARISON" = 0000000000000000000000000000000000000000 ]; then
             COMPARISON=origin/dev
           fi
           export LINT_BASE="$COMPARISON"
           make policy
+      # The live dev and main rules must keep every required dev check on the merge queue.
+      - name: Check the dev merge queue policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make merge-queue-policy
+
+  # STE checks on changed Markdown with the pinned doc-tools release.
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the verified documentation tools
+        run: make docs-tools
+      - name: Show that a bad sample fails and its corrected form passes
+        run: make docs-samples
+      - name: Check the changed Markdown
+        env:
+          COMPARISON: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
+        run: |
+          if [ "$COMPARISON" = 0000000000000000000000000000000000000000 ]; then
+            COMPARISON=origin/dev
+          fi
+          make docs-changed DOCS_BASE="$COMPARISON"
+
+  # Proves the cgroup-v2 memory budget stops a runaway allocator. The job fails
+  # when the runner lacks an effective memory controller; it never runs unbounded.
+  memory:
+    name: Memory budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start the per-user systemd manager
+        # loginctl enable-linger starts the per-user manager for the runner user.
+        # It needs no sudo; polkit authorizes a user for their own account.
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          loginctl enable-linger "$(id -un)"
+          for _ in $(seq 1 30); do
+            if systemctl --user show-environment >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+      - name: Prove the memory budget enforcement
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          make memcheck
 
   # Validates coverage reports and scanner settings in a secret-free job.
   # The token-bearing scan runs separately. Secrets are not available to
@@ -141,6 +197,11 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [test, lint]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout
+      pull-requests: read # read the queued pull request on a merge group
+    outputs:
+      args: ${{ steps.target.outputs.args }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -178,6 +239,35 @@ jobs:
             echo "::error file=$settings::Duplicate Sonar setting"
             exit 1
           fi
+      # SonarCloud has no merge queue support. A merge group runs the pull
+      # request analysis and quality gate of the queued pull request against
+      # dev on the merge group commit. An unexpected merge group ref fails.
+      - name: Resolve the analysis target
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          QUEUE_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" != merge_group ]; then
+            echo "args=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pattern='^refs/heads/gh-readonly-queue/dev/pr-([0-9]+)-[0-9a-f]{40}$'
+          if [[ ! "$QUEUE_REF" =~ $pattern ]]; then
+            echo "::error::Unexpected merge group ref '$QUEUE_REF'"
+            exit 1
+          fi
+          number="${BASH_REMATCH[1]}"
+          branch="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$number" \
+            --jq 'if .base.ref == "dev" then .head.ref else error("not a dev pull request") end')"
+          if [[ ! "$branch" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::Queued pull request branch '$branch' is not a plain ref name"
+            exit 1
+          fi
+          printf 'args=-Dsonar.pullrequest.key=%s -Dsonar.pullrequest.branch=%s -Dsonar.pullrequest.base=dev\n' \
+            "$number" "$branch" >> "$GITHUB_OUTPUT"
 
   # Holds SONAR_TOKEN, so it runs no commands.
   sonar:
@@ -202,27 +292,31 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          args: -Dsonar.qualitygate.wait=true
+          args: -Dsonar.qualitygate.wait=true ${{ needs.sonar-admission.outputs.args }}
 
   gate:
     name: PR Gate
     if: always()
-    needs: [architecture, lint, test, policy, sonar]
+    needs: [architecture, lint, docs, test, policy, memory, sonar]
     runs-on: ubuntu-latest
     steps:
-      - name: Require architecture, lint, tests, policy, and SonarCloud
+      - name: Require architecture, lint, docs, tests, policy, memory, and SonarCloud
         env:
           ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
           LINT_RESULT: ${{ needs.lint.result }}
+          DOCS_RESULT: ${{ needs.docs.result }}
           TEST_RESULT: ${{ needs.test.result }}
           POLICY_RESULT: ${{ needs.policy.result }}
+          MEMORY_RESULT: ${{ needs.memory.result }}
           SONAR_RESULT: ${{ needs.sonar.result }}
           FOREIGN_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
           test "$ARCHITECTURE_RESULT" = success
           test "$LINT_RESULT" = success
+          test "$DOCS_RESULT" = success
           test "$TEST_RESULT" = success
           test "$POLICY_RESULT" = success
+          test "$MEMORY_RESULT" = success
           if [ "$FOREIGN_PR" = true ]; then
             test "$SONAR_RESULT" = skipped
           else

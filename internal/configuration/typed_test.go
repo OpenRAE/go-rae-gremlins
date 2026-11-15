@@ -1,0 +1,449 @@
+/*
+ * Copyright 2026 The Gremlins Authors
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+package configuration
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+
+	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+)
+
+const (
+	envDryRun   = "GREMLINS_UNLEASH_DRY_RUN"
+	envWorkers  = "GREMLINS_UNLEASH_WORKERS"
+	envEfficacy = "GREMLINS_UNLEASH_THRESHOLD_EFFICACY"
+	envExcludes = "GREMLINS_UNLEASH_EXCLUDE_FILES"
+	trueValue   = "true"
+	badBool     = "maybe"
+	badInt      = "four"
+)
+
+const precedenceConfig = `unleash:
+  dry-run: false
+  workers: 2
+  exclude-files:
+    - file-a
+    - file-b
+  threshold:
+    efficacy: 50
+`
+
+// initIsolated resets Viper, clears inherited GREMLINS_* values, and loads
+// only the configuration in dir.
+func initIsolated(t *testing.T, dir string) {
+	t.Helper()
+	Reset()
+	t.Cleanup(Reset)
+	for _, e := range os.Environ() {
+		name, _, _ := strings.Cut(e, "=")
+		if strings.HasPrefix(name, gremlinsEnvVarPrefix+"_") {
+			t.Setenv(name, "")
+			if err := os.Unsetenv(name); err != nil {
+				t.Fatalf("unset %s: %v", name, err)
+			}
+		}
+	}
+	if err := Init([]string{dir}); err != nil {
+		t.Fatalf("Init(%q) error = %v, want nil", dir, err)
+	}
+}
+
+func writeConfig(t *testing.T, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, gremlinsCfgName+".yaml"), []byte(content), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	return dir
+}
+
+func TestFeatureGetConvertsEnvironmentValues(t *testing.T) {
+	initIsolated(t, t.TempDir())
+	t.Setenv(envDryRun, trueValue)
+	t.Setenv(envWorkers, "4")
+	t.Setenv(envEfficacy, "90")
+	t.Setenv(envExcludes, "a_test.go b_test.go")
+
+	if got := Get[bool](UnleashDryRunKey); got != true {
+		t.Errorf("Get[bool](%q) = %v, want true", UnleashDryRunKey, got)
+	}
+	if got := Get[int](UnleashWorkersKey); got != 4 {
+		t.Errorf("Get[int](%q) = %d, want 4", UnleashWorkersKey, got)
+	}
+	if got := Get[float64](UnleashThresholdEfficacyKey); got != 90 {
+		t.Errorf("Get[float64](%q) = %v, want 90", UnleashThresholdEfficacyKey, got)
+	}
+	if diff := cmp.Diff([]string{"a_test.go", "b_test.go"}, Get[[]string](UnleashExcludeFiles)); diff != "" {
+		t.Errorf("Get[[]string](%q) mismatch (-want +got):\n%s", UnleashExcludeFiles, diff)
+	}
+	if err := Validate(); err != nil {
+		t.Errorf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestFeatureGetPrecedence(t *testing.T) {
+	testCases := []struct {
+		env   map[string]string
+		name  string
+		flags []string
+		want  typedValues
+	}{
+		{
+			name: "file",
+			want: typedValues{DryRun: false, Workers: 2, Efficacy: 50, Excludes: []string{"file-a", "file-b"}},
+		},
+		{
+			name: "environment overrides file",
+			env: map[string]string{
+				envDryRun:   trueValue,
+				envWorkers:  "4",
+				envEfficacy: "90",
+				envExcludes: "env-a env-b",
+			},
+			want: typedValues{DryRun: true, Workers: 4, Efficacy: 90, Excludes: []string{"env-a", "env-b"}},
+		},
+		{
+			name: "flag overrides environment",
+			env: map[string]string{
+				envDryRun:   trueValue,
+				envWorkers:  "4",
+				envEfficacy: "90",
+				envExcludes: "env-a env-b",
+			},
+			flags: []string{"--dry-run=false", "--workers=8", "--threshold-efficacy=75.5", "--exclude-files=flag-a"},
+			want:  typedValues{DryRun: false, Workers: 8, Efficacy: 75.5, Excludes: []string{"flag-a"}},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			initIsolated(t, writeConfig(t, precedenceConfig))
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+			bindFlags(t, tc.flags)
+
+			if diff := cmp.Diff(tc.want, readTypedValues()); diff != "" {
+				t.Errorf("typed values mismatch (-want +got):\n%s", diff)
+			}
+			if err := Validate(); err != nil {
+				t.Errorf("Validate() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
+// typedValues holds the typed values that the precedence tests read.
+type typedValues struct {
+	Excludes []string
+	Efficacy float64
+	Workers  int
+	DryRun   bool
+}
+
+func readTypedValues() typedValues {
+	return typedValues{
+		Excludes: Get[[]string](UnleashExcludeFiles),
+		Efficacy: Get[float64](UnleashThresholdEfficacyKey),
+		Workers:  Get[int](UnleashWorkersKey),
+		DryRun:   Get[bool](UnleashDryRunKey),
+	}
+}
+
+// bindFlags registers flags of the same types as the unleash command, parses
+// args, and binds the flags to Viper.
+func bindFlags(t *testing.T, args []string) {
+	t.Helper()
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	fs.Bool("dry-run", false, "")
+	fs.Int("workers", 0, "")
+	fs.Int("test-cpu", 0, "")
+	fs.Int("timeout-coefficient", 0, "")
+	fs.Float64("threshold-efficacy", 0, "")
+	fs.Float64("threshold-mcover", 0, "")
+	fs.StringArray("exclude-files", nil, "")
+	if err := fs.Parse(args); err != nil {
+		t.Fatalf("parse flags %v: %v", args, err)
+	}
+	bindings := map[string]string{
+		UnleashDryRunKey:             "dry-run",
+		UnleashWorkersKey:            "workers",
+		UnleashTestCPUKey:            "test-cpu",
+		UnleashTimeoutCoefficientKey: "timeout-coefficient",
+		UnleashThresholdEfficacyKey:  "threshold-efficacy",
+		UnleashThresholdMCoverageKey: "threshold-mcover",
+		UnleashExcludeFiles:          "exclude-files",
+	}
+	for key, name := range bindings {
+		if err := viper.BindPFlag(key, fs.Lookup(name)); err != nil {
+			t.Fatalf("bind flag %s: %v", name, err)
+		}
+	}
+}
+
+func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
+	testCases := []struct {
+		env     map[string]string
+		config  string
+		name    string
+		flags   []string
+		wantKey []string
+	}{
+		{
+			name:    "bool from environment",
+			env:     map[string]string{envDryRun: badBool},
+			wantKey: []string{UnleashDryRunKey},
+		},
+		{
+			name:    "int from environment",
+			env:     map[string]string{envWorkers: badInt},
+			wantKey: []string{UnleashWorkersKey},
+		},
+		{
+			name:    "float from environment",
+			env:     map[string]string{envEfficacy: "high"},
+			wantKey: []string{UnleashThresholdEfficacyKey},
+		},
+		{
+			name:    "string slice from file",
+			config:  "unleash:\n  exclude-files:\n    nested: value\n",
+			wantKey: []string{UnleashExcludeFiles},
+		},
+		{
+			name:    "mutant enabled from file",
+			config:  "mutants:\n  arithmetic-base:\n    enabled: sometimes\n",
+			wantKey: []string{MutantTypeEnabledKey(mutator.ArithmeticBase)},
+		},
+		{
+			name: "every invalid key",
+			env: map[string]string{
+				envDryRun:  badBool,
+				envWorkers: badInt,
+			},
+			wantKey: []string{UnleashDryRunKey, UnleashWorkersKey},
+		},
+		{
+			name:    "negative workers from environment",
+			env:     map[string]string{envWorkers: "-1"},
+			wantKey: []string{UnleashWorkersKey},
+		},
+		{
+			name:    "negative test CPU from file",
+			config:  "unleash:\n  test-cpu: -2\n",
+			wantKey: []string{UnleashTestCPUKey},
+		},
+		{
+			name:    "negative timeout coefficient from flag",
+			flags:   []string{"--timeout-coefficient=-1"},
+			wantKey: []string{UnleashTimeoutCoefficientKey},
+		},
+		{
+			name:    "negative workers from flag over valid file",
+			config:  "unleash:\n  workers: 2\n",
+			flags:   []string{"--workers=-4"},
+			wantKey: []string{UnleashWorkersKey},
+		},
+		{
+			name:    "efficacy above 100 from environment",
+			env:     map[string]string{envEfficacy: "100.5"},
+			wantKey: []string{UnleashThresholdEfficacyKey},
+		},
+		{
+			name:    "efficacy not a number from environment",
+			env:     map[string]string{envEfficacy: "NaN"},
+			wantKey: []string{UnleashThresholdEfficacyKey},
+		},
+		{
+			name:    "negative mutant coverage from file",
+			config:  "unleash:\n  threshold:\n    mutant-coverage: -1\n",
+			wantKey: []string{UnleashThresholdMCoverageKey},
+		},
+		{
+			name:    "mutant coverage above 100 from flag",
+			flags:   []string{"--threshold-mcover=101"},
+			wantKey: []string{UnleashThresholdMCoverageKey},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			initIsolated(t, writeConfig(t, tc.config))
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+			bindFlags(t, tc.flags)
+
+			err := Validate()
+			if err == nil {
+				t.Fatal("Validate() error = nil, want an invalid-value error")
+			}
+			for _, k := range tc.wantKey {
+				if !strings.Contains(err.Error(), `"`+k+`"`) {
+					t.Errorf("Validate() error = %q, want it to name key %q", err, k)
+				}
+			}
+		})
+	}
+}
+
+func TestFeatureValidateAcceptsNumericBounds(t *testing.T) {
+	testCases := []struct {
+		name   string
+		config string
+		flags  []string
+	}{
+		{
+			name: "zero defaults from file",
+			config: "unleash:\n  workers: 0\n  test-cpu: 0\n  timeout-coefficient: 0\n" +
+				"  threshold:\n    efficacy: 0\n    mutant-coverage: 0\n",
+		},
+		{
+			name: "zero defaults from flags",
+			flags: []string{
+				"--workers=0", "--test-cpu=0", "--timeout-coefficient=0",
+				"--threshold-efficacy=0", "--threshold-mcover=0",
+			},
+		},
+		{
+			name: "upper bounds from flags",
+			flags: []string{
+				"--workers=64", "--test-cpu=8", "--timeout-coefficient=20",
+				"--threshold-efficacy=100", "--threshold-mcover=100",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			initIsolated(t, writeConfig(t, tc.config))
+			bindFlags(t, tc.flags)
+
+			if err := Validate(); err != nil {
+				t.Errorf("Validate() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestFeatureValidateAcceptsUnsetValues(t *testing.T) {
+	initIsolated(t, t.TempDir())
+
+	if err := Validate(); err != nil {
+		t.Errorf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestFeatureGetReturnsZeroForInvalidValue(t *testing.T) {
+	initIsolated(t, t.TempDir())
+	t.Setenv(envWorkers, badInt)
+
+	if got := Get[int](UnleashWorkersKey); got != 0 {
+		t.Errorf("Get[int](%q) = %d, want 0", UnleashWorkersKey, got)
+	}
+}
+
+func TestFeatureTypedValueChecks(t *testing.T) {
+	testCases := []struct {
+		check   func(any) error
+		name    string
+		valid   []any
+		invalid []any
+	}{
+		{
+			name:    "bool",
+			check:   checkBool,
+			valid:   []any{true, trueValue, "1", "F"},
+			invalid: []any{badBool, 1, []any{true}},
+		},
+		{
+			name:    "int",
+			check:   checkInt,
+			valid:   []any{4, int64(4), uint8(4), float64(4), "4", "-4", "0x10"},
+			invalid: []any{badInt, "08", "4.5", float64(4.5), true, map[string]any{}},
+		},
+		{
+			name:    "float",
+			check:   checkFloat,
+			valid:   []any{float64(90.5), 90, "90", "90.5"},
+			invalid: []any{"high", true, []any{90}},
+		},
+		{
+			name:    "string",
+			check:   checkString,
+			valid:   []any{"tag1,tag2", 123, true},
+			invalid: []any{[]any{"a"}, map[string]any{"a": "b"}},
+		},
+		{
+			name:    "string slice",
+			check:   checkStringSlice,
+			valid:   []any{"a b", []string{"a", "b"}, []any{"a", 1}},
+			invalid: []any{[]any{"a", map[string]any{}}, map[string]any{"a": "b"}, 1},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, v := range tc.valid {
+				if err := tc.check(v); err != nil {
+					t.Errorf("check(%#v) error = %v, want nil", v, err)
+				}
+			}
+			for _, v := range tc.invalid {
+				if err := tc.check(v); err == nil {
+					t.Errorf("check(%#v) error = nil, want an error", v)
+				}
+			}
+		})
+	}
+}
+
+func TestFeatureGetConvertsFileValues(t *testing.T) {
+	initIsolated(t, writeConfig(t, "unleash:\n  workers: 4.0\n  threshold:\n    efficacy: 90\n  tags: 123\n"))
+
+	if got := Get[int](UnleashWorkersKey); got != 4 {
+		t.Errorf("Get[int](%q) = %d, want 4", UnleashWorkersKey, got)
+	}
+	if got := Get[float64](UnleashThresholdEfficacyKey); got != 90 {
+		t.Errorf("Get[float64](%q) = %v, want 90", UnleashThresholdEfficacyKey, got)
+	}
+	if got := Get[string](UnleashTagsKey); got != "123" {
+		t.Errorf("Get[string](%q) = %q, want %q", UnleashTagsKey, got, "123")
+	}
+	if err := Validate(); err != nil {
+		t.Errorf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestFeatureGetUntypedReturnsRawValue(t *testing.T) {
+	initIsolated(t, t.TempDir())
+	Set("test.rune", 'a')
+
+	if got := Get[rune]("test.rune"); got != 'a' {
+		t.Errorf("Get[rune](%q) = %v, want 'a'", "test.rune", got)
+	}
+	if got := Get[[]string](UnleashExcludeFiles); len(got) != 0 {
+		t.Errorf("Get[[]string](%q) = %#v, want empty", UnleashExcludeFiles, got)
+	}
+}

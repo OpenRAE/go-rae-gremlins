@@ -13,12 +13,18 @@ Use `go test -race ./internal/<package> -run '<test>'` for the changed behavior.
 Run `make policy` for repository checks and `make lint` for Go linting. CI owns
 the full `make test` / `make cover` runs and mutation testing. Do not run the
 full test suite locally. For behavior changes, demonstrate the regression and
-use mutation testing where practical. Configuration and documentation changes
-need their relevant validation rather than unrelated Go tests.
+use mutation testing where practical.
+
+Configuration and documentation changes need their relevant validation rather
+than unrelated Go tests. For Markdown, run `make docs-changed` or
+`bash scripts/doc-tools.sh lint <path>`, and use the shared `documentation`
+skill. See [documentation](docs/CONTRIBUTING.md#documentation).
 
 Keep credentials and local MCP settings out of commits. Do not read credential
 values while diagnosing setup. Do not introduce services or send source to a
-new provider without approval. Preserve existing local changes and the shared
+new provider without approval.
+
+Preserve existing local changes and the shared
 Git hook dispatcher. Never bypass hooks or secret scanning. Commit only the
 files belonging to the issue. The user owns PR merges and changes into `main`.
 

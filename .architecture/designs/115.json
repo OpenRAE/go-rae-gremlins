@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "issue": 115,
+  "summary": "Make existing test assertions reject one wrong result at a time. The change edits test files only in cmd, internal/diff, and internal/log. TestNewWithCmd checks the Diff, the error, and the git call count separately. TestUninitialised checks the bound buffers, os.Stdout, and os.Stderr after Reset. TestGremlins gives cobra explicit arguments and fails on an execute() error. The repairs remove two existing lint findings, so make lint-shrink removes their entries from .lint/baseline.json. The baseline only shrinks. No production code, internal dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "cmd"
+    },
+    {
+      "package": "internal/diff"
+    },
+    {
+      "package": "internal/log"
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The tests run locally and in existing CI. They start no network call and run no scanned source. The change keeps the development-check, delivery-finalization, and merge-queue-policy boundaries unchanged.",
+  "policies": [
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

@@ -33,7 +33,7 @@ ${COVER_OUT}:
 
 .PHONY: requirements
 requirements:
-	mise install aqua:golangci/golangci-lint
+	mise install
 	go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
 
 .PHONY: lint
@@ -48,7 +48,11 @@ lint-test:
 	python3 -m unittest discover -s scripts -p test_lint.py
 
 lint-cover:
+	python3 -m coverage erase
 	python3 -m coverage run -m unittest discover -s scripts -p test_lint.py
+	python3 -m coverage run -m unittest discover -s .github/scripts -p test_regression_proof.py
+	python3 -m coverage run -m unittest discover -s .github/scripts -p test_merge_queue_policy.py
+	python3 -m coverage combine
 	python3 -m coverage xml -o python-coverage.xml
 
 .PHONY: policy
@@ -56,9 +60,26 @@ policy:
 	pre-commit validate-config
 	pre-commit run --hook-stage pre-commit --all-files
 
+# Reads the live branch rules of the repository with gh.
+.PHONY: merge-queue-policy
+merge-queue-policy:
+	python3 .github/scripts/merge_queue_policy.py --repository OpenRAE/go-rae-gremlins
+
 .PHONY: hooks
 hooks:
 	bash scripts/install-hooks.sh
+
+# Documentation checks use the pinned doc-tools release. See docs/CONTRIBUTING.md.
+DOCS_BASE ?= origin/dev
+.PHONY: docs-tools docs-changed docs-samples
+docs-tools:
+	bash scripts/doc-tools.sh install
+
+docs-changed:
+	bash scripts/doc-tools.sh changed "${DOCS_BASE}"
+
+docs-samples:
+	bash scripts/doc-tools.sh samples
 
 .PHONY: goimports
 goimports:
@@ -86,3 +107,8 @@ architecture:
 
 architecture-design:
 	bash scripts/check-design.sh
+
+# Prove that the cgroup-v2 memory budget stops a runaway allocator. Linux only.
+.PHONY: memcheck
+memcheck:
+	bash scripts/memory-budget-check.sh

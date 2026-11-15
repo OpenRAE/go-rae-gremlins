@@ -1,3 +1,5 @@
+To get started and run a scenario, see [LilRÆ](https://github.com/openrae/lilrae).
+
 <p align="center" style="text-align: center">
   <img alt="Gremlins mascotte" src="docs/docs/assets/images/gremlins_mascotte.png" />
   <h1 align="center" style="text-align: center">Gremlins</h1>
@@ -13,26 +15,27 @@
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgo-gremlins%2Fgremlins.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgo-gremlins%2Fgremlins?ref=badge_shield)
 
 Gremlins is a mutation testing tool for Go. It has been made to work well on _smallish_ Go modules, for example
-_microservices_, on which it helps validate the tests, aids the TDD process and can be used as a CI quality gate.
-As of now, Gremlins doesn't work very well on very big Go modules, mainly because a run can take hours to complete.
+_microservices_. On these modules, it helps validate the tests and aids the TDD process. You can also use it as a CI
+quality gate. As of now, Gremlins does not work very well on very big Go modules, mainly because a run can take hours to
+complete.
 
 ![](docs/docs/assets/images/gremlins-term.webp)
 
 ## Gremlins version
 
-Gremlins is still in its 0.x.x release, which, as per SemVer, doesn't guarantee backward compatibility. What this
+Gremlins is still in its 0.x.x release, which, as per SemVer, does not guarantee backward compatibility. What this
 means for Gremlins is that configuration flags and/or configuration files can change among minor releases. This may
 be important if you use Gremlins in automated builds, for example in _continuous integration_ pipelines.
 
-Also, while in 0.x.x releases, only the current minor release will be maintained; if we are in v0.2.0, no patch
+Also, while in 0.x.x releases, only the current minor release will be maintained. If we are in v0.2.0, no patch
 releases will be provided for the v0.1.0 line.
-Once Gremlins will reach it's 1.x.x release, it will start to be backward compatible, and we'll decide how many
+Once Gremlins reaches its 1.x.x release, it will start to be backward compatible. Then we will decide how many
 releases to maintain at the same time (ex. up to two minors before, as Go itself does).
 
 ## What is Mutation Testing
 
 Code coverage is unreliable as a measure of test quality. It is too easy to have tests that exercise a piece of code but
-don't test anything at all.
+do not test anything at all.
 
 _Mutation testing_ works by mutating the code exercised by the tests and verifying if the mutation is caught by
 the test suite. Imagine _gremlins_ going into your code and messing around: will your test suit catch their damage?
@@ -61,7 +64,7 @@ Gremlins will report each mutation as:
 - `RUNNABLE`: In _dry-run_ mode, a mutation that can be tested.
 - `NOT COVERED`: A mutation not covered by tests; it will not be tested.
 - `KILLED`: The mutation has been caught by the test suite.
-- `LIVED`: The mutation hasn't been caught by the test suite.
+- `LIVED`: The mutation has not been caught by the test suite.
 - `TIMED OUT`: The tests timed out while testing the mutation: the mutation actually made the tests fail, but not
   explicitly.
 - `NOT VIABLE`: The mutation makes the build fail.

@@ -2,7 +2,7 @@ module github.com/OpenRAE/go-rae-gremlins
 
 go 1.25.0
 
-toolchain go1.26.10
+toolchain go1.26.11
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
@@ -16,6 +16,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
+	golang.org/x/mod v0.38.0
 	golang.org/x/tools v0.48.0
 )
 

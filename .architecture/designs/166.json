@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "issue": 166,
+  "summary": "Give each change its own design file under .architecture/designs/<issue>.json instead of the one shared file .architecture/design.json. Two open pull requests then add different files and do not conflict on the design input when dev receives a merge. The architecture tool in tools/architecture reads the design files changed against the comparison branch. checkChangedDesign collects the changed design files under the directory, validates each against the model, and unions their package, contract, and policy coverage. The new -design-changed mode checks the design files changed against -base, so make architecture-design and make architecture both check the design of the current change. The -design path mode still checks one named file for tests and manual use. scripts/check-design.sh runs -design-changed when it gets no argument. CLAUDE.md, docs/CONTRIBUTING.md, docs/development/architecture.md, and .gc/plan-rules.md tell contributors to add .architecture/designs/<issue>.json. The old .architecture/design.json file is removed. No internal dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "tools/architecture",
+      "imports": [
+        "internal/log"
+      ]
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The design tool reads model and design JSON from the local checkout and reads Git history with fixed commands. It starts no network call, downloads nothing, and runs no scanned source. The change keeps the development-check boundary local and in existing CI, and keeps the delivery-finalization and merge-queue-policy boundaries unchanged.",
+  "policies": [
+    "design_step",
+    "guidance",
+    "contributing",
+    "plan"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
@@ -103,10 +103,13 @@ func longExplainer() string {
 
 func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) error {
 	return func(_ *cobra.Command, args []string) error {
+		if err := configuration.Validate(); err != nil {
+			return err
+		}
 		log.Infoln("Starting...")
-		path, _ := os.Getwd()
-		if len(args) > 0 {
-			path = args[0]
+		path, err := modulePath(args)
+		if err != nil {
+			return err
 		}
 		mod, err := gomodule.Init(path)
 		if err != nil {
@@ -119,37 +122,40 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 		}
 		defer cleanUp(workDir)
 
-		wg := &sync.WaitGroup{}
-		wg.Add(1)
-		cancelled := false
-		var results report.Results
-		go runWithCancel(ctx, wg, func(c context.Context) {
-			results, err = run(c, mod, workDir)
-		}, func() {
-			cancelled = true
+		stopNotice := context.AfterFunc(ctx, func() {
+			log.Infof("\nShutting down gracefully...\n")
 		})
-		wg.Wait()
+		defer stopNotice()
+
+		results, err := run(ctx, mod, workDir)
+		if ctx.Err() != nil {
+			return fmt.Errorf("mutation testing cancelled: %w", context.Cause(ctx))
+		}
 		if err != nil {
 			return err
-		}
-		if cancelled {
-			return nil
 		}
 
 		return report.Do(results)
 	}
 }
 
-func runWithCancel(ctx context.Context, wg *sync.WaitGroup, runner func(c context.Context), onCancel func()) {
-	c, cancel := context.WithCancel(ctx)
-	go func() {
-		<-ctx.Done()
-		log.Infof("\nShutting down gracefully...\n")
-		cancel()
-		onCancel()
-	}()
-	runner(c)
-	wg.Done()
+// modulePath returns the absolute path in args, or the current directory when
+// args is empty.
+func modulePath(args []string) (string, error) {
+	if len(args) > 0 {
+		path, err := filepath.Abs(args[0])
+		if err != nil {
+			return "", fmt.Errorf("impossible to resolve the module path: %w", err)
+		}
+
+		return path, nil
+	}
+	path, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("impossible to get the current directory: %w", err)
+	}
+
+	return path, nil
 }
 
 func cleanUp(wd string) {
@@ -171,7 +177,7 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 		return report.Results{}, err
 	}
 
-	cProfile, err := c.Run()
+	cProfile, err := c.Run(ctx)
 	if err != nil {
 		return report.Results{}, fmt.Errorf("failed to gather coverage: %w", err)
 	}
@@ -188,9 +194,8 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 	}
 
 	mut := engine.New(mod, codeData, jDealer)
-	results := mut.Run(ctx)
 
-	return results, nil
+	return mut.Run(ctx)
 }
 
 func setFlagsOnCmd(cmd *cobra.Command) error {

@@ -1,4 +1,6 @@
 dist/
+# Pinned tools that scripts/doc-tools.sh installs.
+/.tools/
 /docs/site/
 out
 .idea
@@ -98,4 +100,5 @@ $RECYCLE.BIN/
 # Python development-check caches
 __pycache__/
 .coverage
+.coverage.*
 python-coverage.xml
