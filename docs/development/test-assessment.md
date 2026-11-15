@@ -86,7 +86,7 @@ The gap rows above stay as the record of the inspected revision. This table reco
 
 | Owner | Source observation | Limit of the evidence |
 | --- | --- | --- |
-| [Makefile](../../Makefile) and [CI](../../.github/workflows/ci.yml) | `make cover` uses race detection and atomic coverage on Linux, macOS, and Windows. Linux uploads the Go coverage profile. | Configuration does not establish current passing results or package percentages. The file target can reuse an existing profile locally. |
+| [Makefile](../../Makefile) and [CI](../../.github/workflows/ci.yml) | `make cover` uses race detection and atomic coverage on Linux, macOS, and Windows. Linux uploads the Go coverage profile. | Configuration does not establish current passing results or package percentages. |
 | [Lint policy](coding-standards.md) | Test files are analyzed, with helper, testing API, error, and approved-import checks. Existing debt uses an identity baseline. | Lint does not establish semantic conformance to T01–T10. |
 | [Mutation workflow](../../.github/workflows/gremlins.yml) | Runs the candidate Gremlins source using [.gremlins.yaml](../../.gremlins.yaml). | No fresh mutation result was reviewed. This workflow is separate from `PR Gate`; its existence is not a passing result. |
 | [Executor](../../internal/engine/executor.go) and [coverage runner](../../internal/coverage/coverage.go) | Construct nested Go test commands. | The outer race flag is not inherited automatically by these commands. Their scope differs from the repository's outer tests. |
