@@ -60,11 +60,6 @@ func TestStatusString(t *testing.T) {
 			expected:       "TIMED OUT",
 			mutationStatus: mutator.TimedOut,
 		},
-		{
-			name:           "MemoryError",
-			expected:       "MEMORY ERROR",
-			mutationStatus: mutator.MemoryError,
-		},
 	}
 	for _, tc := range testCases {
 		tc := tc
@@ -73,6 +68,12 @@ func TestStatusString(t *testing.T) {
 				t.Error(cmp.Diff(tc.mutationStatus.String(), tc.expected))
 			}
 		})
+	}
+}
+
+func TestFeatureStatusStringMemoryError(t *testing.T) {
+	if got, want := mutator.MemoryError.String(), "MEMORY ERROR"; got != want {
+		t.Errorf("MemoryError.String() = %q, want %q", got, want)
 	}
 }
 

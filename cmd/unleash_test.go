@@ -160,11 +160,7 @@ func TestUnleash(t *testing.T) {
 			flagType: intType,
 			defValue: "0",
 		},
-		{
-			name:     "memory-budget",
-			flagType: "string",
-			defValue: "",
-		},
+
 		{
 			name:     "workers",
 			flagType: intType,
@@ -461,4 +457,21 @@ func newUnleashWorkspace(t *testing.T) string {
 	}
 
 	return workspace
+}
+
+func TestFeatureUnleashRegistersMemoryBudgetFlag(t *testing.T) {
+	c, err := newUnleashCmd(context.Background())
+	if err != nil {
+		t.Fatalf("newUnleashCmd() = %v, want nil", err)
+	}
+	f := c.cmd.Flags().Lookup("memory-budget")
+	if f == nil {
+		t.Fatal("flag memory-budget is not registered")
+	}
+	if got := f.Value.Type(); got != "string" {
+		t.Errorf("memory-budget type = %q, want %q", got, "string")
+	}
+	if f.DefValue != "" {
+		t.Errorf("memory-budget default = %q, want empty", f.DefValue)
+	}
 }

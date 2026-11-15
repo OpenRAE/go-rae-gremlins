@@ -291,6 +291,11 @@ func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
 			wantKey: []string{UnleashMemoryBudgetKey},
 		},
 		{
+			name:    "memory budget list from file",
+			config:  "unleash:\n  memory-budget: [1G]\n",
+			wantKey: []string{UnleashMemoryBudgetKey},
+		},
+		{
 			name:    "zero memory budget from file",
 			config:  "unleash:\n  memory-budget: 0\n",
 			wantKey: []string{UnleashMemoryBudgetKey},

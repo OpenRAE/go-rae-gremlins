@@ -162,7 +162,8 @@ func sysctlMIB(name string) ([]int32, error) {
 	nameBytes := []byte(name)
 	// #nosec G103 - Audited: the kernel reads len(name) bytes of nameBytes and
 	// writes at most size bytes to mib. Both stay alive during the call.
-	if err := sysctl([]int32{0, 3}, unsafe.Pointer(&mib[0]), &size, unsafe.Pointer(&nameBytes[0]), uintptr(len(nameBytes))); err != nil {
+	err := sysctl([]int32{0, 3}, unsafe.Pointer(&mib[0]), &size, unsafe.Pointer(&nameBytes[0]), uintptr(len(nameBytes)))
+	if err != nil {
 		return nil, fmt.Errorf("find the sysctl %s: %w", name, err)
 	}
 

@@ -58,12 +58,17 @@ var memorySupported = sync.OnceValue(func() error {
 // treeResident returns the total resident memory in bytes of process root
 // and its descendants. A process that exits during the walk adds nothing.
 func treeResident(root int) (uint64, error) {
+	return treeResidentIn("/proc", root)
+}
+
+// treeResidentIn is treeResident for the proc file system at proc.
+func treeResidentIn(proc string, root int) (uint64, error) {
 	var total uint64
 	pending := []int{root}
 	for len(pending) > 0 {
 		pid := pending[len(pending)-1]
 		pending = pending[:len(pending)-1]
-		resident, children, err := processResident(pid)
+		resident, children, err := processResident(proc, pid)
 		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ESRCH) {
 			continue
 		}
@@ -78,10 +83,10 @@ func treeResident(root int) (uint64, error) {
 }
 
 // processResident returns the resident memory in bytes of process pid and
-// the process IDs of its children.
-func processResident(pid int) (uint64, []int, error) {
-	dir := "/proc/" + strconv.Itoa(pid)
-	statm, err := os.ReadFile(dir + "/statm") // #nosec G304 - A kernel file of a child process.
+// the process IDs of its children, from the proc file system at proc.
+func processResident(proc string, pid int) (uint64, []int, error) {
+	dir := filepath.Join(proc, strconv.Itoa(pid))
+	statm, err := os.ReadFile(filepath.Join(dir, "statm")) // #nosec G304 - A kernel file of a child process.
 	if err != nil {
 		return 0, nil, err
 	}
@@ -93,13 +98,14 @@ func processResident(pid int) (uint64, []int, error) {
 	if err != nil {
 		return 0, nil, fmt.Errorf("parse %s/statm: %w", dir, err)
 	}
-	tasks, err := os.ReadDir(dir + "/task")
+	tasks, err := os.ReadDir(filepath.Join(dir, "task"))
 	if err != nil {
 		return 0, nil, err
 	}
 	var children []int
 	for _, task := range tasks {
-		list, err := os.ReadFile(dir + "/task/" + task.Name() + "/children") // #nosec G304 - A kernel file of a child process.
+		// #nosec G304 - A kernel file of a child process.
+		list, err := os.ReadFile(filepath.Join(dir, "task", task.Name(), "children"))
 		if err != nil {
 			return 0, nil, err
 		}

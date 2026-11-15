@@ -138,6 +138,62 @@ func TestFeatureTreeResidentCountsTheProcess(t *testing.T) {
 	}
 }
 
+func TestFeatureTreeResidentInSumsTheTree(t *testing.T) {
+	const (
+		rootStatm    = "10/statm"
+		rootChildren = "10/task/10/children"
+	)
+	page := pageSize()
+	testCases := map[string]struct {
+		files   map[string]string
+		want    uint64
+		wantErr bool
+	}{
+		"parent and child": {
+			files: map[string]string{
+				rootStatm: "100 3 0 0 0 0 0\n", rootChildren: "11 ",
+				"11/statm": "100 4 0 0 0 0 0\n", "11/task/11/children": "",
+			},
+			want: 7 * page,
+		},
+		"a child that exited adds nothing": {
+			files: map[string]string{rootStatm: "100 3 0 0 0 0 0\n", rootChildren: "11"},
+			want:  3 * page,
+		},
+		"a statm without a resident size": {
+			files:   map[string]string{rootStatm: "100\n", rootChildren: ""},
+			wantErr: true,
+		},
+		"a statm with a malformed resident size": {
+			files:   map[string]string{rootStatm: "100 x\n", rootChildren: ""},
+			wantErr: true,
+		},
+		"a malformed child list": {
+			files:   map[string]string{rootStatm: "100 3\n", rootChildren: "eleven"},
+			wantErr: true,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			proc := t.TempDir()
+			for file, content := range tc.files {
+				path := filepath.Join(proc, file)
+				if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+					t.Fatalf("create the directory of %s: %v", file, err)
+				}
+				writeFile(t, path, content)
+			}
+			got, err := treeResidentIn(proc, 10)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("treeResidentIn() error = %v, want error %t", err, tc.wantErr)
+			}
+			if got != tc.want {
+				t.Errorf("treeResidentIn() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 // writeFile writes content to path.
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()

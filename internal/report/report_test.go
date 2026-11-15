@@ -141,20 +141,6 @@ func TestReport(t *testing.T) {
 				coverageLine,
 		},
 		{
-			name: "reports memory errors apart from killed and lived mutants",
-			mutants: []mutator.Mutator{
-				stubMutant{status: mutator.MemoryError, mutantType: mutator.IncrementDecrement, position: fakePosition},
-				stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: fakePosition},
-			},
-			want: "\n" +
-				// Limit the time reporting to the first two units (millis are excluded)
-				testingLine +
-				"Killed: 1, Lived: 0, Not covered: 0\n" +
-				"Timed out: 0, Memory errors: 1, Not viable: 0, Skipped: 0\n" +
-				"Test efficacy: 100.00%\n" +
-				"Mutator coverage: 100.00%\n",
-		},
-		{
 			name:    "reports nothing if no result",
 			mutants: []mutator.Mutator{},
 			want: "\n" +
@@ -801,5 +787,33 @@ func TestRegressionThresholdFlags(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestFeatureReportCountsMemoryErrorsApartFromKilledAndLived(t *testing.T) {
+	isolateConfig(t)
+	out := &bytes.Buffer{}
+	log.Init(out, &bytes.Buffer{})
+	defer log.Reset()
+
+	data := report.Results{
+		Mutants: []mutator.Mutator{
+			stubMutant{status: mutator.MemoryError, mutantType: mutator.IncrementDecrement, position: fakePosition},
+			stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+		},
+		Elapsed: (2 * time.Minute) + (22 * time.Second),
+	}
+	if err := report.Do(data); err != nil {
+		t.Fatalf("Do() = %v, want nil", err)
+	}
+
+	want := "\n" +
+		"Mutation testing completed in 2 minutes 22 seconds\n" +
+		"Killed: 1, Lived: 0, Not covered: 0\n" +
+		"Timed out: 0, Memory errors: 1, Not viable: 0, Skipped: 0\n" +
+		"Test efficacy: 100.00%\n" +
+		"Mutator coverage: 100.00%\n"
+	if diff := cmp.Diff(want, out.String()); diff != "" {
+		t.Errorf("Do() output mismatch (-want +got):\n%s", diff)
 	}
 }

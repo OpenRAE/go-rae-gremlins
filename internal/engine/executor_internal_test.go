@@ -90,7 +90,10 @@ func TestGetTestArgs(t *testing.T) {
 			testCPU:           2,
 			integrationMode:   true,
 			pkg:               examplePackage,
-			want:              []string{goTestArg, "-tags", "integration", timeoutArg, expectedTimeout, failFastArg, "-cpu", "2", "-p", "1", allPackagesArg},
+			want: []string{
+				goTestArg, "-tags", "integration", timeoutArg, expectedTimeout, failFastArg,
+				"-cpu", "2", "-p", "1", allPackagesArg,
+			},
 		},
 	}
 

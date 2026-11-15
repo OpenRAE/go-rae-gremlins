@@ -149,7 +149,6 @@ func TestMutatorTestExecution(t *testing.T) {
 	testCases := []struct {
 		testResult    execContext
 		name          string
-		budget        string
 		mutantStatus  mutator.Status
 		wantMutStatus mutator.Status
 	}{
@@ -171,21 +170,11 @@ func TestMutatorTestExecution(t *testing.T) {
 			mutantStatus:  mutator.Runnable,
 			wantMutStatus: mutator.Killed,
 		},
-		{
-			name:          "if tests pass the memory limit then mutation is MEMORY ERROR",
-			testResult:    fakeExecCommandAllocates,
-			budget:        "64M",
-			mutantStatus:  mutator.Runnable,
-			wantMutStatus: mutator.MemoryError,
-		},
 	}
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			viperSet(map[string]any{
-				configuration.UnleashDryRunKey:       false,
-				configuration.UnleashMemoryBudgetKey: tc.budget,
-			})
+			viperSet(map[string]any{configuration.UnleashDryRunKey: false})
 			defer viperReset()
 			wdDealer := newWdDealerStub(t)
 			holder := &commandHolder{}
@@ -650,12 +639,12 @@ func TestProcessTestsFailure(_ *testing.T) {
 	os.Exit(1) // skipcq: RVV-A0003
 }
 
-// allocated holds the memory of TestProcessAllocates.
+// allocated holds the memory of TestFeatureHelperAllocates.
 var allocated [][]byte
 
-// TestProcessAllocates is a helper child that makes 512 MiB of memory
+// TestFeatureHelperAllocates is a helper child that makes 512 MiB of memory
 // resident, 1 MiB each millisecond, so a memory watchdog sees the growth.
-func TestProcessAllocates(_ *testing.T) {
+func TestFeatureHelperAllocates(_ *testing.T) {
 	if os.Getenv("GO_TEST_PROCESS") != "1" {
 		return
 	}
@@ -668,6 +657,28 @@ func TestProcessAllocates(_ *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 	os.Exit(0) // skipcq: RVV-A0003
+}
+
+func TestFeatureExecutorReportsMemoryError(t *testing.T) {
+	viperSet(map[string]any{
+		configuration.UnleashDryRunKey:       false,
+		configuration.UnleashMemoryBudgetKey: "64M",
+	})
+	defer viperReset()
+	mut := &mutantStub{
+		status:  mutator.Runnable,
+		mutType: mutator.ConditionalsBoundary,
+		pkg:     expectedModule,
+	}
+
+	got := runExecutorOnce(t, newWdDealerStub(t), fakeExecCommandAllocates, mut)
+
+	if got.Err != nil {
+		t.Fatalf("result error = %v, want nil", got.Err)
+	}
+	if mut.status != mutator.MemoryError {
+		t.Errorf("mutant status = %v, want %v", mut.status, mutator.MemoryError)
+	}
 }
 
 func TestMutatorRunInTheCorrectFolder(t *testing.T) {
@@ -797,7 +808,7 @@ func fakeExecCommandTestsFailure(ctx context.Context, command string, args ...st
 }
 
 func fakeExecCommandAllocates(ctx context.Context, command string, args ...string) *exec.Cmd {
-	cs := []string{"-test.run=TestProcessAllocates", "--", command}
+	cs := []string{"-test.run=^TestFeatureHelperAllocates$", "--", command}
 	cs = append(cs, args...)
 
 	return getCmd(ctx, cs)

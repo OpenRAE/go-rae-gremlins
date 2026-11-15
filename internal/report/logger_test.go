@@ -59,12 +59,7 @@ func Test_parseFilter(t *testing.T) {
 				mutator.Runnable: struct{}{},
 			},
 		},
-		{
-			filter: "m",
-			want: report.Filter{
-				mutator.MemoryError: struct{}{},
-			},
-		},
+
 		{
 			filter: "",
 		},
@@ -299,4 +294,15 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 			t.Errorf("expected only status line, got: %q", got)
 		}
 	})
+}
+
+func TestFeatureParseFilterSelectsMemoryErrors(t *testing.T) {
+	got, err := report.ParseFilter("m")
+	if err != nil {
+		t.Fatalf("ParseFilter(%q) = %v, want nil", "m", err)
+	}
+	want := report.Filter{mutator.MemoryError: struct{}{}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("ParseFilter(%q) mismatch (-want +got):\n%s", "m", diff)
+	}
 }
