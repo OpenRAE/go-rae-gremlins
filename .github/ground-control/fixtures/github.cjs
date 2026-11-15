@@ -44,12 +44,7 @@ if (need && method !== 'GET' && permissions[need] !== 'write') {
   process.stderr.write('Resource not accessible by integration (HTTP 403)'); process.exit(1);
 }
 const field = (name) => args.find(a => a.startsWith(name + '='))?.slice(name.length + 1);
-if (args[0] === 'pr' && args[1] === 'checks') {
-  const checkState = state.checkState || 'SUCCESS';
-  output([{name: 'PR Gate', state: checkState}]);
-  if (checkState !== 'SUCCESS') process.exit(checkState === 'PENDING' ? 8 : 1);
-}
-else if (endpoint === prefix + '/actions/workflows/ground-control-phase-e.yml/dispatches' && method === 'POST') {
+if (endpoint === prefix + '/actions/workflows/ground-control-phase-e.yml/dispatches' && method === 'POST') {
   state.dispatches.push(JSON.parse(fs.readFileSync(0, 'utf8'))); save(); output({});
 }
 else if (args[0] === 'release' && args[1] === 'download') {
@@ -63,8 +58,8 @@ else if (endpoint.includes('/collaborators/') && endpoint.endsWith('/permission'
   const permission = endpoint.includes('/maintainer/') ? 'write' : 'none';
   output({permission});
 } else if (endpoint === prefix + '/pulls/42') output(state.pr);
+else if (endpoint === prefix + '/pulls/42/files') pages(state.files);
 else if (endpoint === prefix + '/issues/1103/timeline') pages([{event:'cross-referenced',source:{issue:{number:42,pull_request:{},repository:{full_name:'example/phase-e-fixture'}}}}]);
-else if (endpoint === prefix + '/issues/42/comments') pages(state.pointer);
 else if (endpoint === prefix + '/issues/1103/comments' && method === 'GET') pages(state.comments);
 else if (endpoint === prefix + '/issues/1103/comments' && method === 'POST') {
   const body=field('body'); if (typeof body !== 'string') throw new Error('missing body');
