@@ -55,7 +55,8 @@ func TestFeatureGitBaselineHistory(t *testing.T) {
 	root := gitFixture(t)
 	b, revision, err := targetBaseline(root, "HEAD")
 	if err != nil || b.Version != 1 || len(b.Findings) != 0 || revision == "" {
-		t.Fatalf("targetBaseline(HEAD) on first adoption = %+v, %q, %v; want version 1, no findings, a revision, nil", b, revision, err)
+		t.Fatalf("targetBaseline(HEAD) on first adoption = %+v, %q, %v; want version 1, no findings, a revision, nil",
+			b, revision, err)
 	}
 	writeFile(t, root, baselineFile, `{"version":1,"findings":[{"rule":"DEP","file":"core/a.go","subject":"app"}]}`)
 	commitFixture(t, root)

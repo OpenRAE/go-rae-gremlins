@@ -214,11 +214,12 @@ func checkFlag(t *testing.T, op string, err error, cmd *cobra.Command, tc testCa
 		t.Errorf("%s(%q): key %q before parse: default mismatch (-want +got):\n%s", op, tc.flag.Name, tc.flag.CfgKey, diff)
 	}
 
-	if err := cmd.ParseFlags([]string{"--" + tc.flag.Name + "=" + tc.arg}); err != nil {
-		t.Fatalf("%s(%q): ParseFlags(--%s=%s) error = %v, want nil", op, tc.flag.Name, tc.flag.Name, tc.arg, err)
+	arg := "--" + tc.flag.Name + "=" + tc.arg
+	if err := cmd.ParseFlags([]string{arg}); err != nil {
+		t.Fatalf("%s(%q): ParseFlags(%s) error = %v, want nil", op, tc.flag.Name, arg, err)
 	}
 	if diff := cmp.Diff(tc.want, configValue(tc.flag.CfgKey, tc.want)); diff != "" {
-		t.Errorf("%s(%q): key %q after --%s=%s: value mismatch (-want +got):\n%s", op, tc.flag.Name, tc.flag.CfgKey, tc.flag.Name, tc.arg, diff)
+		t.Errorf("%s(%q): key %q after %s: value mismatch (-want +got):\n%s", op, tc.flag.Name, tc.flag.CfgKey, arg, diff)
 	}
 }
 
