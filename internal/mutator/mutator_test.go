@@ -71,6 +71,12 @@ func TestStatusString(t *testing.T) {
 	}
 }
 
+func TestFeatureStatusStringSkipped(t *testing.T) {
+	if got, want := mutator.Skipped.String(), "SKIPPED"; got != want {
+		t.Errorf("Skipped.String() = %q, want %q", got, want)
+	}
+}
+
 func TestTypeString(t *testing.T) {
 	testCases := []struct {
 		name       string
