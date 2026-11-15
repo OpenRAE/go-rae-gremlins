@@ -52,7 +52,7 @@ jobs:
         if: github.event_name == 'push'
         run: |
           export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-          scripts/run-bounded.sh --budget 10G -- "$RUNNER_TEMP/gremlins" unleash --memory-budget 2G
+          scripts/run-bounded.sh --budget 10G -- "$RUNNER_TEMP/gremlins" unleash --memory-budget 4G
 
   regression-proof:
     name: Regression proof
