@@ -117,16 +117,25 @@ func addDecl(c *fileCoverage, decl ast.Decl) {
 	case *ast.FuncDecl:
 		c.compiled = append(c.compiled, signatureSpan(d.Pos(), d.End(), d.Body))
 	case *ast.GenDecl:
-		if d.Tok == token.CONST || d.Tok == token.TYPE {
-			c.compiled = append(c.compiled, spanOf(d))
-		}
-		if d.Tok == token.VAR {
-			c.varDecls = append(c.varDecls, spanOf(d))
-			for _, f := range outerFuncLits(d) {
-				c.compiled = append(c.compiled, signatureSpan(f.Pos(), f.End(), f.Body))
-				c.varFuncBody = append(c.varFuncBody, spanOf(f.Body))
-			}
-		}
+		addGenDecl(c, d)
+	default:
+		// A bad declaration from a syntax error has no spans.
+	}
+}
+
+// addGenDecl records in c the spans of a package-level constant, type, or
+// variable declaration. Import declarations have no spans.
+func addGenDecl(c *fileCoverage, d *ast.GenDecl) {
+	if d.Tok == token.CONST || d.Tok == token.TYPE {
+		c.compiled = append(c.compiled, spanOf(d))
+	}
+	if d.Tok != token.VAR {
+		return
+	}
+	c.varDecls = append(c.varDecls, spanOf(d))
+	for _, f := range outerFuncLits(d) {
+		c.compiled = append(c.compiled, signatureSpan(f.Pos(), f.End(), f.Body))
+		c.varFuncBody = append(c.varFuncBody, spanOf(f.Body))
 	}
 }
 
