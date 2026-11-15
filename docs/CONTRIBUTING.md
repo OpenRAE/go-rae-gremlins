@@ -171,6 +171,10 @@ The queue requires `PR Gate`, `Mutation testing`, `Conventional PR title`, `ggsh
 merge group commit. These workflows run on merge groups. They compare with the merge group base commit and read the
 queued PR. A failed check removes the PR from the queue. `main` has no merge queue.
 
+The [Merge Queue Removed](../.github/workflows/merge-queue-removed.yml) workflow adds the `merge-queue-removed`
+label to an open PR that the queue removed without a merge. It removes the label when the PR enters the queue
+again or closes. Fix a labeled PR, then add it to the queue again.
+
 The `Policy` job of CI runs `make merge-queue-policy`. This check reads the live branch rules of `dev` and `main`.
 It fails when `dev` has no merge queue, when `main` has a merge queue, or when `dev` has required checks in classic
 branch protection. It also fails when `dev` has non-strict checks and no merge queue. It fails when a required `dev`
