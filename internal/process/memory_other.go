@@ -39,3 +39,8 @@ func treeResident(int) (uint64, error) {
 func AvailableMemory() (uint64, error) {
 	return 0, errors.ErrUnsupported
 }
+
+// onlyZombies returns false: this platform has no process table reader.
+func onlyZombies(int) bool {
+	return false
+}

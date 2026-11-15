@@ -59,35 +59,75 @@ func memorySupported() error {
 // in the process group that root leads. A process that exits during the
 // read adds nothing.
 func treeResident(root int) (uint64, error) {
+	pids, err := groupPIDs(root)
+	if err != nil {
+		return 0, err
+	}
+	var total uint64
+	for _, pid := range pids {
+		info, running, err := taskInfo(pid)
+		if err != nil {
+			return 0, err
+		}
+		if running {
+			total += info.residentSize
+		}
+	}
+
+	return total, nil
+}
+
+// onlyZombies reports whether no process of the group that root leads has
+// a task. An exited process that its parent has not waited for, a zombie,
+// has no task.
+func onlyZombies(root int) bool {
+	pids, err := groupPIDs(root)
+	if err != nil {
+		return false
+	}
+	for _, pid := range pids {
+		if _, running, err := taskInfo(pid); err != nil || running {
+			return false
+		}
+	}
+
+	return true
+}
+
+// groupPIDs returns the process IDs of the process group that root leads.
+func groupPIDs(root int) ([]int32, error) {
 	pids := make([]int32, maxGroupSize)
 	// #nosec G103 - Audited: the kernel writes at most the given byte count to
 	// pids, which stays alive during the call.
 	n, err := procInfo(procInfoCallListPids, procPgrpOnly, root, unsafe.Pointer(&pids[0]), len(pids)*4)
 	if err != nil {
-		return 0, fmt.Errorf("list the process group %d: %w", root, err)
+		return nil, fmt.Errorf("list the process group %d: %w", root, err)
 	}
-	var total uint64
+	var group []int32
 	for _, pid := range pids[:n/4] {
-		if pid == 0 {
-			continue
+		if pid != 0 {
+			group = append(group, pid)
 		}
-		var info procTaskInfo
-		// #nosec G103 - Audited: the kernel writes at most the given byte count
-		// to info, which stays alive during the call.
-		size, err := procInfo(procInfoCallPidInfo, int(pid), procPidTaskInfo, unsafe.Pointer(&info), int(unsafe.Sizeof(info)))
-		if errors.Is(err, syscall.ESRCH) {
-			continue
-		}
-		if err != nil {
-			return 0, fmt.Errorf("read the memory of process %d: %w", pid, err)
-		}
-		if size != int(unsafe.Sizeof(info)) {
-			continue
-		}
-		total += info.residentSize
 	}
 
-	return total, nil
+	return group, nil
+}
+
+// taskInfo returns the task information of process pid. It returns false
+// when the process has no task: it exited, or it is a zombie.
+func taskInfo(pid int32) (procTaskInfo, bool, error) {
+	var info procTaskInfo
+	// #nosec G103 - Audited: the kernel writes at most the given byte count to
+	// info, which stays alive during the call.
+	size, err := procInfo(procInfoCallPidInfo, int(pid), procPidTaskInfo, unsafe.Pointer(&info), int(unsafe.Sizeof(info)))
+	if errors.Is(err, syscall.ESRCH) {
+		return info, false, nil
+	}
+	if err != nil {
+		return info, false, fmt.Errorf("read the task of process %d: %w", pid, err)
+	}
+
+	return info, size == int(unsafe.Sizeof(info)), nil
 }
 
 // sysctlCount reads the unsigned integer sysctl value name, which the kernel
@@ -153,10 +193,11 @@ func procInfo(call, pid, flavor int, buffer unsafe.Pointer, size int) (int, erro
 }
 
 // AvailableMemory returns the memory in bytes that new processes can use:
-// the free, speculative, and purgeable pages of the system.
+// the free pages, the purgeable pages, and the file-backed pages that the
+// system can reclaim.
 func AvailableMemory() (uint64, error) {
 	var pages uint64
-	for _, name := range []string{"vm.page_free_count", "vm.page_speculative_count", "vm.page_purgeable_count"} {
+	for _, name := range []string{"vm.page_free_count", "vm.page_purgeable_count", "vm.page_pageable_external_count"} {
 		count, err := sysctlCount(name)
 		if err != nil {
 			return 0, fmt.Errorf("read %s: %w", name, err)

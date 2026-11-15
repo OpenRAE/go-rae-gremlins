@@ -231,3 +231,9 @@ func readCgroupValue(path string) (uint64, bool, error) {
 
 	return value, true, nil
 }
+
+// onlyZombies returns false. Linux delivers a signal to a group of zombies
+// without an error.
+func onlyZombies(int) bool {
+	return false
+}

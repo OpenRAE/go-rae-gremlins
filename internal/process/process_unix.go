@@ -44,11 +44,15 @@ func (*processTree) start() error {
 }
 
 // kill sends SIGKILL to every process in the group of cmd. It returns
-// os.ErrProcessDone when no process remains in the group.
+// os.ErrProcessDone when no running process remains in the group.
 func (t *processTree) kill() error {
 	// A negative PID addresses the process group.
 	err := syscall.Kill(-t.cmd.Process.Pid, syscall.SIGKILL)
 	if errors.Is(err, syscall.ESRCH) {
+		return os.ErrProcessDone
+	}
+	if errors.Is(err, syscall.EPERM) && onlyZombies(t.cmd.Process.Pid) {
+		// Darwin refuses a signal to a group of zombies with EPERM.
 		return os.ErrProcessDone
 	}
 
