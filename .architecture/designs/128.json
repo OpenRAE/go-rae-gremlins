@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "issue": 128,
+  "summary": "On Windows, process.Run puts each command in a new job object. The command starts suspended, joins the job, and then resumes, so every descendant is in the job from its start. When the command context is done, or after the command exits, Run terminates the job and so stops the complete process tree. The job also has the kill-on-close limit, so the tree stops when Gremlins releases the job. The Unix behavior does not change. internal/process imports golang.org/x/sys/windows, which the module already requires, and the strict depguard list in .golangci.yml approves that one package. A Windows test checks that a cancellation and a normal exit both stop a descendant. No CLI flag, configuration key, JSON report field, or exit code changes. The Windows CI test job uploads its Go coverage profile. The Sonar admission check requires that profile as a third report, and Sonar reads it with the Linux profile, so Sonar measures the Windows-only files.",
+  "changes": [
+    {
+      "package": "internal/process",
+      "imports": []
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The change runs the same go commands as before, with the same arguments, environment, and working directories. It adds no network call, no new destination, and no new source execution. The job object contains only the processes that Gremlins starts. The Sonar jobs download one more coverage artifact from the same workflow run. The secret-free admission job checks it with the same rules as the other reports before the token-bearing scan. The development-check, delivery-finalization, and merge-queue-policy boundaries do not change.",
+  "policies": [
+    "ci",
+    "coverage_admission",
+    "lint",
+    "sonar"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

@@ -89,6 +89,7 @@ linters:
             - github.com/spf13/viper$
             - golang.org/x/mod/modfile$
             - golang.org/x/mod/module$
+            - golang.org/x/sys/windows$
             - golang.org/x/tools/cover$
     errcheck:
       check-type-assertions: true
