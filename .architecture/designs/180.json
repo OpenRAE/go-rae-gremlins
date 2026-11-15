@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "issue": 180,
+  "summary": "Report a mutant in a package-level variable initializer from the evidence that the profile gives. The Go coverage profile has no block for these initializers. Go runs them when it initializes the package, before any other code of the package. internal/coverage adds Profile.IsDirCovered, which tells if the tests executed a block of a file in one directory. internal/engine marks a mutant in a package-level variable declaration as RUNNABLE when the tests executed a block of the same package, and as SKIPPED when they executed none. A function literal in an initializer keeps its own coverage blocks. The quick start describes the behavior. No internal dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/mutator",
+        "internal/process",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/gomodule",
+        "internal/mutator",
+        "internal/report"
+      ]
+    },
+    {
+      "package": "internal/coverage",
+      "imports": [
+        "internal/configuration",
+        "internal/gomodule",
+        "internal/log",
+        "internal/process"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/gomodule"
+      ]
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The engine reads the coverage profile and the Go files that it already reads. It adds no network access and runs no scanned source. The change keeps the development-check, delivery-finalization, and merge-queue-policy boundaries unchanged.",
+  "policies": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

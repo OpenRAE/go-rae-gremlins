@@ -18,10 +18,23 @@ package coverage
 
 import (
 	"go/token"
+	"path"
 )
 
 // Profile is implemented as a map holding a slice of Block per each filename.
 type Profile map[string][]Block
+
+// IsDirCovered tells if the tests executed a block of a file in the
+// slash-separated directory dir. The files of one directory make one package.
+func (p Profile) IsDirCovered(dir string) bool {
+	for name, blocks := range p {
+		if len(blocks) > 0 && path.Dir(name) == dir {
+			return true
+		}
+	}
+
+	return false
+}
 
 // IsCovered checks if the given token.Position is covered by the coverage Profile.
 func (p Profile) IsCovered(pos token.Position) bool {

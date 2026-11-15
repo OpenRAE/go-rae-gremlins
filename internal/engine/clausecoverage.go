@@ -19,6 +19,7 @@ package engine
 import (
 	"go/ast"
 	"go/token"
+	"path"
 	"slices"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/coverage"
@@ -34,12 +35,20 @@ import (
 // fileCoverage also tells if the coverage profile can show a token position.
 // The profile has no block for a file that the host build excludes, and no
 // block for a package-level constant declaration.
+//
+// The profile also has no block for the initializers of package-level
+// variables. Go runs these initializers when it initializes the package,
+// before any other code of the package. Thus an executed block in a file of
+// the package proves that the initializers ran.
 type fileCoverage struct {
 	set         *token.FileSet
 	profile     coverage.Profile
 	clauseExprs []exprSpan
 	constDecls  []exprSpan
+	varDecls    []exprSpan
+	varFuncLits []exprSpan
 	built       bool
+	pkgRan      bool
 }
 
 // exprSpan is the source range [start, end) of an expression.
@@ -52,9 +61,18 @@ type exprSpan struct {
 // includes the file.
 func newFileCoverage(set *token.FileSet, file *ast.File, profile coverage.Profile, built bool) fileCoverage {
 	c := fileCoverage{set: set, profile: profile, built: built}
+	c.pkgRan = profile.IsDirCovered(path.Dir(set.Position(file.Package).Filename))
 	for _, decl := range file.Decls {
-		if d, ok := decl.(*ast.GenDecl); ok && d.Tok == token.CONST {
-			c.constDecls = append(c.constDecls, exprSpan{start: d.Pos(), end: d.End()})
+		d, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		if d.Tok == token.CONST {
+			c.constDecls = append(c.constDecls, spanOf(d))
+		}
+		if d.Tok == token.VAR {
+			c.varDecls = append(c.varDecls, spanOf(d))
+			c.varFuncLits = append(c.varFuncLits, funcLitsOf(d)...)
 		}
 	}
 	ast.Inspect(file, func(node ast.Node) bool {
@@ -77,24 +95,58 @@ func (c fileCoverage) isCovered(pos token.Pos) bool {
 	if c.profile.IsCovered(c.set.Position(pos)) {
 		return true
 	}
-	for _, s := range c.clauseExprs {
-		if pos >= s.start && pos < s.end {
-			return true
-		}
+	if c.pkgRan && c.inVarInitializer(pos) {
+		return true
 	}
 
-	return false
+	return within(c.clauseExprs, pos)
 }
 
 // isObservable tells if a test run can cover pos. The tests of the host build
 // cannot run a file that the build excludes. A package-level constant
-// declaration has no coverage block because the compiler evaluates it.
+// declaration has no coverage block because the compiler evaluates it. The
+// profile shows a package-level variable initializer only when the tests ran
+// other code of the package.
 func (c fileCoverage) isObservable(pos token.Pos) bool {
-	if !c.built {
+	switch {
+	case !c.built, within(c.constDecls, pos):
 		return false
+	case c.inVarInitializer(pos):
+		return c.pkgRan
+	default:
+		return true
 	}
+}
 
-	return !slices.ContainsFunc(c.constDecls, func(s exprSpan) bool { return pos >= s.start && pos < s.end })
+// inVarInitializer tells if pos is in a package-level variable declaration
+// and not in a function literal of it. A function literal has its own
+// coverage blocks.
+func (c fileCoverage) inVarInitializer(pos token.Pos) bool {
+	return within(c.varDecls, pos) && !within(c.varFuncLits, pos)
+}
+
+// funcLitsOf returns the outermost function literals of a declaration.
+func funcLitsOf(d *ast.GenDecl) []exprSpan {
+	var spans []exprSpan
+	ast.Inspect(d, func(node ast.Node) bool {
+		if f, ok := node.(*ast.FuncLit); ok {
+			spans = append(spans, spanOf(f))
+
+			return false
+		}
+
+		return true
+	})
+
+	return spans
+}
+
+func spanOf(n ast.Node) exprSpan {
+	return exprSpan{start: n.Pos(), end: n.End()}
+}
+
+func within(spans []exprSpan, pos token.Pos) bool {
+	return slices.ContainsFunc(spans, func(s exprSpan) bool { return pos >= s.start && pos < s.end })
 }
 
 // bodyRan tells if the body of the clause with the given colon ran.

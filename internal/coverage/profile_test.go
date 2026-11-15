@@ -217,3 +217,32 @@ func TestIsCovered(t *testing.T) {
 		})
 	}
 }
+
+func TestFeatureProfileIsDirCovered(t *testing.T) {
+	block := []coverage.Block{{StartLine: 1, StartCol: 1, EndLine: 2, EndCol: 1}}
+	profile := coverage.Profile{
+		"root.go":         block,
+		"pkg/a.go":        block,
+		"pkg/sub/deep.go": block,
+		"empty/a.go":      nil,
+	}
+	testCases := []struct {
+		name string
+		dir  string
+		want bool
+	}{
+		{name: "module root with a block", dir: ".", want: true},
+		{name: "package with a block", dir: "pkg", want: true},
+		{name: "nested package with a block", dir: "pkg/sub", want: true},
+		{name: "package with a file and no block", dir: "empty", want: false},
+		{name: "package not in the profile", dir: "other", want: false},
+		{name: "parent directory of a package with a block", dir: "pkg/..", want: false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := profile.IsDirCovered(tc.dir); got != tc.want {
+				t.Errorf("IsDirCovered(%q) = %v, want %v", tc.dir, got, tc.want)
+			}
+		})
+	}
+}
