@@ -639,6 +639,46 @@ func TestFeatureSkipTestdataVendorAndNestedModuleTrees(t *testing.T) {
 	}
 }
 
+// TestRegressionSkipFilesTheGoToolIgnores checks that Run mutates no file
+// that the go tool ignores: a name that starts with "." or "_", or a file in
+// such a directory, for example a Go file under .git.
+func TestRegressionSkipFilesTheGoToolIgnores(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile("testdata/fixtures/geq_go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const mutated = "pkg/file.go"
+	ignored := []string{".git/review/probe.go", "_tools/tool.go", "pkg/.hidden.go", "pkg/_ignored.go"}
+	sys := fstest.MapFS{mutated: {Data: src}}
+	for _, name := range ignored {
+		sys[name] = &fstest.MapFile{Data: src}
+	}
+	mod := gomodule.GoModule{
+		Name:       expectedModule,
+		Root:       ".",
+		CallingDir: ".",
+	}
+	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+	defer viperReset()
+	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
+	res := runEngine(t, mut)
+
+	files := make(map[string]int)
+	for _, m := range res.Mutants {
+		files[m.Position().Filename]++
+	}
+	if files[mutated] == 0 {
+		t.Errorf("got no mutants of %s, want mutants; mutants by file: %v", mutated, files)
+	}
+	for _, name := range ignored {
+		if files[name] != 0 {
+			t.Errorf("got mutants of %s, want none; mutants by file: %v", name, files)
+		}
+	}
+}
+
 const (
 	goodFile   = "good.go"
 	lockedFile = "locked.go"

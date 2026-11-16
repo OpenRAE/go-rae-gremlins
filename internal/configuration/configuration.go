@@ -46,6 +46,7 @@ const (
 	UnleashWorkersKey            = "unleash.workers"
 	UnleashTestCPUKey            = "unleash.test-cpu"
 	UnleashTimeoutCoefficientKey = "unleash.timeout-coefficient"
+	UnleashMemoryBudgetKey       = "unleash.memory-budget"
 	UnleashIntegrationMode       = "unleash.integration"
 	UnleashExcludeFiles          = "unleash.exclude-files"
 	UnleashDiffRef               = "unleash.diff"
@@ -266,6 +267,7 @@ func typedKeys() map[string]func(any) error {
 		UnleashWorkersKey:            checkInt,
 		UnleashTestCPUKey:            checkInt,
 		UnleashTimeoutCoefficientKey: checkInt,
+		UnleashMemoryBudgetKey:       checkSize,
 		UnleashIntegrationMode:       checkBool,
 		UnleashExcludeFiles:          checkStringSlice,
 		UnleashDiffRef:               checkString,
@@ -361,6 +363,39 @@ func checkFloat(v any) error {
 	default:
 		return fmt.Errorf("%v (%T) is not a number", v, v)
 	}
+}
+
+// checkSize accepts an empty value, which selects the default, and a size
+// that ParseSize accepts.
+func checkSize(v any) error {
+	if !isScalar(v) {
+		return fmt.Errorf("%v (%T) is not a size", v, v)
+	}
+	s := fmt.Sprint(v)
+	if s == "" {
+		return nil
+	}
+	_, err := ParseSize(s)
+
+	return err
+}
+
+// ParseSize parses a positive byte count with an optional binary unit
+// suffix: K (KiB), M (MiB), G (GiB), or T (TiB). For example, "2G" is 2 GiB.
+func ParseSize(s string) (uint64, error) {
+	units := map[byte]uint{'K': 10, 'M': 20, 'G': 30, 'T': 40}
+	digits, shift := s, uint(0)
+	if n := len(s); n > 0 {
+		if u, ok := units[s[n-1]]; ok {
+			digits, shift = s[:n-1], u
+		}
+	}
+	n, err := strconv.ParseUint(digits, 10, 64)
+	if err != nil || n == 0 || n > math.MaxUint64>>shift {
+		return 0, fmt.Errorf("%q is not a positive size such as 512M or 2G", s)
+	}
+
+	return n << shift, nil
 }
 
 func checkString(v any) error {

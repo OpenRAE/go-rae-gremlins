@@ -15,7 +15,7 @@
  */
 
 // Package process runs external commands together with the processes that
-// they start.
+// they start, and limits the memory of these process trees.
 package process
 
 import (
@@ -23,8 +23,23 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync/atomic"
 	"time"
 )
+
+// sampleInterval is the time between two memory samples of a process tree.
+// A tree can pass its limit by what it allocates in one interval.
+const sampleInterval = 50 * time.Millisecond
+
+// Usage is the memory use of a process tree that RunBounded ran.
+type Usage struct {
+	// Peak is the peak memory in bytes of the largest process in the tree:
+	// the resident set on Unix, and the committed memory on Windows.
+	Peak uint64
+	// OverLimit is true when the tree used more memory than its limit, so
+	// RunBounded stopped it.
+	OverLimit bool
+}
 
 // Run starts cmd with the processes that it starts in one process tree and
 // waits for cmd to complete. When the context of cmd is done, Run stops the
@@ -38,10 +53,28 @@ import (
 // cmd must come from exec.CommandContext. Run sets cmd.SysProcAttr,
 // cmd.Cancel, and cmd.WaitDelay. It returns the error of cmd.Run, joined with
 // any error of the tree control.
-func Run(cmd *exec.Cmd) (err error) {
+func Run(cmd *exec.Cmd) error {
+	_, err := RunBounded(cmd, 0)
+
+	return err
+}
+
+// RunBounded runs cmd like Run and returns the memory use of the tree. When
+// memoryLimit is not zero, a watchdog samples the total memory of the tree
+// every sampleInterval: the resident memory of its processes on Unix, and
+// the peak committed memory of the job on Windows. When the total passes
+// memoryLimit, the watchdog stops the tree and Usage.OverLimit is true.
+// When the watchdog cannot read the memory of a running tree, it stops the
+// tree and RunBounded returns the error.
+func RunBounded(cmd *exec.Cmd, memoryLimit uint64) (usage Usage, err error) {
+	if memoryLimit != 0 {
+		if err := memorySupported(); err != nil {
+			return Usage{}, fmt.Errorf("limit the memory of %s: %w", cmd.Path, err)
+		}
+	}
 	tree, err := newProcessTree(cmd)
 	if err != nil {
-		return fmt.Errorf("prepare the process tree of %s: %w", cmd.Path, err)
+		return Usage{}, fmt.Errorf("prepare the process tree of %s: %w", cmd.Path, err)
 	}
 	defer func() {
 		if closeErr := tree.close(); closeErr != nil {
@@ -51,14 +84,63 @@ func Run(cmd *exec.Cmd) (err error) {
 	cmd.Cancel = tree.kill
 	cmd.WaitDelay = 5 * time.Second
 	if err := cmd.Start(); err != nil {
-		return err
+		return Usage{}, err
 	}
 	if err := tree.start(); err != nil {
-		return stopOutsideTree(cmd, fmt.Errorf("start the process tree of %s: %w", cmd.Path, err))
+		return Usage{}, stopOutsideTree(cmd, fmt.Errorf("start the process tree of %s: %w", cmd.Path, err))
+	}
+	stop := make(chan struct{})
+	watched := make(chan error, 1)
+	var overLimit atomic.Bool
+	if memoryLimit != 0 {
+		go func() { watched <- watchMemory(tree, memoryLimit, stop, &overLimit) }()
+	} else {
+		watched <- nil
 	}
 	err = cmd.Wait()
+	close(stop)
+	if watchErr := <-watched; watchErr != nil {
+		err = errors.Join(err, fmt.Errorf("watch the memory of %s: %w", cmd.Path, watchErr))
+	}
 	if killErr := tree.kill(); killErr != nil && !errors.Is(killErr, os.ErrProcessDone) {
-		return errors.Join(err, fmt.Errorf("stop the remaining processes of %s: %w", cmd.Path, killErr))
+		return Usage{}, errors.Join(err, fmt.Errorf("stop the remaining processes of %s: %w", cmd.Path, killErr))
+	}
+	peak, peakErr := tree.peak()
+	if peakErr != nil {
+		return Usage{}, errors.Join(err, fmt.Errorf("read the peak memory of %s: %w", cmd.Path, peakErr))
+	}
+
+	return Usage{Peak: peak, OverLimit: overLimit.Load()}, err
+}
+
+// watchMemory samples the memory of tree until stop is closed. It stops the
+// tree and sets overLimit when the memory passes limit. It stops the tree
+// and returns the error when it cannot read the memory.
+func watchMemory(tree *processTree, limit uint64, stop <-chan struct{}, overLimit *atomic.Bool) error {
+	ticker := time.NewTicker(sampleInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return nil
+		case <-ticker.C:
+		}
+		used, err := tree.memory()
+		if err != nil {
+			return errors.Join(err, ignoreDone(tree.kill()))
+		}
+		if used > limit {
+			overLimit.Store(true)
+
+			return ignoreDone(tree.kill())
+		}
+	}
+}
+
+// ignoreDone returns err, or nil when err is os.ErrProcessDone.
+func ignoreDone(err error) error {
+	if errors.Is(err, os.ErrProcessDone) {
+		return nil
 	}
 
 	return err

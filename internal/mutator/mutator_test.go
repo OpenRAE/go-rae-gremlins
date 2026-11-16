@@ -69,6 +69,12 @@ func TestStatusString(t *testing.T) {
 	}
 }
 
+func TestFeatureStatusStringMemoryError(t *testing.T) {
+	if got, want := mutator.MemoryError.String(), "MEMORY ERROR"; got != want {
+		t.Errorf("MemoryError.String() = %q, want %q", got, want)
+	}
+}
+
 func TestFeatureStatusStringSkipped(t *testing.T) {
 	if got, want := mutator.Skipped.String(), "SKIPPED"; got != want {
 		t.Errorf("Skipped.String() = %q, want %q", got, want)

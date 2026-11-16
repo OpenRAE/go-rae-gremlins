@@ -12,7 +12,7 @@ They use local stand-ins for blocked assertion packages. They download no test d
 Baseline tests cover growth, substitutions, occurrences, stale entries, history, initial adoption, and malformed input.
 
 CI uses Coverage.py 7.16.0 for the Python adapter, with line and branch reporting through the existing Sonar pipeline.
-The admission check requires the Linux Go, Windows Go, and Python coverage reports. It rejects unexpected files, links, and XML entity declarations.
+The admission check requires the Linux Go, Windows Go, macOS Go, and Python coverage reports. It rejects unexpected files, links, and XML entity declarations.
 Use `make lint-cover` when the pinned Coverage.py is installed; `make lint-test` needs only the standard library.
 
 Reference snapshots reviewed for issue #77:

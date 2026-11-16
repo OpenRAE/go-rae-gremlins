@@ -77,7 +77,7 @@ func TestFeatureExecutorStopsProcessTree(t *testing.T) {
 				return cmd
 			}
 			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
-			mjd := engine.NewExecutorDealer(mod, newWdDealerStub(t), 0, engine.WithExecContext(treeExec))
+			mjd := newExecutorDealer(t, mod, newWdDealerStub(t), 0, engine.WithExecContext(treeExec))
 			mut := &mutantStub{status: mutator.Runnable, mutType: mutator.ConditionalsBoundary, pkg: expectedModule}
 			outCh := make(chan engine.ExecutorResult, 1)
 			wg := sync.WaitGroup{}

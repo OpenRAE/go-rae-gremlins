@@ -113,6 +113,47 @@ func (t *processTree) kill() error {
 	return windows.TerminateJobObject(t.job, killedExitCode)
 }
 
+// memory returns the peak committed memory in bytes of all the processes in
+// the job.
+func (t *processTree) memory() (uint64, error) {
+	info, err := t.limits()
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(info.PeakJobMemoryUsed), nil
+}
+
+// peak returns the peak committed memory in bytes of the largest process in
+// the job.
+func (t *processTree) peak() (uint64, error) {
+	info, err := t.limits()
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(info.PeakProcessMemoryUsed), nil
+}
+
+// limits returns the extended limit information of the job, which holds its
+// memory peaks.
+func (t *processTree) limits() (windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION, error) {
+	var info windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+	// #nosec G103 - Audited: the Win32 call writes to info, which stays alive
+	// on this stack during the call.
+	if err := windows.QueryInformationJobObject(t.job, windows.JobObjectExtendedLimitInformation,
+		uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info)), nil); err != nil {
+		return info, fmt.Errorf("query the job object: %w", err)
+	}
+
+	return info, nil
+}
+
+// memorySupported returns nil. The job object reports the memory of a tree.
+func memorySupported() error {
+	return nil
+}
+
 // close releases the job object. Any process that remains in the job stops.
 func (t *processTree) close() error {
 	return windows.CloseHandle(t.job)

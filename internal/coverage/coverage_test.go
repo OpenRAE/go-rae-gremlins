@@ -113,7 +113,7 @@ func TestCoverageRun(t *testing.T) {
 			assertCallerDirKept(t, callerDir, holder, mod.Root)
 
 			firstWant := "go mod download"
-			secondWant := fmt.Sprintf("go test -tags tag1 tag2 -coverpkg %s -cover -coverprofile %v %s",
+			secondWant := fmt.Sprintf("go test -tags tag1 tag2 -coverpkg %s -count=1 -cover -coverprofile %v %s",
 				coverpkg, wantFilePath, tc.wantPath)
 
 			if len(holder.events) != 2 {
@@ -245,6 +245,9 @@ func TestCoverageParsesOutput(t *testing.T) {
 	}
 	if got.Elapsed == 0 {
 		t.Error("Run() Elapsed = 0, want a positive duration")
+	}
+	if got.Peak == 0 {
+		t.Error("Run().Peak = 0, want the peak memory of the coverage process")
 	}
 }
 
