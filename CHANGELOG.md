@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.8.0](https://github.com/OpenRAE/go-rae-gremlins/compare/v0.7.0...v0.8.0) (2026-11-17)
+
+
+### Features
+
+* bound mutation runs with a cgroup-v2 memory budget ([4bddac6](https://github.com/OpenRAE/go-rae-gremlins/commit/4bddac6407ea4feda0b864f8856f5db629d974f1))
+
+
+### Bug Fixes
+
+* always run make build and make cover when output files exist ([#191](https://github.com/OpenRAE/go-rae-gremlins/issues/191)) ([36ef7d0](https://github.com/OpenRAE/go-rae-gremlins/commit/36ef7d0440d490b034dd304aa1527cdace99f043))
+* bound the memory of mutant test runs ([#194](https://github.com/OpenRAE/go-rae-gremlins/issues/194)) ([34752f0](https://github.com/OpenRAE/go-rae-gremlins/commit/34752f0a73efc11a15edf506760ef6efd5aba66e))
+* close files opened when copying worker directories ([#156](https://github.com/OpenRAE/go-rae-gremlins/issues/156)) ([0af7f70](https://github.com/OpenRAE/go-rae-gremlins/commit/0af7f70b98e4fd14d01662c18115c02bfb4980ce))
+* cover package-level variable initializers when their package ran ([#184](https://github.com/OpenRAE/go-rae-gremlins/issues/184)) ([8b58975](https://github.com/OpenRAE/go-rae-gremlins/commit/8b58975ff705d5b03f4d960dfbfbca1ee31bd30c))
+* fail the lint gate when Go is newer than the linter's Go ([#158](https://github.com/OpenRAE/go-rae-gremlins/issues/158)) ([7bb1858](https://github.com/OpenRAE/go-rae-gremlins/commit/7bb1858b2452c5eb9ba7ab8c0765bbf647b766e3))
+* find the delivered issue in Phase E with Ground Control v1.12.0 ([#186](https://github.com/OpenRAE/go-rae-gremlins/issues/186)) ([e680604](https://github.com/OpenRAE/go-rae-gremlins/commit/e68060497e6f129812fe43df4f888d90f89e7033))
+* give each change its own architecture design file ([#169](https://github.com/OpenRAE/go-rae-gremlins/issues/169)) ([23274c6](https://github.com/OpenRAE/go-rae-gremlins/commit/23274c65f7c175e55c76d0ff8732c29463ef5dce))
+* make the dev to main promotion checks pass ([#176](https://github.com/OpenRAE/go-rae-gremlins/issues/176)) ([58418b6](https://github.com/OpenRAE/go-rae-gremlins/commit/58418b6a3809dff16f91190f64086eca7653c57b))
+* mutate %= to *= in invert assignments instead of to itself ([#163](https://github.com/OpenRAE/go-rae-gremlins/issues/163)) ([21c70b4](https://github.com/OpenRAE/go-rae-gremlins/commit/21c70b424d8c9ddeb7ab6e8f6c37a89cb9874893))
+* own cancellation and shutdown for the complete run ([#162](https://github.com/OpenRAE/go-rae-gremlins/issues/162)) ([e3a0e60](https://github.com/OpenRAE/go-rae-gremlins/commit/e3a0e607f94130f37cff94e0a811e78242568f07))
+* parse the module declaration after comments or blank lines ([#165](https://github.com/OpenRAE/go-rae-gremlins/issues/165)) ([f8c9676](https://github.com/OpenRAE/go-rae-gremlins/commit/f8c96760e5f2057dd4681c6f5a1416cb7096d683))
+* read typed configuration values from environment settings ([#150](https://github.com/OpenRAE/go-rae-gremlins/issues/150)) ([67b7cb3](https://github.com/OpenRAE/go-rae-gremlins/commit/67b7cb39f5fa7798c38fcd8c51e671b977c467f2))
+* reject out-of-range numeric settings before tests start ([#171](https://github.com/OpenRAE/go-rae-gremlins/issues/171)) ([5d01171](https://github.com/OpenRAE/go-rae-gremlins/commit/5d0117146635e46e60be14d43bde032bca154724))
+* return errors from malformed discovered configuration ([#155](https://github.com/OpenRAE/go-rae-gremlins/issues/155)) ([5376295](https://github.com/OpenRAE/go-rae-gremlins/commit/537629576f310d74d527002ca0e0d04f1aaffa3a))
+* return errors when the JSON report cannot be written ([#164](https://github.com/OpenRAE/go-rae-gremlins/issues/164)) ([712f55b](https://github.com/OpenRAE/go-rae-gremlins/commit/712f55b28618185a19507607277503cb782f8870))
+* return source discovery errors instead of partial success ([#159](https://github.com/OpenRAE/go-rae-gremlins/issues/159)) ([12a1c41](https://github.com/OpenRAE/go-rae-gremlins/commit/12a1c414f13b9c514d5b57d795c9e11426447d1a))
+* run coverage without changing the caller working directory ([#160](https://github.com/OpenRAE/go-rae-gremlins/issues/160)) ([248519e](https://github.com/OpenRAE/go-rae-gremlins/commit/248519e3763707b908ea88d3b20f79f66adbf4a4))
+* skip mutants in type declarations and function signatures ([#188](https://github.com/OpenRAE/go-rae-gremlins/issues/188)) ([c814e76](https://github.com/OpenRAE/go-rae-gremlins/commit/c814e766ff9a9225b8e30d23fa9fb16d65de4d94))
+* skip mutants that coverage cannot observe ([#177](https://github.com/OpenRAE/go-rae-gremlins/issues/177)) ([d46b282](https://github.com/OpenRAE/go-rae-gremlins/commit/d46b282891d0adb2c0c15c63b09bb2661f697a87))
+* stop descendant test processes on Windows with a job object ([#185](https://github.com/OpenRAE/go-rae-gremlins/issues/185)) ([a3661a0](https://github.com/OpenRAE/go-rae-gremlins/commit/a3661a0943f2c7988e8b1647e97d01df09f788ed))
+* stop failed mutations from contaminating later results ([#161](https://github.com/OpenRAE/go-rae-gremlins/issues/161)) ([ee929a2](https://github.com/OpenRAE/go-rae-gremlins/commit/ee929a2de6762c878652b158d3f32adacc63df0d))
+* stop the coverage test process when a run is cancelled ([#173](https://github.com/OpenRAE/go-rae-gremlins/issues/173)) ([86bdfc5](https://github.com/OpenRAE/go-rae-gremlins/commit/86bdfc5714b780575fca8eed3db3ed3f67f1958f))
+
 ## [0.7.0](https://github.com/OpenRAE/go-rae-gremlins/compare/v0.6.0...v0.7.0) (2026-11-10)
 
 
