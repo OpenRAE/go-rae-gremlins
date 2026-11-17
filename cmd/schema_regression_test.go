@@ -208,6 +208,8 @@ func schemaDefault(t *testing.T, key string, n schemaNode) any {
 		var items []any
 		items, ok = n.Default.([]any)
 		v, ok = stringItems(items, ok)
+	default:
+		t.Fatalf("%s %q has the unsupported type %q", schemaPath, key, n.Type)
 	}
 	if !ok {
 		t.Fatalf("%s %q default %v (%T) does not match the type %q", schemaPath, key, n.Default, n.Default, n.Type)

@@ -228,23 +228,62 @@ func setFlagsOnCmd(cmd *cobra.Command) error {
 // configuration keys and defaults. The mutant type flags come last.
 func unleashFlags() []*flags.Flag {
 	fls := []*flags.Flag{
-		{Name: paramDryRun, CfgKey: configuration.UnleashDryRunKey, Shorthand: "d", DefaultV: false, Usage: "find mutants but do not run their tests (the coverage run still runs the tests)"},
+		{
+			Name: paramDryRun, CfgKey: configuration.UnleashDryRunKey, Shorthand: "d", DefaultV: false,
+			Usage: "find mutants but do not run their tests (the coverage run still runs the tests)",
+		},
 		{
 			Name: paramOutputStatuses, CfgKey: configuration.UnleashOutputStatusesKey, Shorthand: "S", DefaultV: "",
 			Usage: "print only statuses from this flag, allowed values - 'lctmkvsr'",
 		},
-		{Name: paramOutputDiffStatuses, CfgKey: configuration.UnleashOutputDiffStatusesKey, DefaultV: "", Usage: "print diff for mutants with these statuses, allowed values - 'lk'"},
-		{Name: paramBuildTags, CfgKey: configuration.UnleashTagsKey, Shorthand: "t", DefaultV: "", Usage: "a comma-separated list of build tags"},
-		{Name: paramCoverPackages, CfgKey: configuration.UnleashCoverPkgKey, DefaultV: "", Usage: "a comma-separated list of package patterns"},
-		{Name: paramDiff, CfgKey: configuration.UnleashDiffRef, Shorthand: "D", DefaultV: "", Usage: "diff branch or commit"},
-		{Name: paramOutput, CfgKey: configuration.UnleashOutputKey, Shorthand: "o", DefaultV: "", Usage: "set the output file for machine readable results"},
-		{Name: paramIntegrationMode, CfgKey: configuration.UnleashIntegrationMode, Shorthand: "i", DefaultV: false, Usage: "makes Gremlins run the complete test suite for each mutation"},
-		{Name: paramExcludeFiles, CfgKey: configuration.UnleashExcludeFiles, Shorthand: "E", DefaultV: []string(nil), Usage: "exclude files from Gremlins run by filepath regexp"},
-		{Name: paramThresholdEfficacy, CfgKey: configuration.UnleashThresholdEfficacyKey, DefaultV: float64(0), Usage: "threshold for code-efficacy percent"},
-		{Name: paramThresholdMCoverage, CfgKey: configuration.UnleashThresholdMCoverageKey, DefaultV: float64(0), Usage: "threshold for mutant-coverage percent"},
-		{Name: paramWorkers, CfgKey: configuration.UnleashWorkersKey, DefaultV: 0, Usage: "the number of workers to use in mutation testing"},
-		{Name: paramTestCPU, CfgKey: configuration.UnleashTestCPUKey, DefaultV: 0, Usage: "the number of CPUs to allow each test run to use"},
-		{Name: paramTimeoutCoefficient, CfgKey: configuration.UnleashTimeoutCoefficientKey, DefaultV: 0, Usage: "the coefficient by which the timeout is increased"},
+		{
+			Name: paramOutputDiffStatuses, CfgKey: configuration.UnleashOutputDiffStatusesKey, DefaultV: "",
+			Usage: "print diff for mutants with these statuses, allowed values - 'lk'",
+		},
+		{
+			Name: paramBuildTags, CfgKey: configuration.UnleashTagsKey, Shorthand: "t", DefaultV: "",
+			Usage: "a comma-separated list of build tags",
+		},
+		{
+			Name: paramCoverPackages, CfgKey: configuration.UnleashCoverPkgKey, DefaultV: "",
+			Usage: "a comma-separated list of package patterns",
+		},
+		{
+			Name: paramDiff, CfgKey: configuration.UnleashDiffRef, Shorthand: "D", DefaultV: "",
+			Usage: "diff branch or commit",
+		},
+		{
+			Name: paramOutput, CfgKey: configuration.UnleashOutputKey, Shorthand: "o", DefaultV: "",
+			Usage: "set the output file for machine readable results",
+		},
+		{
+			Name: paramIntegrationMode, CfgKey: configuration.UnleashIntegrationMode, Shorthand: "i", DefaultV: false,
+			Usage: "makes Gremlins run the complete test suite for each mutation",
+		},
+		{
+			Name: paramExcludeFiles, CfgKey: configuration.UnleashExcludeFiles, Shorthand: "E", DefaultV: []string(nil),
+			Usage: "exclude files from Gremlins run by filepath regexp",
+		},
+		{
+			Name: paramThresholdEfficacy, CfgKey: configuration.UnleashThresholdEfficacyKey, DefaultV: float64(0),
+			Usage: "threshold for code-efficacy percent",
+		},
+		{
+			Name: paramThresholdMCoverage, CfgKey: configuration.UnleashThresholdMCoverageKey, DefaultV: float64(0),
+			Usage: "threshold for mutant-coverage percent",
+		},
+		{
+			Name: paramWorkers, CfgKey: configuration.UnleashWorkersKey, DefaultV: 0,
+			Usage: "the number of workers to use in mutation testing",
+		},
+		{
+			Name: paramTestCPU, CfgKey: configuration.UnleashTestCPUKey, DefaultV: 0,
+			Usage: "the number of CPUs to allow each test run to use",
+		},
+		{
+			Name: paramTimeoutCoefficient, CfgKey: configuration.UnleashTimeoutCoefficientKey, DefaultV: 0,
+			Usage: "the coefficient by which the timeout is increased",
+		},
 		{
 			Name: paramMemoryBudget, CfgKey: configuration.UnleashMemoryBudgetKey, DefaultV: "",
 			Usage: "the memory that all the mutant test runs can use together, such as 512M or 2G " +
