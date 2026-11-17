@@ -51,9 +51,11 @@ unleash:
   integration: false
   dry-run: false
   tags: ""
+  coverpkg: ""
   output: ""
   diff: ""
   output-statuses: ""
+  output-diff-statuses: ""
   workers: 0 #(1)
   test-cpu: 0 #(2)
   timeout-coefficient: 0 #(3)

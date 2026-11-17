@@ -57,12 +57,6 @@
     },
     {
       "linter": "revive",
-      "file": "cmd/unleash.go",
-      "fingerprint": "f176b463fd9be3d2f091aa2ed5c390f43484a7fc2d64b49ca6ca45770548b87f",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "internal/engine/engine_test.go",
       "fingerprint": "3cbcfc73b3b11c1ceea92bf8de084fd1603ddcf1c430ce16b10566204270aca2",
       "count": 1

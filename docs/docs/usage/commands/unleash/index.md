@@ -118,7 +118,8 @@ Use `actions/checkout@v4` with `fetch-depth: 0` to fetch all history.
 
 :material-flag:`--dry-run`/`-d` · :material-sign-direction: Default: false
 
-Just performs the analysis but not the mutation testing.
+Finds and reports the mutants, but does not run the tests of each mutant.
+The coverage run still runs the tests of the module, because the report needs the coverage of each mutant.
 
 ```shell
 gremlins unleash --dry-run
@@ -148,10 +149,10 @@ Output
  NOT COVERED CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3
 ```
 
-#### Filter out out `SKIPPED`, `KILLED`.
+#### Filter out `SKIPPED` and `KILLED`
 
 ```shell
-gremlins unleash --S lctv
+gremlins unleash -S lctv
 ```
 
 Output

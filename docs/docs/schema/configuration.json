@@ -4,18 +4,24 @@
   "title": "The Gremlins configuration schema",
   "type": "object",
   "properties": {
+    "silent": {
+      "title": "Silent mode",
+      "description": "Suppresses the information output. Error messages stay visible",
+      "type": "boolean",
+      "default": false
+    },
     "unleash": {
       "type": "object",
       "properties": {
-        "silent": {
-          "title": "Silent mode",
-          "description": "All the STDOUT output is suppressed",
+        "dry-run": {
+          "title": "Dry-run mode",
+          "description": "Finds the mutants and reports them without running their tests. The coverage run still runs the tests of the module",
           "type": "boolean",
           "default": false
         },
-        "dry-run": {
-          "title": "Dry-run mode",
-          "description": "Searches for mutants but doesn't execute the tests",
+        "integration": {
+          "title": "Integration mode",
+          "description": "Runs the complete test suite for each mutant, not only the tests of the mutant's package",
           "type": "boolean",
           "default": false
         },
@@ -37,6 +43,30 @@
             "./internal/log,./pkg/..."
           ]
         },
+        "diff": {
+          "title": "Diff",
+          "description": "A Git branch or commit. Gremlins tests only the mutants in the code that changed since the merge base of this reference. Empty tests all the covered mutants",
+          "type": "string",
+          "default": "",
+          "examples": [
+            "origin/main"
+          ]
+        },
+        "exclude-files": {
+          "title": "Exclude files",
+          "description": "Go regular expressions. Gremlins skips each file whose path matches one of them. Gremlins always skips test files",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "examples": [
+            [
+              "_mock\\.go$",
+              "^gen/"
+            ]
+          ]
+        },
         "output": {
           "title": "Output",
           "description": "The output file for machine readable results",
@@ -44,6 +74,26 @@
           "default": "",
           "examples": [
             "output.json"
+          ]
+        },
+        "output-statuses": {
+          "title": "Output statuses",
+          "description": "Prints only the mutants with these statuses to the console: l LIVED, c NOT COVERED, t TIMED OUT, m MEMORY ERROR, k KILLED, v NOT VIABLE, s SKIPPED, r RUNNABLE. Empty prints all. Gremlins ignores an invalid filter with a warning. The JSON output does not change",
+          "type": "string",
+          "default": "",
+          "pattern": "^[lctmkvsr]*$",
+          "examples": [
+            "lc"
+          ]
+        },
+        "output-diff-statuses": {
+          "title": "Output diff statuses",
+          "description": "Prints the code diff of the printed mutants with these statuses: l LIVED, k KILLED. Empty prints no diff. Gremlins ignores an invalid filter with a warning",
+          "type": "string",
+          "default": "",
+          "pattern": "^[lk]*$",
+          "examples": [
+            "l"
           ]
         },
         "workers": {
@@ -78,10 +128,10 @@
         },
         "memory-budget": {
           "title": "Memory budget",
-          "description": "The memory that all the mutant test runs can use together, as a byte count with an optional K, M, G, or T binary unit. An empty value uses the smaller of 1G and half of the available memory",
+          "description": "The memory that all the mutant test runs can use together, as a positive byte count with an optional K, M, G, or T binary unit. An empty value uses the smaller of 1G and half of the available memory",
           "type": "string",
           "default": "",
-          "pattern": "^([1-9][0-9]*[KMGT]?)?$",
+          "pattern": "^(0*[1-9][0-9]*[KMGT]?)?$",
           "examples": [
             "2G"
           ]
@@ -95,7 +145,7 @@
           "properties": {
             "efficacy": {
               "title": "Test efficacy",
-              "description": "Test efficacy threshold",
+              "description": "The test efficacy percentage under which Gremlins exits with an error. 0 disables the check",
               "type": "number",
               "default": 0,
               "minimum": 0,
@@ -107,7 +157,7 @@
             },
             "mutant-coverage": {
               "title": "Mutant-coverage",
-              "description": "Mutant coverage threshold",
+              "description": "The mutant coverage percentage under which Gremlins exits with an error. 0 disables the check",
               "type": "number",
               "default": 0,
               "minimum": 0,
@@ -128,9 +178,6 @@
         "arithmetic-base": {
           "title": "The arithmetic-base Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
           "properties": {
             "enabled": {
               "title": "The enabled Schema",
@@ -142,9 +189,6 @@
         "conditionals-boundary": {
           "title": "The conditionals-boundary Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
           "properties": {
             "enabled": {
               "title": "The enabled Schema",
@@ -156,9 +200,6 @@
         "conditionals-negation": {
           "title": "The conditionals-negation Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
           "properties": {
             "enabled": {
               "title": "The enabled Schema",
@@ -170,9 +211,6 @@
         "increment-decrement": {
           "title": "The increment-decrement Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
           "properties": {
             "enabled": {
               "title": "The enabled Schema",
@@ -184,9 +222,6 @@
         "invert-negatives": {
           "title": "The invert-negatives Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
           "properties": {
             "enabled": {
               "title": "The enabled Schema",
@@ -198,9 +233,6 @@
         "invert-loopctrl": {
           "title": "The invert-loopctrl Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
           "properties": {
             "enabled": {
               "title": "The enabled Schema",
@@ -212,9 +244,6 @@
         "invert-assignments": {
           "title": "The invert-assignments Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
           "properties": {
             "enabled": {
               "title": "The enabled Schema",
@@ -226,9 +255,6 @@
         "invert-bitwise": {
           "title": "The invert-bitwise Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
           "properties": {
             "enabled": {
               "title": "The enabled Schema",
@@ -240,9 +266,17 @@
         "invert-bwassign": {
           "title": "The invert-bwassign Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
+          "properties": {
+            "enabled": {
+              "title": "The enabled Schema",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "invert-logical": {
+          "title": "The invert-logical Schema",
+          "type": "object",
           "properties": {
             "enabled": {
               "title": "The enabled Schema",
@@ -254,9 +288,6 @@
         "remove-self-assignments": {
           "title": "The remove-self-assignments Schema",
           "type": "object",
-          "required": [
-            "enabled"
-          ],
           "properties": {
             "enabled": {
               "title": "The enabled Schema",

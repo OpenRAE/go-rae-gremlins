@@ -61,7 +61,7 @@ Use the shared `documentation` skill of doc-tools v0.1.0. See
 # Basic mutation testing
 gremlins unleash              # Or: gremlins run, gremlins r
 
-# Dry-run mode (find mutations without testing)
+# Dry-run mode (find mutants without running their tests)
 gremlins unleash --dry-run    # Or: -d
 
 # Configuration file
