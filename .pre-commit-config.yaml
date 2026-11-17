@@ -3,8 +3,13 @@ default_stages: [pre-commit]
 
 # Each hook repository is pinned to a commit, because a tag can move.
 repos:
+# Commit time runs only the fast file-hygiene and secret checks. The broad Go
+# checks (lint, vulnerability analysis, and the race test suite) run at the
+# `manual` stage, so a developer can run them on demand. The hosted CI jobs
+# enforce them for every push and pull request (ADR-079, issue #122).
+
   # ===========================================================================
-  # STAGE 1: Fast checks (linting, formatting, syntax)
+  # STAGE 1: Fast checks (file hygiene and syntax)
   # ===========================================================================
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -33,6 +38,7 @@ repos:
         language: system
         files: (\.go$|^\.golangci\.yml$|^go\.(mod|sum)$|^mise\.toml$|^\.lint/|^scripts/(lint|test_lint)\.py$|^Makefile$|^\.github/workflows/ci\.yml$|^\.pre-commit-config\.yaml$)
         pass_filenames: false
+        stages: [manual]
 
   # ===========================================================================
   # STAGE 2: Security
@@ -53,10 +59,11 @@ repos:
     hooks:
       - id: govulncheck
         name: govulncheck (Go vulnerability database)
-        entry: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+        entry: make vuln
         language: system
         files: (\.go$|^go\.(mod|sum)$)
         pass_filenames: false
+        stages: [manual]
 
   # ===========================================================================
   # STAGE 4: Tests
@@ -70,3 +77,4 @@ repos:
         language: system
         files: (\.go$|^go\.(mod|sum)$|/testdata/)
         pass_filenames: false
+        stages: [manual]

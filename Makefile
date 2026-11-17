@@ -6,6 +6,7 @@ RELEASE=${RELEASER_CMD} release
 LINTER_CMD=mise exec -- golangci-lint
 LINT_BASE ?= origin/dev
 LINT_ADOPTION_BASE ?=
+GOVULNCHECK_VERSION=v1.9.0
 BINARY_NAME=gremlins
 COVER_OUT=coverage.out
 TARGET=dist
@@ -37,6 +38,12 @@ requirements:
 .PHONY: lint
 lint:
 	python3 scripts/lint.py --base "${LINT_BASE}" --adoption-base "${LINT_ADOPTION_BASE}"
+
+# Scans the module against the Go vulnerability database. The hosted CI job and
+# the manual-stage pre-commit hook both call this target.
+.PHONY: vuln
+vuln:
+	${GO_CMD} run golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} ./...
 
 .PHONY: lint-shrink lint-test lint-cover
 lint-shrink:

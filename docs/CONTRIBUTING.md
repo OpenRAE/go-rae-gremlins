@@ -30,14 +30,16 @@ mise install
 make hooks
 ```
 
-`make hooks` installs and verifies the clone's hook dispatch and runs an initial check of all files. That initial
-check includes the configured Go checks and race tests. Run it for each new clone; Git does not copy local hooks.
-If installation reports an existing unmanaged hook or a dispatcher problem, inspect and resolve that problem
+`make hooks` installs and verifies the clone's commit-time hook dispatch and runs an initial check of all files.
+That initial check runs the fast file-hygiene and secret checks. Run it for each new clone; Git does not copy local
+hooks. If installation reports an existing unmanaged hook or a dispatcher problem, inspect and resolve that problem
 before committing. Do not bypass the hooks or overwrite a shared hook configuration.
 
 The [pre-commit configuration](../.pre-commit-config.yaml) checks file hygiene, syntax, merge conflicts, private
-keys, and secrets. Go changes also run lint, vulnerability checks, and race tests. These are publication gates;
-daily development checks should target the changed behavior.
+keys, and secrets at commit time. The broad Go checks (lint, vulnerability analysis, and the race test suite) run at
+the `manual` stage. The hosted CI jobs enforce them for every push and pull request. During development, run the
+targeted checks for the changed behavior. To run a broad check on demand, use
+`pre-commit run <hook-id> --hook-stage manual`.
 
 ## Branch and implement
 
