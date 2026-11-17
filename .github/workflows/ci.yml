@@ -77,6 +77,21 @@ jobs:
           export LINT_BASE="$COMPARISON"
           make lint
 
+  vuln:
+    name: Vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Provision Go modules before offline analysis
+        run: go mod download
+      - run: make vuln
+
   test:
     name: Test (${{ matrix.os }})
     strategy:
@@ -334,13 +349,14 @@ jobs:
   gate:
     name: PR Gate
     if: always()
-    needs: [architecture, lint, docs, test, policy, memory, sonar]
+    needs: [architecture, lint, vuln, docs, test, policy, memory, sonar]
     runs-on: ubuntu-latest
     steps:
-      - name: Require architecture, lint, docs, tests, policy, memory, and SonarCloud
+      - name: Require architecture, lint, vulnerability scan, docs, tests, policy, memory, and SonarCloud
         env:
           ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
           LINT_RESULT: ${{ needs.lint.result }}
+          VULN_RESULT: ${{ needs.vuln.result }}
           DOCS_RESULT: ${{ needs.docs.result }}
           TEST_RESULT: ${{ needs.test.result }}
           POLICY_RESULT: ${{ needs.policy.result }}
@@ -350,6 +366,7 @@ jobs:
         run: |
           test "$ARCHITECTURE_RESULT" = success
           test "$LINT_RESULT" = success
+          test "$VULN_RESULT" = success
           test "$DOCS_RESULT" = success
           test "$TEST_RESULT" = success
           test "$POLICY_RESULT" = success

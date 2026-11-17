@@ -10,7 +10,7 @@
 # silently. This script is the repo-native installer + verifier that closes that gap.
 #
 # What it does, for the current clone only:
-#   * writes a Ground-Control-managed pre-commit and pre-push hook into git's
+#   * writes a Ground-Control-managed pre-commit hook into git's
 #     resolved hook path (the location a _chain-style dispatcher delegates to, and
 #     the location git uses directly when no dispatcher is set). Each managed hook
 #     execs `pre-commit hook-impl` — the same entrypoint `pre-commit install` wires.
@@ -37,9 +37,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 MANAGED_MARKER="ground-control-managed-hook"
 MANAGED_VERSION="v1"
-# Hook types this repo activates. Add a type here to activate a new stage; the
-# managed-hook body and verification are parameterised over it (no new framework).
-MANAGED_HOOK_TYPES=(pre-commit pre-push)
+# Hook types this repo activates. The config selects only the pre-commit stage,
+# so this installs the pre-commit hook alone (issue #122). Add a type here to
+# activate a new stage; the managed-hook body and verification are parameterised
+# over it (no new framework).
+MANAGED_HOOK_TYPES=(pre-commit)
 
 force=0
 dry_run=0
