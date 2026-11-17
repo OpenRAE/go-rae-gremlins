@@ -263,7 +263,9 @@ func referenceExample(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("read %s: %v", configurationPagePath, err)
 	}
-	_, section, ok := strings.Cut(string(b), "\n### Reference\n")
+	// A Windows checkout can convert the page to CRLF line endings.
+	page := strings.ReplaceAll(string(b), "\r\n", "\n")
+	_, section, ok := strings.Cut(page, "\n### Reference\n")
 	if !ok {
 		t.Fatalf("%s has no Reference section", configurationPagePath)
 	}
