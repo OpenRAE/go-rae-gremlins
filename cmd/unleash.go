@@ -92,8 +92,9 @@ func longExplainer() string {
 		Unleash only tests covered mutants, since it doesn't make sense to test mutants
 		that no test case is able to catch.
 
-		In 'dry-run' mode, unleash only performs the analysis of the source code, but it
-		doesn't actually perform the test.
+		In 'dry-run' mode, unleash gathers the coverage and analyses the source code,
+		but it does not run the tests of each mutant. The coverage run still runs the
+		tests.
 
 		Thresholds are configurable quality gates that make gremlins exit with an error
 		if those values are not met. Efficacy is the percent of KILLED mutants over
@@ -214,24 +215,75 @@ func setFlagsOnCmd(cmd *cobra.Command) error {
 		return pflag.NormalizedName(name)
 	})
 
+	for _, f := range unleashFlags() {
+		if err := flags.Set(cmd, f); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// unleashFlags returns the flags of the unleash command with their
+// configuration keys and defaults. The mutant type flags come last.
+func unleashFlags() []*flags.Flag {
 	fls := []*flags.Flag{
-		{Name: paramDryRun, CfgKey: configuration.UnleashDryRunKey, Shorthand: "d", DefaultV: false, Usage: "find mutations but do not executes tests"},
+		{
+			Name: paramDryRun, CfgKey: configuration.UnleashDryRunKey, Shorthand: "d", DefaultV: false,
+			Usage: "find mutants but do not run their tests (the coverage run still runs the tests)",
+		},
 		{
 			Name: paramOutputStatuses, CfgKey: configuration.UnleashOutputStatusesKey, Shorthand: "S", DefaultV: "",
 			Usage: "print only statuses from this flag, allowed values - 'lctmkvsr'",
 		},
-		{Name: paramOutputDiffStatuses, CfgKey: configuration.UnleashOutputDiffStatusesKey, DefaultV: "", Usage: "print diff for mutants with these statuses, allowed values - 'lk'"},
-		{Name: paramBuildTags, CfgKey: configuration.UnleashTagsKey, Shorthand: "t", DefaultV: "", Usage: "a comma-separated list of build tags"},
-		{Name: paramCoverPackages, CfgKey: configuration.UnleashCoverPkgKey, DefaultV: "", Usage: "a comma-separated list of package patterns"},
-		{Name: paramDiff, CfgKey: configuration.UnleashDiffRef, Shorthand: "D", DefaultV: "", Usage: "diff branch or commit"},
-		{Name: paramOutput, CfgKey: configuration.UnleashOutputKey, Shorthand: "o", DefaultV: "", Usage: "set the output file for machine readable results"},
-		{Name: paramIntegrationMode, CfgKey: configuration.UnleashIntegrationMode, Shorthand: "i", DefaultV: false, Usage: "makes Gremlins run the complete test suite for each mutation"},
-		{Name: paramExcludeFiles, CfgKey: configuration.UnleashExcludeFiles, Shorthand: "E", DefaultV: []string{}, Usage: "exclude files from Gremlins run by filepath regexp"},
-		{Name: paramThresholdEfficacy, CfgKey: configuration.UnleashThresholdEfficacyKey, DefaultV: float64(0), Usage: "threshold for code-efficacy percent"},
-		{Name: paramThresholdMCoverage, CfgKey: configuration.UnleashThresholdMCoverageKey, DefaultV: float64(0), Usage: "threshold for mutant-coverage percent"},
-		{Name: paramWorkers, CfgKey: configuration.UnleashWorkersKey, DefaultV: 0, Usage: "the number of workers to use in mutation testing"},
-		{Name: paramTestCPU, CfgKey: configuration.UnleashTestCPUKey, DefaultV: 0, Usage: "the number of CPUs to allow each test run to use"},
-		{Name: paramTimeoutCoefficient, CfgKey: configuration.UnleashTimeoutCoefficientKey, DefaultV: 0, Usage: "the coefficient by which the timeout is increased"},
+		{
+			Name: paramOutputDiffStatuses, CfgKey: configuration.UnleashOutputDiffStatusesKey, DefaultV: "",
+			Usage: "print diff for mutants with these statuses, allowed values - 'lk'",
+		},
+		{
+			Name: paramBuildTags, CfgKey: configuration.UnleashTagsKey, Shorthand: "t", DefaultV: "",
+			Usage: "a comma-separated list of build tags",
+		},
+		{
+			Name: paramCoverPackages, CfgKey: configuration.UnleashCoverPkgKey, DefaultV: "",
+			Usage: "a comma-separated list of package patterns",
+		},
+		{
+			Name: paramDiff, CfgKey: configuration.UnleashDiffRef, Shorthand: "D", DefaultV: "",
+			Usage: "diff branch or commit",
+		},
+		{
+			Name: paramOutput, CfgKey: configuration.UnleashOutputKey, Shorthand: "o", DefaultV: "",
+			Usage: "set the output file for machine readable results",
+		},
+		{
+			Name: paramIntegrationMode, CfgKey: configuration.UnleashIntegrationMode, Shorthand: "i", DefaultV: false,
+			Usage: "makes Gremlins run the complete test suite for each mutation",
+		},
+		{
+			Name: paramExcludeFiles, CfgKey: configuration.UnleashExcludeFiles, Shorthand: "E", DefaultV: []string(nil),
+			Usage: "exclude files from Gremlins run by filepath regexp",
+		},
+		{
+			Name: paramThresholdEfficacy, CfgKey: configuration.UnleashThresholdEfficacyKey, DefaultV: float64(0),
+			Usage: "threshold for code-efficacy percent",
+		},
+		{
+			Name: paramThresholdMCoverage, CfgKey: configuration.UnleashThresholdMCoverageKey, DefaultV: float64(0),
+			Usage: "threshold for mutant-coverage percent",
+		},
+		{
+			Name: paramWorkers, CfgKey: configuration.UnleashWorkersKey, DefaultV: 0,
+			Usage: "the number of workers to use in mutation testing",
+		},
+		{
+			Name: paramTestCPU, CfgKey: configuration.UnleashTestCPUKey, DefaultV: 0,
+			Usage: "the number of CPUs to allow each test run to use",
+		},
+		{
+			Name: paramTimeoutCoefficient, CfgKey: configuration.UnleashTimeoutCoefficientKey, DefaultV: 0,
+			Usage: "the coefficient by which the timeout is increased",
+		},
 		{
 			Name: paramMemoryBudget, CfgKey: configuration.UnleashMemoryBudgetKey, DefaultV: "",
 			Usage: "the memory that all the mutant test runs can use together, such as 512M or 2G " +
@@ -239,34 +291,22 @@ func setFlagsOnCmd(cmd *cobra.Command) error {
 		},
 	}
 
-	for _, f := range fls {
-		err := flags.Set(cmd, f)
-		if err != nil {
-			return err
-		}
-	}
-
-	return setMutantTypeFlags(cmd)
+	return append(fls, mutantTypeFlags()...)
 }
 
-func setMutantTypeFlags(cmd *cobra.Command) error {
+// mutantTypeFlags returns one enable flag for each mutant type.
+func mutantTypeFlags() []*flags.Flag {
+	fls := make([]*flags.Flag, 0, len(mutator.Types))
 	for _, mt := range mutator.Types {
 		name := mt.String()
-		usage := fmt.Sprintf("enable %q mutants", name)
-		param := strings.ReplaceAll(name, "_", "-")
-		param = strings.ToLower(param)
-		confKey := configuration.MutantTypeEnabledKey(mt)
-
-		err := flags.Set(cmd, &flags.Flag{
+		param := strings.ToLower(strings.ReplaceAll(name, "_", "-"))
+		fls = append(fls, &flags.Flag{
 			Name:     param,
-			CfgKey:   confKey,
+			CfgKey:   configuration.MutantTypeEnabledKey(mt),
 			DefaultV: configuration.IsDefaultEnabled(mt),
-			Usage:    usage,
+			Usage:    fmt.Sprintf("enable %q mutants", name),
 		})
-		if err != nil {
-			return err
-		}
 	}
 
-	return nil
+	return fls
 }

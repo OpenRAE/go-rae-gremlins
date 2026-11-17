@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "issue": 123,
+  "summary": "Align the Draft-07 configuration schema and the configuration examples with the runtime settings. The schema moves silent to the top level, where the persistent flag binds it. It adds unleash.integration, unleash.diff, unleash.exclude-files, unleash.output-statuses, unleash.output-diff-statuses, and the invert-logical mutant. Mutant objects no longer require enabled, and the memory-budget pattern accepts the sizes that ParseSize accepts. The dry-run text in the schema, the flag help, the unleash help, the unleash page, and the CLAUDE.md command note says that the coverage run still runs the tests. Regression tests that use only base APIs compare the schema keys with the keys that newRootCmd binds, in both directions, reject required settings, and load the complete reference example through configuration.Init and Validate to compare it with the schema defaults. The cmd package returns its flag table from functions, so a feature test compares each schema type and default with its flag. The schema stays editor guidance; Viper and configuration.Validate keep runtime ownership. No CLI flag, configuration key, default, JSON report field, or exit code changes. See docs/development/configuration-schema-preflight.md for the semantic and verification boundaries. The exclude-files flag default becomes a nil list, with the same behavior, and the fixed lint finding leaves the baseline.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "cmd/internal/flags",
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    }
+  ],
+  "contracts": [
+    "cli",
+    "cli_persistent",
+    "schema"
+  ],
+  "contract_changes": {
+    "cli": "compatible",
+    "cli_persistent": "compatible",
+    "schema": "compatible"
+  },
+  "trust_boundaries": "Schema metadata and examples stay in the checkout and existing CI. The contract test reads two checkout files: the schema and the configuration page. It writes the reference example to a private temporary file, resets Viper, and clears inherited GREMLINS_* values. It runs no command, child process, coverage, Git, or mutant test, and uses no network. The development-check boundary is unchanged. The delivery-finalization and merge-queue declarations restate the existing model permissions; this change adds no destination, credential, privilege, or source execution.",
+  "conflicts": [],
+  "policies": [
+    "guidance",
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  }
+}
