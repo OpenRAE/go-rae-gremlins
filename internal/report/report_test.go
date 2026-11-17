@@ -109,7 +109,7 @@ func TestReport(t *testing.T) {
 				// Limit the time reporting to the first two units (millis are excluded)
 				testingLine +
 				"Killed: 1, Lived: 1, Not covered: 1\n" +
-				"Timed out: 1, Not viable: 1, Skipped: 1\n" +
+				"Timed out: 1, Memory errors: 0, Not viable: 1, Skipped: 1\n" +
 				"Test efficacy: 50.00%\n" +
 				"Mutator coverage: 66.67%\n",
 		},
@@ -122,7 +122,7 @@ func TestReport(t *testing.T) {
 				// Limit the time reporting to the first two units (millis are excluded)
 				testingLine +
 				"Killed: 0, Lived: 0, Not covered: 1\n" +
-				"Timed out: 0, Not viable: 0, Skipped: 0\n" +
+				"Timed out: 0, Memory errors: 0, Not viable: 0, Skipped: 0\n" +
 				"Test efficacy: 0.00%\n" +
 				coverageLine,
 		},
@@ -136,7 +136,7 @@ func TestReport(t *testing.T) {
 				// Limit the time reporting to the first two units (millis are excluded)
 				testingLine +
 				"Killed: 0, Lived: 0, Not covered: 0\n" +
-				"Timed out: 2, Not viable: 0, Skipped: 0\n" +
+				"Timed out: 2, Memory errors: 0, Not viable: 0, Skipped: 0\n" +
 				"Test efficacy: 0.00%\n" +
 				coverageLine,
 		},
@@ -159,12 +159,14 @@ func TestReport(t *testing.T) {
 				Elapsed: (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 			}
 
-			_ = report.Do(data)
+			if err := report.Do(data); err != nil {
+				t.Fatalf("Do() error = %v, want nil", err)
+			}
 
 			got := out.String()
 
-			if !cmp.Equal(got, tc.want) {
-				t.Error(cmp.Diff(tc.want, got))
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("Do() output mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -213,12 +215,14 @@ func TestReport(t *testing.T) {
 				Elapsed: (2 * time.Minute) + (22 * time.Second) + (123 * time.Millisecond),
 			}
 
-			_ = report.Do(data)
+			if err := report.Do(data); err != nil {
+				t.Fatalf("Do() error = %v, want nil", err)
+			}
 
 			got := out.String()
 
-			if !cmp.Equal(got, tc.want) {
-				t.Error(cmp.Diff(tc.want, got))
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("Do() output mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -319,21 +323,21 @@ func TestAssessment(t *testing.T) {
 
 			if !tc.expectError {
 				if err != nil {
-					t.Errorf("expected no error, got %v", err)
+					t.Errorf("Do() error = %v, want nil", err)
 				}
 
 				return
 			}
 			if err == nil {
-				t.Fatal("expected an error")
+				t.Fatal("Do() error = nil, want an ExitError")
 			}
 			var exitErr *execution.ExitError
 			if errors.As(err, &exitErr) {
 				if exitErr.ExitCode() == 0 {
-					t.Errorf("expected exit code to be different from 0, got %d", exitErr.ExitCode())
+					t.Errorf("Do() exit code = %d, want non-zero", exitErr.ExitCode())
 				}
 			} else {
-				t.Errorf("expected err to be ExitError")
+				t.Errorf("Do() error = %v (%T), want an ExitError", err, err)
 			}
 		})
 	}
@@ -350,7 +354,7 @@ func TestFeatureAssessmentEmptyResultsSkipsThreshold(t *testing.T) {
 		err := report.Do(report.Results{})
 
 		if err != nil {
-			t.Errorf("expected no error for empty results, got %v", err)
+			t.Errorf("Do(empty results) error = %v, want nil", err)
 		}
 	})
 }
@@ -372,8 +376,8 @@ func TestMutantNoDiff(t *testing.T) {
 
 		want := "       LIVED CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n"
 		got := out.String()
-		if !cmp.Equal(got, want) {
-			t.Error(cmp.Diff(want, got))
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("Mutant() output mismatch (-want +got):\n%s", diff)
 		}
 	})
 }
@@ -388,10 +392,10 @@ func TestMutantDiff(t *testing.T) {
 			assertFunc: func(t *testing.T, out, errOut *bytes.Buffer) {
 				t.Helper()
 				if errOut.Len() > 0 {
-					t.Errorf("unexpected error logged: %q", errOut.String())
+					t.Errorf("Mutant() error output = %q, want empty", errOut.String())
 				}
 				if out.Len() > 0 {
-					t.Errorf("expected no output for empty snippets, got: %q", out.String())
+					t.Errorf("Mutant() output = %q, want empty", out.String())
 				}
 			},
 		},
@@ -400,10 +404,10 @@ func TestMutantDiff(t *testing.T) {
 			assertFunc: func(t *testing.T, out, errOut *bytes.Buffer) {
 				t.Helper()
 				if errOut.Len() > 0 {
-					t.Errorf("unexpected error logged: %q", errOut.String())
+					t.Errorf("Mutant() error output = %q, want empty", errOut.String())
 				}
 				if out.Len() > 0 {
-					t.Errorf("expected no output for empty origin snippet, got: %q", out.String())
+					t.Errorf("Mutant() output = %q, want empty", out.String())
 				}
 			},
 		},
@@ -412,10 +416,10 @@ func TestMutantDiff(t *testing.T) {
 			assertFunc: func(t *testing.T, out, errOut *bytes.Buffer) {
 				t.Helper()
 				if errOut.Len() > 0 {
-					t.Errorf("unexpected error logged: %q", errOut.String())
+					t.Errorf("Mutant() error output = %q, want empty", errOut.String())
 				}
 				if out.Len() > 0 {
-					t.Errorf("expected no output for empty mutated snippet, got: %q", out.String())
+					t.Errorf("Mutant() output = %q, want empty", out.String())
 				}
 			},
 		},
@@ -425,10 +429,10 @@ func TestMutantDiff(t *testing.T) {
 			assertFunc: func(t *testing.T, out, errOut *bytes.Buffer) {
 				t.Helper()
 				if errOut.Len() > 0 {
-					t.Errorf("unexpected error logged: %q", errOut.String())
+					t.Errorf("Mutant() error output = %q, want empty", errOut.String())
 				}
 				if out.Len() > 0 {
-					t.Errorf("expected no output for identical snippets, got: %q", out.String())
+					t.Errorf("Mutant() output = %q, want empty", out.String())
 				}
 			},
 		},
@@ -438,12 +442,12 @@ func TestMutantDiff(t *testing.T) {
 			assertFunc: func(t *testing.T, out, errOut *bytes.Buffer) {
 				t.Helper()
 				if errOut.Len() > 0 {
-					t.Errorf("unexpected error logged: %q", errOut.String())
+					t.Errorf("Mutant() error output = %q, want empty", errOut.String())
 				}
 				want := "       -if x > y {\n       +if x >= y {\n          x = 10\n"
 				got := out.String()
-				if !cmp.Equal(got, want) {
-					t.Error(cmp.Diff(want, got))
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("Mutant() output mismatch (-want +got):\n%s", diff)
 				}
 			},
 		},
@@ -489,6 +493,8 @@ func TestMutantLog(t *testing.T) {
 	report.Mutant(m)
 	m = stubMutant{status: mutator.TimedOut, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
 	report.Mutant(m)
+	m = stubMutant{status: mutator.MemoryError, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
+	report.Mutant(m)
 	m = stubMutant{status: mutator.Skipped, mutantType: mutator.ConditionalsBoundary, position: fakePosition}
 	report.Mutant(m)
 
@@ -501,10 +507,11 @@ func TestMutantLog(t *testing.T) {
 		"    RUNNABLE CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n" +
 		"  NOT VIABLE CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n" +
 		"   TIMED OUT CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n" +
+		"MEMORY ERROR CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n" +
 		"     SKIPPED CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n"
 
-	if !cmp.Equal(got, want) {
-		t.Error(cmp.Diff(got, want))
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Mutant() output mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -551,23 +558,24 @@ func TestReportToFile(t *testing.T) {
 		configuration.Set(configuration.UnleashOutputKey, output)
 
 		if err := report.Do(data); err != nil {
-			t.Fatal("error not expected")
+			t.Fatalf("Do() error = %v, want nil", err)
 		}
 
 		//nolint:gosec // test code reading test output file
 		file, err := os.ReadFile(output)
 		if err != nil {
-			t.Fatal("file not found")
+			t.Fatalf("os.ReadFile(report output) error = %v, want nil", err)
 		}
 
 		var got internal.OutputResult
 		err = json.Unmarshal(file, &got)
 		if err != nil {
-			t.Fatal("impossible to unmarshal results")
+			t.Fatalf("json.Unmarshal(report output) error = %v, want nil", err)
 		}
 
-		if !cmp.Equal(got, want, cmpopts.SortSlices(sortOutputFile), cmpopts.SortSlices(sortMutation)) {
-			t.Error(cmp.Diff(got, want))
+		opts := []cmp.Option{cmpopts.SortSlices(sortOutputFile), cmpopts.SortSlices(sortMutation)}
+		if diff := cmp.Diff(want, got, opts...); diff != "" {
+			t.Errorf("report output file mismatch (-want +got):\n%s", diff)
 		}
 	})
 
@@ -577,13 +585,13 @@ func TestReportToFile(t *testing.T) {
 		output := filepath.Join(outDir, outFile)
 
 		if err := report.Do(data); err != nil {
-			t.Fatal("error not expected")
+			t.Fatalf("Do() error = %v, want nil", err)
 		}
 
 		//nolint:gosec // test code reading test output
 		_, err := os.ReadFile(output)
 		if err == nil {
-			t.Error("expected file not found")
+			t.Error("os.ReadFile(report output) error = nil, want a not-found error")
 		}
 	})
 }
@@ -776,13 +784,41 @@ func TestRegressionThresholdFlags(t *testing.T) {
 					var exitErr *execution.ExitError
 					err := report.Do(data)
 					if !errors.As(err, &exitErr) {
-						t.Fatalf("expected exit %d, got %v", tc.code, err)
+						t.Fatalf("Do() error = %v, want an ExitError with code %d", err, tc.code)
 					}
 					if exitErr.ExitCode() != tc.code {
-						t.Fatalf("expected exit %d, got %d", tc.code, exitErr.ExitCode())
+						t.Fatalf("Do() exit code = %d, want %d", exitErr.ExitCode(), tc.code)
 					}
 				})
 			}
 		})
+	}
+}
+
+func TestFeatureReportCountsMemoryErrorsApartFromKilledAndLived(t *testing.T) {
+	isolateConfig(t)
+	out := &bytes.Buffer{}
+	log.Init(out, &bytes.Buffer{})
+	defer log.Reset()
+
+	data := report.Results{
+		Mutants: []mutator.Mutator{
+			stubMutant{status: mutator.MemoryError, mutantType: mutator.IncrementDecrement, position: fakePosition},
+			stubMutant{status: mutator.Killed, mutantType: mutator.ConditionalsNegation, position: fakePosition},
+		},
+		Elapsed: (2 * time.Minute) + (22 * time.Second),
+	}
+	if err := report.Do(data); err != nil {
+		t.Fatalf("Do() = %v, want nil", err)
+	}
+
+	want := "\n" +
+		"Mutation testing completed in 2 minutes 22 seconds\n" +
+		"Killed: 1, Lived: 0, Not covered: 0\n" +
+		"Timed out: 0, Memory errors: 1, Not viable: 0, Skipped: 0\n" +
+		"Test efficacy: 100.00%\n" +
+		"Mutator coverage: 100.00%\n"
+	if diff := cmp.Diff(want, out.String()); diff != "" {
+		t.Errorf("Do() output mismatch (-want +got):\n%s", diff)
 	}
 }

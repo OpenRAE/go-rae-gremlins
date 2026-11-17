@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "issue": 182,
+  "summary": "Upgrade the Phase E finalizer from Ground Control v1.9.0 to v1.12.0. v1.9.0 needs a delivery pointer comment that Ground Control v1.11.0 and later do not write, so each run ended with delivery_pointer_missing. v1.12.0 finds the issue from the <issue>-<slug> head branch and a trusted pickup record. The workflow pins the v1.12.0 release tuple, drops the required-checks step that failed each dev to main promotion, and drops the Sonar settings file and the checks and statuses read permissions that v1.12.0 does not use. The manifest copies the release overrides and pins hono 4.13.16 and @hono/node-server 2.1.6 to fix three moderate npm advisories. The lockfile starts from the release lockfile. The integration test, its GitHub stand-in, the Phase E documents, and the evidence files change to match. No Go package, import, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The delivery_finalization boundary keeps its destinations: the existing CI runner, the GitHub API, the private Ground Control release, and the npm registry. It executes no candidate source. The job token loses checks read, statuses read, and the Sonar secret, so the boundary gets smaller. The other trust_changes entries restate the existing boundaries.",
+  "conflicts": [],
+  "policies": [
+    "delivery_finalization",
+    "finalizer_manifest",
+    "finalizer_lock"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

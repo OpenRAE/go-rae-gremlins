@@ -113,20 +113,20 @@ func TestCoverageRun(t *testing.T) {
 			assertCallerDirKept(t, callerDir, holder, mod.Root)
 
 			firstWant := "go mod download"
-			secondWant := fmt.Sprintf("go test -tags tag1 tag2 -coverpkg %s -cover -coverprofile %v %s",
+			secondWant := fmt.Sprintf("go test -tags tag1 tag2 -coverpkg %s -count=1 -cover -coverprofile %v %s",
 				coverpkg, wantFilePath, tc.wantPath)
 
 			if len(holder.events) != 2 {
-				t.Fatal("expected two commands to be executed")
+				t.Fatalf("Run() executed %d commands, want 2", len(holder.events))
 			}
 			firstGot := fmt.Sprintf("go %v", strings.Join(holder.events[0].args, " "))
 			secondGot := fmt.Sprintf("go %v", strings.Join(holder.events[1].args, " "))
 
-			if !cmp.Equal(firstGot, firstWant) {
-				t.Error(cmp.Diff(firstGot, firstWant))
+			if diff := cmp.Diff(firstWant, firstGot); diff != "" {
+				t.Errorf("Run() first command mismatch (-want +got):\n%s", diff)
 			}
-			if !cmp.Equal(secondGot, secondWant) {
-				t.Error(cmp.Diff(secondGot, secondWant))
+			if diff := cmp.Diff(secondWant, secondGot); diff != "" {
+				t.Errorf("Run() second command mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -155,14 +155,14 @@ func TestCoverageRunFails(t *testing.T) {
 	t.Run("failure of: go mod download", func(t *testing.T) {
 		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 0), "workdir", mod)
 		if _, err := cov.Run(t.Context()); err == nil {
-			t.Error("expected run to report an error")
+			t.Error("Run() error = nil, want an error")
 		}
 	})
 
 	t.Run("failure of: go test", func(t *testing.T) {
 		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 1), "workdir", mod)
 		if _, err := cov.Run(t.Context()); err == nil {
-			t.Error("expected run to report an error")
+			t.Error("Run() error = nil, want an error")
 		}
 	})
 }
@@ -240,11 +240,14 @@ func TestCoverageParsesOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !cmp.Equal(got.Profile, want.Profile) {
-		t.Error(cmp.Diff(got, want))
+	if diff := cmp.Diff(want.Profile, got.Profile); diff != "" {
+		t.Errorf("Run() profile mismatch (-want +got):\n%s", diff)
 	}
 	if got.Elapsed == 0 {
-		t.Error("expected elapsed time to be greater than 0")
+		t.Error("Run() Elapsed = 0, want a positive duration")
+	}
+	if got.Peak == 0 {
+		t.Error("Run().Peak = 0, want the peak memory of the coverage process")
 	}
 }
 
@@ -284,7 +287,7 @@ func TestParseOutputFail(t *testing.T) {
 	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), "testdata/invalid", mod)
 
 	if _, err := cov.Run(t.Context()); err == nil {
-		t.Error("expected an error")
+		t.Error("Run() with an invalid coverage profile error = nil, want an error")
 	}
 }
 

@@ -505,7 +505,7 @@ func TestMutations(t *testing.T) {
 			got := res.Mutants
 
 			if res.Module != expectedModule {
-				t.Errorf("expected module to be %q, got %q", expectedModule, res.Module)
+				t.Errorf("Run() Module = %q, want %q", res.Module, expectedModule)
 			}
 
 			for _, g := range got {
@@ -515,8 +515,7 @@ func TestMutations(t *testing.T) {
 				}
 			}
 
-			t.Errorf("expected tokenMutations list to contain the found mutation")
-			t.Log(got)
+			t.Errorf("Run() mutants = %v, want a %v mutant with status %v and a position", got, tc.mutantType, tc.mutStatus)
 		})
 	}
 }
@@ -541,7 +540,7 @@ func TestMutantSkipDisabled(t *testing.T) {
 
 			for _, m := range got {
 				if m.Type() == mt {
-					t.Fatalf("expected %q not to be in the found tokens", mt)
+					t.Fatalf("Run() with %v disabled returned a %v mutant, want none", mt, mt)
 				}
 			}
 		})
@@ -572,10 +571,10 @@ func TestDisablingOneMutantTypeDoesNotDisableOthersForSameToken(t *testing.T) {
 	}
 
 	if !hasNegation {
-		t.Fatal("expected ConditionalsNegation mutants to still be produced")
+		t.Fatal("Run() returned no ConditionalsNegation mutants, want at least one")
 	}
 	if hasBoundary {
-		t.Fatal("expected ConditionalsBoundary mutants to be disabled")
+		t.Fatal("Run() returned a ConditionalsBoundary mutant, want none")
 	}
 }
 
@@ -636,6 +635,46 @@ func TestFeatureSkipTestdataVendorAndNestedModuleTrees(t *testing.T) {
 	for _, excluded := range []string{"testdata/fixture.go", "vendor/dep/file.go", "nested/file.go"} {
 		if files[excluded] != 0 {
 			t.Errorf("got mutants of %s, want none; mutants by file: %v", excluded, files)
+		}
+	}
+}
+
+// TestRegressionSkipFilesTheGoToolIgnores checks that Run mutates no file
+// that the go tool ignores: a name that starts with "." or "_", or a file in
+// such a directory, for example a Go file under .git.
+func TestRegressionSkipFilesTheGoToolIgnores(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile("testdata/fixtures/geq_go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const mutated = "pkg/file.go"
+	ignored := []string{".git/review/probe.go", "_tools/tool.go", "pkg/.hidden.go", "pkg/_ignored.go"}
+	sys := fstest.MapFS{mutated: {Data: src}}
+	for _, name := range ignored {
+		sys[name] = &fstest.MapFile{Data: src}
+	}
+	mod := gomodule.GoModule{
+		Name:       expectedModule,
+		Root:       ".",
+		CallingDir: ".",
+	}
+	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+	defer viperReset()
+	mut := engine.New(mod, engine.CodeData{}, newJobDealerStub(t), engine.WithDirFs(sys))
+	res := runEngine(t, mut)
+
+	files := make(map[string]int)
+	for _, m := range res.Mutants {
+		files[m.Position().Filename]++
+	}
+	if files[mutated] == 0 {
+		t.Errorf("got no mutants of %s, want mutants; mutants by file: %v", mutated, files)
+	}
+	for _, name := range ignored {
+		if files[name] != 0 {
+			t.Errorf("got mutants of %s, want none; mutants by file: %v", name, files)
 		}
 	}
 }
@@ -885,28 +924,122 @@ func checkObservableStatuses(
 	t *testing.T, mutants []mutator.Mutator, observable map[mutantLine]bool, observedState mutator.Status,
 ) {
 	t.Helper()
+	want := make(map[mutantLine]mutator.Status, len(observable))
+	for at, obs := range observable {
+		want[at] = mutator.Skipped
+		if obs {
+			want[at] = observedState
+		}
+	}
+	checkLineStatuses(t, mutants, want)
+}
+
+// checkLineStatuses checks that each mutant is on a line of want and has the
+// status of that line, and that each line of want has a mutant.
+func checkLineStatuses(t *testing.T, mutants []mutator.Mutator, want map[mutantLine]mutator.Status) {
+	t.Helper()
 	found := make(map[mutantLine]bool)
 	for _, m := range mutants {
 		at := mutantLine{m.Position().Filename, m.Position().Line}
-		obs, ok := observable[at]
+		wantStatus, ok := want[at]
 		if !ok {
 			t.Errorf("got %s mutant at %s, want no mutant on that line", m.Type(), m.Position())
 
 			continue
 		}
 		found[at] = true
-		want := mutator.Skipped
-		if obs {
-			want = observedState
-		}
-		if m.Status() != want {
-			t.Errorf("%s mutant at %s: status = %s, want %s", m.Type(), m.Position(), m.Status(), want)
+		if m.Status() != wantStatus {
+			t.Errorf("%s mutant at %s: status = %s, want %s", m.Type(), m.Position(), m.Status(), wantStatus)
 		}
 	}
-	for at := range observable {
+	for at := range want {
 		if !found[at] {
 			t.Errorf("got no mutant at %s:%d, want at least one", at.file, at.line)
 		}
+	}
+}
+
+// TestRegressionPackageVarInitializerCoverage checks the status of a mutant
+// in a package-level variable initializer. The profile has blocks only for
+// function bodies, as a real profile does. An executed block in any file of
+// the package proves that the initializers ran, so the mutant is runnable.
+// Without such a block the profile cannot show the initializer, so the mutant
+// is skipped. A function literal in an initializer follows its own blocks.
+func TestRegressionPackageVarInitializerCoverage(t *testing.T) {
+	const (
+		ranFile  = "ran/vars.go"
+		onlyFile = "ran/only.go"
+		idleFile = "idle/vars.go"
+	)
+	sys := fstest.MapFS{
+		ranFile: {Data: []byte("package ran\n\nvar delay = 5 * 2\n\n" +
+			"var check = func(a int) bool { return a > 0 }\n\n" +
+			"func F() int { return delay * 3 }\n")},
+		onlyFile: {Data: []byte("package ran\n\nvar size = 2 + 3\n")},
+		idleFile: {Data: []byte("package idle\n\nvar size = 2 + 3\n\nfunc G(a int) int { return a - 1 }\n")},
+	}
+	// The block is the body of F. No test ran check or G.
+	profile := coverage.Profile{ranFile: {{StartLine: 7, StartCol: 14, EndLine: 7, EndCol: 34}}}
+	want := map[mutantLine]mutator.Status{
+		{ranFile, 3}:  mutator.Runnable,
+		{ranFile, 5}:  mutator.NotCovered,
+		{ranFile, 7}:  mutator.Runnable,
+		{onlyFile, 3}: mutator.Runnable,
+		{idleFile, 3}: mutator.Skipped,
+		{idleFile, 5}: mutator.NotCovered,
+	}
+	mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+	defer viperReset()
+
+	mut := engine.New(mod, engine.CodeData{Cov: profile}, newJobDealerStub(t), engine.WithDirFs(sys))
+	res := runEngine(t, mut)
+
+	checkLineStatuses(t, res.Mutants, want)
+}
+
+// TestRegressionSkipTypeDeclarationsAndSignatures checks that a mutant in a
+// package-level type declaration or in the signature of a function, a method,
+// or a function literal of a package-level variable is skipped. The compiler
+// evaluates these expressions, so no test run can cover them. The mutants in
+// the function bodies follow the coverage profile.
+func TestRegressionSkipTypeDeclarationsAndSignatures(t *testing.T) {
+	const sigFile = "sig.go"
+	sys := fstest.MapFS{
+		sigFile: {Data: []byte("package p\n\n" +
+			"type Buf [4 * 2]byte\n\n" +
+			"var check = func(b [2 + 1]int) int {\n\treturn len(b) * 2\n}\n\n" +
+			"type T struct{}\n\n" +
+			"func (T) M(b [1 + 1]int) (r [3 - 1]int) {\n\treturn [2]int{b[0] * 2, b[1]}\n}\n")},
+	}
+	// observable maps each line with mutants to whether coverage can observe it.
+	observable := map[mutantLine]bool{
+		{sigFile, 3}:  false,
+		{sigFile, 5}:  false,
+		{sigFile, 6}:  true,
+		{sigFile, 11}: false,
+		{sigFile, 12}: true,
+	}
+	full := coverage.Profile{sigFile: {{StartLine: 1, StartCol: 1, EndLine: 100, EndCol: 1}}}
+	tests := []struct {
+		name          string
+		profile       coverage.Profile
+		observedState mutator.Status
+	}{
+		{name: "every line covered", profile: full, observedState: mutator.Runnable},
+		{name: "no coverage blocks", profile: coverage.Profile{}, observedState: mutator.NotCovered},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+			viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+			defer viperReset()
+
+			mut := engine.New(mod, engine.CodeData{Cov: tc.profile}, newJobDealerStub(t), engine.WithDirFs(sys))
+			res := runEngine(t, mut)
+
+			checkObservableStatuses(t, res.Mutants, observable, tc.observedState)
+		})
 	}
 }
 
@@ -951,7 +1084,7 @@ func TestStopsOnCancel(t *testing.T) {
 		}
 
 		if len(res.Mutants) > 0 {
-			t.Errorf("expected to receive no mutants, got %d", len(res.Mutants))
+			t.Errorf("Run() returned %d mutants, want 0", len(res.Mutants))
 		}
 	})
 }
@@ -1063,7 +1196,7 @@ func TestPackageDiscovery(t *testing.T) {
 			got := jds.gotMutants[0].Pkg()
 
 			if got != tc.wantPath {
-				t.Errorf("want %q, got %q", tc.wantPath, got)
+				t.Errorf("mutant Pkg() = %q, want %q", got, tc.wantPath)
 			}
 		})
 	}

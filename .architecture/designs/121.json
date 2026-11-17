@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "issue": 121,
+  "summary": "The Makefile build and cover targets become phony targets that always run their Go commands. Before this change, they depended on output files with no prerequisites, so an existing dist/bin/gremlins or coverage.out file stopped the recipe and the targets returned stale output. Go's build cache skips unchanged work. The commands and their arguments do not change. No Go package, dependency, CLI flag, configuration key, JSON report field, exit code, architecture rule, or baseline changes. The only modeled policy change is the Makefile build policy.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The build and cover targets run the same go build and go test commands as before, with the same arguments and working directory. The change adds no network call, no new destination, and no new source execution. The trust_changes entries restate the model's existing boundaries; this change does not change them.",
+  "conflicts": [],
+  "policies": [
+    "build"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  }
+}

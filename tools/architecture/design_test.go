@@ -48,7 +48,7 @@ func TestFeatureDesignContractCompatibility(t *testing.T) {
 			}
 			err := checkDesign(testModel(t), d)
 			if (err != nil) != tc.bad {
-				t.Fatalf("error=%v", err)
+				t.Fatalf("checkDesign() error = %v, want error %t", err, tc.bad)
 			}
 			if tc.bad && !strings.Contains(err.Error(), "CON") {
 				t.Fatalf("no compiled rule diagnostic: %v", err)
@@ -79,7 +79,7 @@ func TestFeatureDesignTrustCompatibility(t *testing.T) {
 			}
 			err := checkDesign(testModel(t), d)
 			if (err != nil) != tc.bad {
-				t.Fatalf("error=%v", err)
+				t.Fatalf("checkDesign() error = %v, want error %t", err, tc.bad)
 			}
 			if tc.bad && !strings.Contains(err.Error(), "TRUST") {
 				t.Fatalf("no compiled rule diagnostic: %v", err)
@@ -155,7 +155,7 @@ func TestFeatureDesignTestDependencyScope(t *testing.T) {
 				Changes:         []change{{Package: corePackage, Imports: tc.imports, TestImports: tc.testImports}},
 			}
 			if err := checkDesign(c, d); (err != nil) != tc.bad {
-				t.Fatalf("error=%v", err)
+				t.Fatalf("checkDesign() error = %v, want error %t", err, tc.bad)
 			}
 		})
 	}

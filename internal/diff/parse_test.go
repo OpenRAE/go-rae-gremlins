@@ -25,81 +25,85 @@ import (
 )
 
 func TestNewWithCmd(t *testing.T) {
-	t.Run("must return nil on empty flag", func(t *testing.T) {
-		setDiffRef(t, "")
+	t.Run("must return nil on empty flag", testNewWithCmdEmptyRef)
+	t.Run("must return error", testNewWithCmdGitFailure)
+	t.Run("must return diff error", testNewWithCmdInvalidDiff)
+	t.Run("must return changes", testNewWithCmdChanges)
+}
 
-		m := &mock{}
+func testNewWithCmdEmptyRef(t *testing.T) {
+	setDiffRef(t, "")
 
-		d, err := NewWithCmd(m.call)
+	m := &mock{}
 
-		if err != nil {
-			t.Errorf("NewWithCmd() with empty diff ref: want nil error, got %v", err)
-		}
-		if d != nil {
-			t.Errorf("NewWithCmd() with empty diff ref: want nil Diff, got %#v", d)
-		}
-		if m.calls != 0 {
-			t.Errorf("NewWithCmd() with empty diff ref: want 0 git calls, got %d", m.calls)
-		}
-	})
+	d, err := NewWithCmd(m.call)
 
-	t.Run("must return error", func(t *testing.T) {
-		setDiffRef(t, "test")
+	if err != nil {
+		t.Errorf("NewWithCmd() with empty diff ref error = %v, want nil", err)
+	}
+	if d != nil {
+		t.Errorf("NewWithCmd() with empty diff ref = %#v, want nil Diff", d)
+	}
+	if m.calls != 0 {
+		t.Errorf("NewWithCmd() with empty diff ref made %d git calls, want 0", m.calls)
+	}
+}
 
-		m := &mock{
-			outputErr: errors.New("test"),
-		}
+func testNewWithCmdGitFailure(t *testing.T) {
+	setDiffRef(t, "test")
 
-		_, err := NewWithCmd(m.call)
-		if err == nil {
-			t.Error("must return error")
-		}
+	m := &mock{
+		outputErr: errors.New("test"),
+	}
 
-		if m.calls != 1 {
-			t.Fatal("cmd not called")
-		}
+	_, err := NewWithCmd(m.call)
+	if err == nil {
+		t.Error("NewWithCmd() with a failing git command error = nil, want an error")
+	}
 
-		expectedArgs := []string{"diff", "--merge-base", "test"}
+	if m.calls != 1 {
+		t.Fatalf("NewWithCmd() made %d git calls, want 1", m.calls)
+	}
 
-		if m.callName != "git" || !reflect.DeepEqual(m.callArgs, expectedArgs) {
-			t.Log("name", m.callName)
-			t.Log("args", m.callArgs)
-			t.Error("cmd not called properly")
-		}
-	})
+	expectedArgs := []string{"diff", "--merge-base", "test"}
 
-	t.Run("must return diff error", func(t *testing.T) {
-		setDiffRef(t, "test")
+	if m.callName != "git" || !reflect.DeepEqual(m.callArgs, expectedArgs) {
+		t.Errorf("NewWithCmd() ran %q %q, want %q %q", m.callName, m.callArgs, "git", expectedArgs)
+	}
+}
 
-		m := &mock{
-			output: []byte(testErrDiff),
-		}
+func testNewWithCmdInvalidDiff(t *testing.T) {
+	setDiffRef(t, "test")
 
-		_, err := NewWithCmd(m.call)
-		if err == nil {
-			t.Error("must return error")
-		}
-	})
+	m := &mock{
+		output: []byte(testErrDiff),
+	}
 
-	t.Run("must return changes", func(t *testing.T) {
-		setDiffRef(t, "test")
+	_, err := NewWithCmd(m.call)
+	if err == nil {
+		t.Error("NewWithCmd() with an invalid diff error = nil, want an error")
+	}
+}
 
-		m := &mock{
-			output: []byte(testDiff),
-		}
+func testNewWithCmdChanges(t *testing.T) {
+	setDiffRef(t, "test")
 
-		expected := Diff{
-			"test/test": {{StartLine: 44, EndLine: 44}},
-		}
+	m := &mock{
+		output: []byte(testDiff),
+	}
 
-		result, err := NewWithCmd(m.call)
+	expected := Diff{
+		"test/test": {{StartLine: 44, EndLine: 44}},
+	}
 
-		if err != nil || !reflect.DeepEqual(result, expected) {
-			t.Log("err", err)
-			t.Log("result", result)
-			t.Error("unexpected result")
-		}
-	})
+	result, err := NewWithCmd(m.call)
+
+	if err != nil {
+		t.Errorf("NewWithCmd() error = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("NewWithCmd() = %v, want %v", result, expected)
+	}
 }
 
 // setDiffRef registers the configuration reset before it sets the diff

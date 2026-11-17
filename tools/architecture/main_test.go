@@ -92,10 +92,10 @@ func TestFeatureScanBoundaries(t *testing.T) {
 				t.Fatal(err)
 			}
 			if tc.want == "" && len(findings) != 0 {
-				t.Fatalf("unexpected: %v", findings)
+				t.Fatalf("scan() findings = %v, want none", findings)
 			}
 			if tc.want != "" && (len(findings) != 1 || findings[0].Rule != tc.want) {
-				t.Fatalf("want %s, got %v", tc.want, findings)
+				t.Fatalf("scan() findings = %v, want one %s finding", findings, tc.want)
 			}
 		})
 	}
@@ -129,7 +129,7 @@ func TestFeatureBaselineRatchet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ratchet(tc.current, tc.candidate, tc.target)
 			if (err != nil) != tc.bad {
-				t.Fatalf("error=%v", err)
+				t.Fatalf("ratchet() error = %v, want error %t", err, tc.bad)
 			}
 		})
 	}
@@ -173,7 +173,7 @@ func TestFeatureDesignUsesCompiledRules(t *testing.T) {
 			}
 			err := checkDesign(testModel(t), d)
 			if (err != nil) != tc.bad {
-				t.Fatalf("error=%v", err)
+				t.Fatalf("checkDesign() error = %v, want error %t", err, tc.bad)
 			}
 		})
 	}
@@ -199,21 +199,25 @@ func TestFeatureStrictJSON(t *testing.T) {
 }
 
 func TestFeatureInvalidModels(t *testing.T) {
-	cases := []func(*model){
-		func(m *model) { m.Version = 2 },
-		func(m *model) { m.Rules[0].Fix = "" },
-		func(m *model) { m.Rules[1].ID = m.Rules[0].ID },
-		func(m *model) { m.Rules[1].Kind = "invalid" },
-		func(m *model) { m.Packages["../escape"] = component{} },
-		func(m *model) { m.Contracts[cliContract] = "/tmp/outside" },
-		func(m *model) { m.Packages[appPackage] = component{Allow: []string{"missing"}} },
-	}
-	for i, mutate := range cases {
-		m := testModel(t).model
-		mutate(&m)
-		if _, err := compile(m); err == nil {
-			t.Errorf("case %d accepted", i)
-		}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*model)
+	}{
+		{"unsupported version", func(m *model) { m.Version = 2 }},
+		{"rule without fix", func(m *model) { m.Rules[0].Fix = "" }},
+		{"duplicate rule ID", func(m *model) { m.Rules[1].ID = m.Rules[0].ID }},
+		{"invalid rule kind", func(m *model) { m.Rules[1].Kind = "invalid" }},
+		{"package path escape", func(m *model) { m.Packages["../escape"] = component{} }},
+		{"contract outside repository", func(m *model) { m.Contracts[cliContract] = "/tmp/outside" }},
+		{"unknown allowed package", func(m *model) { m.Packages[appPackage] = component{Allow: []string{"missing"}} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := testModel(t).model
+			tc.mutate(&m)
+			if _, err := compile(m); err == nil {
+				t.Errorf("compile() of a model with %s error = nil, want an error", tc.name)
+			}
+		})
 	}
 }
 

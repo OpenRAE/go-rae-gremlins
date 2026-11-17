@@ -27,9 +27,12 @@ import (
 	"sync/atomic"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
+	"github.com/OpenRAE/go-rae-gremlins/internal/coverage"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine"
+	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workdir"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
@@ -259,4 +262,18 @@ type blockingExecutorStub struct {
 func (j *blockingExecutorStub) Start(ctx context.Context, _ *workerpool.Worker) {
 	<-ctx.Done()
 	j.wg.Done()
+}
+
+// newExecutorDealer returns the executor dealer of mod for a coverage run
+// that took elapsed, with no measured peak memory.
+func newExecutorDealer(
+	t *testing.T, mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.Duration, opts ...engine.ExecutorDealerOption,
+) *engine.MutantExecutorDealer {
+	t.Helper()
+	dealer, err := engine.NewExecutorDealer(mod, wdd, coverage.Result{Elapsed: elapsed}, opts...)
+	if err != nil {
+		t.Fatalf("NewExecutorDealer() = %v, want nil", err)
+	}
+
+	return dealer
 }

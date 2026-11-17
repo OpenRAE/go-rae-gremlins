@@ -22,9 +22,17 @@ from the clause bodies that the tests ran:
 
 Go coverage profiles cannot show some code. Gremlins skips the mutations in this code:
 
-- Package-level constant declarations. The compiler evaluates them, so the profile has no blocks for them.
+- Package-level constant and type declarations, and the signatures of functions, methods, and function literals. The
+  compiler evaluates them, so the profile has no blocks for them.
 - Files that the file name or the build constraints exclude from the host build with the configured tags. For example,
   a `_windows.go` file on Linux.
+
+Go coverage profiles also have no blocks for the initializers of package-level variables. Go runs these initializers
+when it initializes the package, before any other code of the package:
+
+- An initializer is covered when the tests ran other code of the same package.
+- Gremlins skips the mutations of an initializer when the tests ran no code of the package.
+- The body of a function literal in an initializer has its own blocks in the profile.
 
 Gremlins will report each mutation as:
 
@@ -36,3 +44,4 @@ Gremlins will report each mutation as:
 - `TIMED OUT`: The tests timed out while testing the mutation: the mutation actually made the tests fail, but not
   explicitly.
 - `NOT VIABLE`: The mutation makes the build fail.
+- `MEMORY ERROR`: The test run used more memory than its limit, so Gremlins stopped it.

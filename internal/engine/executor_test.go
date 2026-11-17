@@ -116,7 +116,7 @@ func TestApplyAndRollback(t *testing.T) {
 			Root:       tmpDir,
 			CallingDir: ".",
 		}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(fakeExecCommandSuccess))
+		mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout, engine.WithExecContext(fakeExecCommandSuccess))
 		mut := &mutantStub{
 			status:  mutator.Runnable,
 			mutType: mutator.ConditionalsBoundary,
@@ -134,11 +134,11 @@ func TestApplyAndRollback(t *testing.T) {
 		startExecutor(t, executor, w, outCh, &wg, "executor")
 
 		if !mut.applyCalled {
-			t.Error("expected apply to be called")
+			t.Error("executor did not call Apply(), want one call")
 		}
 
 		if !mut.rollbackCalled {
-			t.Error("expected rollback to be called")
+			t.Error("executor did not call Rollback(), want one call")
 		}
 	})
 }
@@ -183,7 +183,7 @@ func TestMutatorTestExecution(t *testing.T) {
 				Root:       ".",
 				CallingDir: ".",
 			}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 				engine.WithExecContext(fakeExecCommandWithHolder(holder, tc.testResult)),
 			)
 			mut := &mutantStub{
@@ -203,7 +203,7 @@ func TestMutatorTestExecution(t *testing.T) {
 			got := startExecutor(t, executor, w, outCh, &wg, "executor").Mutant
 
 			if got.Status() != tc.wantMutStatus {
-				t.Errorf("expected mutation to be %v, but got: %v", tc.wantMutStatus, got.Status())
+				t.Errorf("executor result Status() = %v, want %v", got.Status(), tc.wantMutStatus)
 			}
 
 			if tc.mutantStatus != mutator.NotCovered {
@@ -217,7 +217,7 @@ func TestMutatorTestExecution(t *testing.T) {
 					}
 				}
 				if goTmpDirEnv != actualGoTmpDir {
-					t.Errorf("expected GOTMPDIR to be %s, got %s", goTmpDirEnv, actualGoTmpDir)
+					t.Errorf("go test command GOTMPDIR entry = %q, want %q", actualGoTmpDir, goTmpDirEnv)
 				}
 			}
 		})
@@ -258,7 +258,7 @@ func TestFeatureLabel(t *testing.T) {
 	wdDealer := workdir.NewCachedDealer(t.TempDir(), mod.Root)
 	defer wdDealer.Clean()
 
-	mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout)
+	mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout)
 	mut := &mutantStub{
 		status:  mutator.Runnable,
 		mutType: mutator.ConditionalsBoundary,
@@ -381,7 +381,7 @@ func runExecutorOnce(
 		Root:       ".",
 		CallingDir: ".",
 	}
-	mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(testResult))
+	mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout, engine.WithExecContext(testResult))
 	outCh := make(chan engine.ExecutorResult, 1)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -465,7 +465,7 @@ func TestMutatorRun(t *testing.T) {
 			pkg:      examplePackage,
 			callDir:  exampleCallDir,
 			tags:     exampleTags,
-			wantPath: "./...",
+			wantPath: "-p 1 ./...",
 		},
 		{
 			name:               "it can override timeout coefficient",
@@ -496,7 +496,7 @@ func TestMutatorRun(t *testing.T) {
 			}
 			wdDealer := newWdDealerStub(t)
 			holder := &commandHolder{}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 				engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 			mut := &mutantStub{
 				status:  mutator.Runnable,
@@ -527,7 +527,7 @@ func TestMutatorRun(t *testing.T) {
 			timeoutDifference := absTimeDiff(holder.timeout, expectedTimeout*2)
 			diffThreshold := 100 * time.Second
 			if timeoutDifference > diffThreshold {
-				t.Errorf("expected timeout to be within %s from the set timeout, got %s", diffThreshold, timeoutDifference)
+				t.Errorf("go test command timeout = %s, want within %s of %s", holder.timeout, diffThreshold, expectedTimeout*2)
 			}
 		})
 	}
@@ -580,7 +580,7 @@ func TestCPU(t *testing.T) {
 			}
 			wdDealer := newWdDealerStub(t)
 			holder := &commandHolder{}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 				engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 			mut := &mutantStub{
 				status:  mutator.Runnable,
@@ -599,7 +599,7 @@ func TestCPU(t *testing.T) {
 
 			for _, arg := range holder.args {
 				if !tc.cpuPresent && strings.Contains(arg, "-cpu") {
-					t.Fatal("didn't expect to have -cpu flag")
+					t.Fatalf("go test command args = %q, want no -cpu flag", holder.args)
 				}
 				if !tc.cpuPresent {
 					return
@@ -610,7 +610,7 @@ func TestCPU(t *testing.T) {
 					// PASS
 					return
 				}
-				t.Fatalf("want flag %q, got args %s", cpuFlag, holder.args)
+				t.Fatalf("go test command args = %q, want flag %q", holder.args, cpuFlag)
 			}
 
 		})
@@ -639,6 +639,48 @@ func TestProcessTestsFailure(_ *testing.T) {
 	os.Exit(1) // skipcq: RVV-A0003
 }
 
+// allocated holds the memory of TestFeatureHelperAllocates.
+var allocated [][]byte
+
+// TestFeatureHelperAllocates is a helper child that makes 512 MiB of memory
+// resident, 1 MiB each millisecond, so a memory watchdog sees the growth.
+func TestFeatureHelperAllocates(_ *testing.T) {
+	if os.Getenv("GO_TEST_PROCESS") != "1" {
+		return
+	}
+	for range 512 {
+		chunk := make([]byte, 1<<20)
+		for i := 0; i < len(chunk); i += os.Getpagesize() {
+			chunk[i] = 1
+		}
+		allocated = append(allocated, chunk)
+		time.Sleep(time.Millisecond)
+	}
+	os.Exit(0) // skipcq: RVV-A0003
+}
+
+func TestFeatureExecutorReportsMemoryError(t *testing.T) {
+	viperSet(map[string]any{
+		configuration.UnleashDryRunKey:       false,
+		configuration.UnleashMemoryBudgetKey: "64M",
+	})
+	defer viperReset()
+	mut := &mutantStub{
+		status:  mutator.Runnable,
+		mutType: mutator.ConditionalsBoundary,
+		pkg:     expectedModule,
+	}
+
+	got := runExecutorOnce(t, newWdDealerStub(t), fakeExecCommandAllocates, mut)
+
+	if got.Err != nil {
+		t.Fatalf("result error = %v, want nil", got.Err)
+	}
+	if mut.status != mutator.MemoryError {
+		t.Errorf("mutant status = %v, want %v", mut.status, mutator.MemoryError)
+	}
+}
+
 func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 	t.Run("mutation should run in the correct folder", func(t *testing.T) {
 		callingDir := exampleCallDir
@@ -649,7 +691,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		}
 		wdDealer := newWdDealerStub(t)
 		holder := &commandHolder{}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+		mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 			engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 		mut := &mutantStub{
 			status:  mutator.Runnable,
@@ -667,7 +709,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		startExecutor(t, executor, w, outCh, &wg, "executor")
 
 		if mut.Workdir() != holder.cmd.Dir {
-			t.Errorf("expected working dir to be %s, got %s", holder.cmd.Dir, mut.Workdir())
+			t.Errorf("go test command Dir = %q, want the mutant workdir %q", holder.cmd.Dir, mut.Workdir())
 		}
 	})
 	t.Run("integration mode: mutation should run in the wd root folder", func(t *testing.T) {
@@ -690,7 +732,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		}
 
 		holder := &commandHolder{}
-		mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout,
+		mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
 			engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
 		mut := &mutantStub{
 			status:  mutator.Runnable,
@@ -708,7 +750,7 @@ func TestMutatorRunInTheCorrectFolder(t *testing.T) {
 		startExecutor(t, executor, w, outCh, &wg, "executor")
 
 		if wantRootDir != holder.cmd.Dir {
-			t.Errorf("expected working dir to be %q, got %q", wantRootDir, holder.cmd.Dir)
+			t.Errorf("go test command Dir = %q, want %q", holder.cmd.Dir, wantRootDir)
 		}
 	})
 }
@@ -765,6 +807,13 @@ func fakeExecCommandTestsFailure(ctx context.Context, command string, args ...st
 	return getCmd(ctx, cs)
 }
 
+func fakeExecCommandAllocates(ctx context.Context, command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=^TestFeatureHelperAllocates$", "--", command}
+	cs = append(cs, args...)
+
+	return getCmd(ctx, cs)
+}
+
 func getCmd(ctx context.Context, cs []string) *exec.Cmd {
 	// #nosec G204 G702 - We are in tests, we don't care
 	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
@@ -806,7 +855,7 @@ func TestFeatureExecutorCancellation(t *testing.T) {
 			}
 			wdDealer := newWdDealerStub(t)
 			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
-			mjd := engine.NewExecutorDealer(mod, wdDealer, expectedTimeout, engine.WithExecContext(cancelingExec))
+			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout, engine.WithExecContext(cancelingExec))
 			mut := &mutantStub{
 				status:  mutator.Runnable,
 				mutType: mutator.ConditionalsBoundary,

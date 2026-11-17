@@ -43,16 +43,16 @@ func TestUninitialised(t *testing.T) {
 	})
 
 	if got := out.String(); got != "" {
-		t.Errorf("out after Reset: want empty, got %q", got)
+		t.Errorf("out after Reset = %q, want empty", got)
 	}
 	if got := eOut.String(); got != "" {
-		t.Errorf("eOut after Reset: want empty, got %q", got)
+		t.Errorf("eOut after Reset = %q, want empty", got)
 	}
 	if stdout != "" {
-		t.Errorf("os.Stdout of uninitialised logger: want empty, got %q", stdout)
+		t.Errorf("os.Stdout of uninitialised logger = %q, want empty", stdout)
 	}
 	if stderr != "" {
-		t.Errorf("os.Stderr of uninitialised logger: want empty, got %q", stderr)
+		t.Errorf("os.Stderr of uninitialised logger = %q, want empty", stderr)
 	}
 }
 
@@ -121,7 +121,7 @@ func TestLogInfo(t *testing.T) {
 
 		want := "test 1"
 		if got != want {
-			t.Errorf("want %q, got %q", want, got)
+			t.Errorf("Infof() output = %q, want %q", got, want)
 		}
 	})
 
@@ -134,7 +134,7 @@ func TestLogInfo(t *testing.T) {
 
 		want := "test test\n"
 		if got != want {
-			t.Errorf("want %q, got %q", want, got)
+			t.Errorf("Infoln() output = %q, want %q", got, want)
 		}
 	})
 	log.Reset()
@@ -156,12 +156,12 @@ func TestLogError(t *testing.T) {
 
 		want := "ERROR: test 1"
 		if got != want {
-			t.Errorf("want %q, got %q", want, got)
+			t.Errorf("Errorf() error output = %q, want %q", got, want)
 		}
 
 		got = out.String()
 		if got != "" {
-			t.Errorf("expected out to be empty, got %s", got)
+			t.Errorf("Errorf() output = %q, want empty", got)
 		}
 	})
 
@@ -175,12 +175,12 @@ func TestLogError(t *testing.T) {
 
 		want := "ERROR: test test\n"
 		if got != want {
-			t.Errorf("want %q, got %q", want, got)
+			t.Errorf("Errorln() error output = %q, want %q", got, want)
 		}
 
 		got = out.String()
 		if got != "" {
-			t.Errorf("expected out to be empty, got %s", got)
+			t.Errorf("Errorln() output = %q, want empty", got)
 		}
 	})
 }
@@ -219,11 +219,10 @@ func TestSilentMode(t *testing.T) {
 	log.Errorf("%s\n", "test")
 	log.Errorln("test")
 
-	if sOut.String() != "" {
-		t.Errorf("expected empty string")
+	if got := sOut.String(); got != "" {
+		t.Errorf("silent mode output = %q, want empty", got)
 	}
-	if eOut.String() != "ERROR: test\nERROR: test\n" {
-		t.Log(eOut.String())
-		t.Errorf("expected errors to be reported")
+	if got, want := eOut.String(), "ERROR: test\nERROR: test\n"; got != want {
+		t.Errorf("silent mode error output = %q, want %q", got, want)
 	}
 }

@@ -154,7 +154,7 @@ func (mu *Engine) discover(ctx context.Context) error {
 			return nil
 		}
 
-		isGoCode := filepath.Ext(walkPath) == ".go" && !strings.HasSuffix(walkPath, "_test.go")
+		isGoCode := filepath.Ext(walkPath) == ".go" && !strings.HasSuffix(walkPath, "_test.go") && !goIgnored(d.Name())
 		if !isGoCode || mu.codeData.Exclusion.IsFileExcluded(walkPath) {
 			return nil
 		}
@@ -163,17 +163,23 @@ func (mu *Engine) discover(ctx context.Context) error {
 	})
 }
 
-// skipDir reports whether dirPath is a testdata tree, a vendor tree, or the
-// root of a nested Go module. None of these belong to the module being
-// mutated, so Run must not descend into them.
+// skipDir reports whether dirPath is a testdata tree, a vendor tree, a tree
+// that the go tool ignores, or the root of a nested Go module. None of these
+// belong to the module being mutated, so Run must not descend into them.
 func (mu *Engine) skipDir(dirPath, name string) bool {
-	if name == "testdata" || name == "vendor" {
+	if name == "testdata" || name == "vendor" || goIgnored(name) {
 		return true
 	}
 
 	_, err := fs.Stat(mu.fs, path.Join(dirPath, "go.mod"))
 
 	return err == nil
+}
+
+// goIgnored reports whether the go tool ignores a file or directory with
+// name: it ignores names that start with "." or "_".
+func goIgnored(name string) bool {
+	return strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
 }
 
 func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {

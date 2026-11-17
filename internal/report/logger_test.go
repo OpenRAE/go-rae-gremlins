@@ -59,6 +59,7 @@ func Test_parseFilter(t *testing.T) {
 				mutator.Runnable: struct{}{},
 			},
 		},
+
 		{
 			filter: "",
 		},
@@ -125,11 +126,11 @@ func TestParseDiffFilter(t *testing.T) {
 
 			got, err := report.ParseDiffFilter(tc.input)
 			if !errors.Is(err, tc.wantErr) {
-				t.Errorf("expected err %v, got: %v", tc.wantErr, err)
+				t.Errorf("ParseDiffFilter(%q) error = %v, want %v", tc.input, err, tc.wantErr)
 			}
 
 			if !reflect.DeepEqual(got, tc.wantFilter) {
-				t.Errorf("ParseDiffFilter() got = %v, want %v", got, tc.wantFilter)
+				t.Errorf("ParseDiffFilter(%q) = %v, want %v", tc.input, got, tc.wantFilter)
 			}
 		})
 	}
@@ -172,8 +173,8 @@ func TestLogger(t *testing.T) {
 		"      KILLED CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n" +
 		"       LIVED CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n"
 
-	if !cmp.Equal(got, want) {
-		t.Error(cmp.Diff(got, want))
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Mutant() output mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -198,10 +199,10 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		})
 
 		if out.Len() > 0 {
-			t.Errorf("expected no output for filtered-out mutant, got: %q", out.String())
+			t.Errorf("Mutant() output = %q, want empty", out.String())
 		}
 		if errOut.Len() > 0 {
-			t.Errorf("expected no error output for filtered-out mutant, got: %q", errOut.String())
+			t.Errorf("Mutant() error output = %q, want empty", errOut.String())
 		}
 	})
 
@@ -226,10 +227,10 @@ func TestLoggerOutputStatusesAndDiffStatusesTogether(t *testing.T) {
 		got := out.String()
 		statusLine := "      KILLED CONDITIONALS_BOUNDARY at aFolder/aFile.go:12:3\n"
 		if !strings.HasPrefix(got, statusLine) {
-			t.Errorf("expected status line prefix, got: %q", got)
+			t.Errorf("Mutant() output = %q, want prefix %q", got, statusLine)
 		}
 		if !strings.Contains(got, "-x > y") || !strings.Contains(got, "+x >= y") {
-			t.Errorf("expected diff lines in output, got: %q", got)
+			t.Errorf("Mutant() output = %q, want the lines %q and %q", got, "-x > y", "+x >= y")
 		}
 	})
 }
@@ -256,10 +257,10 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 
 		got := out.String()
 		if !strings.HasPrefix(got, statusLine) {
-			t.Errorf("expected status line prefix, got: %q", got)
+			t.Errorf("Mutant() output = %q, want prefix %q", got, statusLine)
 		}
 		if !strings.Contains(got, "-x > y") || !strings.Contains(got, "+x >= y") {
-			t.Errorf("expected diff lines in output, got: %q", got)
+			t.Errorf("Mutant() output = %q, want the lines %q and %q", got, "-x > y", "+x >= y")
 		}
 	})
 
@@ -275,7 +276,7 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 
 		got := out.String()
 		if got != statusLine {
-			t.Errorf("expected only status line, got: %q", got)
+			t.Errorf("Mutant() output = %q, want %q", got, statusLine)
 		}
 	})
 
@@ -290,7 +291,18 @@ func TestLoggerOutputDiffStatuses(t *testing.T) {
 
 		got := out.String()
 		if got != statusLine {
-			t.Errorf("expected only status line, got: %q", got)
+			t.Errorf("Mutant() output = %q, want %q", got, statusLine)
 		}
 	})
+}
+
+func TestFeatureParseFilterSelectsMemoryErrors(t *testing.T) {
+	got, err := report.ParseFilter("m")
+	if err != nil {
+		t.Fatalf("ParseFilter(%q) = %v, want nil", "m", err)
+	}
+	want := report.Filter{mutator.MemoryError: struct{}{}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("ParseFilter(%q) mismatch (-want +got):\n%s", "m", diff)
+	}
 }

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "issue": 181,
+  "summary": "Add the Merge Queue Removed workflow from Ground Control. It runs on the pull_request enqueued, dequeued, and closed events for dev. It adds the merge-queue-removed label to an open PR that the dev merge queue removed, and removes the label when the PR enters the queue again or closes. docs/CONTRIBUTING.md describes the label. No Go package, import, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The new workflow is not a modeled policy path. It reads the PR state and writes PR labels through the GitHub API with the workflow token, which has only pull-requests write access. It checks out no code and executes no candidate source. Event values reach the shell only through environment variables. The trust_changes entries restate the existing boundaries.",
+  "conflicts": [],
+  "policies": [
+    "contributing"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

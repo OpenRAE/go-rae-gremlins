@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-11-15T02:47:53.718779+00:00",
+  "release": "v1.12.0",
+  "release_sha256": "67ab2945bd35ef107b2d4c4cbd60d1f66307e57199615bfdabf7f5c6dcbb31e5",
+  "source_commit": "4b0bb6eea0082bda66c5e610495eb4bb59937467",
+  "command": "GROUND_CONTROL_TEST_ROOT=<reference-install>/node_modules/grndctl GROUND_CONTROL_RELEASE_ASSET=<verified-asset> node --test .github/ground-control/phase-e.integration.test.mjs",
+  "scope": "Actual workflow scripts and fresh checksum-verified locked CLI installation; GitHub API/CLI stand-in, not live repository credentials.",
+  "tests": 16,
+  "passed": 16,
+  "failed": 0,
+  "skipped": 0,
+  "sha256": {
+    ".github/workflows/ground-control-phase-e.yml": "ca6468de9be730c7a171347bfe42bd68248061b2fcb9b5c6eeb458916eea269f",
+    ".github/workflows/ground-control-fork-finalization.yml": "0f1f6f58080c5768d96c7683d1254bb5bbdf625ed7eb21ea87fb6897004d1072",
+    ".github/ground-control/package.json": "93db23697f6b1260b86069b21076ed55acd4de659090dbed962f1fde96c29f35",
+    ".github/ground-control/package-lock.json": "d8ac89248a2c704371a1ade331b8c6bd6bdf12ef50d23faf35f22873fcb778c4",
+    ".github/ground-control/phase-e.integration.test.mjs": "0d5fe73b8ba50a7641c438764ff86b235e33713782f0e022b5685d430e50c3c3",
+    ".github/ground-control/fixtures/github.cjs": "90d27e71066422555c9730c8a351c1fc1bbfcb46cf011a1a2a83fcd7f2fc6852",
+    "docs/development/evidence/phase-e-v1.12.0.tap": "dd13f33eec7923c4051f9b358705f480b0e5feff9bdcf9c2f8a669efcc101a3d"
+  },
+  "npm_audit_omit_dev": {
+    "vulnerabilities": 0
+  },
+  "local_verification_environment": {
+    "reference_package": "<temporary-directory>/node_modules/grndctl",
+    "verified_asset": "<temporary-directory>/grndctl-1.12.0.tgz",
+    "private_artifacts_committed": false
+  }
+}

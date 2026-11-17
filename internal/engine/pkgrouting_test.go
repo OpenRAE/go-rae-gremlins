@@ -135,7 +135,7 @@ func runRoutingModule(t *testing.T, callingDir string, wantPkgs map[string]strin
 
 	wdDealer := workdir.NewCachedDealer(t.TempDir(), mod.Root)
 	defer wdDealer.Clean()
-	jDealer := engine.NewExecutorDealer(mod, wdDealer, 30*time.Second)
+	jDealer := newExecutorDealer(t, mod, wdDealer, 30*time.Second)
 	codeData := engine.CodeData{Cov: wholeFilesCovered(wantPkgs)}
 	eng := engine.New(mod, codeData, jDealer)
 

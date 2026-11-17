@@ -33,12 +33,12 @@ import (
 func TestUnleash(t *testing.T) {
 	c, err := newUnleashCmd(context.Background())
 	if err != nil {
-		t.Fatal("newUnleashCmd should no fail")
+		t.Fatalf("newUnleashCmd() error = %v, want nil", err)
 	}
 	cmd := c.cmd
 
 	if cmd.Name() != "unleash" {
-		t.Errorf("expected 'unleash', got %q", cmd.Name())
+		t.Errorf("newUnleashCmd().Name() = %q, want %q", cmd.Name(), "unleash")
 	}
 
 	flags := cmd.Flags()
@@ -160,6 +160,7 @@ func TestUnleash(t *testing.T) {
 			flagType: intType,
 			defValue: "0",
 		},
+
 		{
 			name:     "workers",
 			flagType: intType,
@@ -172,16 +173,16 @@ func TestUnleash(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f := flags.Lookup(tc.name)
 			if f == nil {
-				t.Fatalf("expected flag %q to be registered", tc.name)
+				t.Fatalf("flags.Lookup(%q) = nil, want a registered flag", tc.name)
 			}
 			if tc.shorthand != "" && f.Shorthand != tc.shorthand {
-				t.Errorf("expected %q to have a shorthand %q, got %q", tc.name, tc.shorthand, f.Shorthand)
+				t.Errorf("flag %q shorthand = %q, want %q", tc.name, f.Shorthand, tc.shorthand)
 			}
 			if f.Value.Type() != tc.flagType {
-				t.Errorf("expected %q to be type %q, got %q", tc.name, f.Value.Type(), f.Value.Type())
+				t.Errorf("flag %q type = %q, want %q", tc.name, f.Value.Type(), tc.flagType)
 			}
 			if f.DefValue != tc.defValue {
-				t.Errorf("expected %q to have default value %q, got %q", tc.name, tc.defValue, f.DefValue)
+				t.Errorf("flag %q default = %q, want %q", tc.name, f.DefValue, tc.defValue)
 			}
 		})
 	}
@@ -191,17 +192,17 @@ func TestUnleash(t *testing.T) {
 		s := strings.ToLower(mt.String())
 		mtf := flags.Lookup(s)
 		if mtf == nil {
-			t.Errorf("expected to have flag for mutant type: %s", mt)
+			t.Errorf("flags.Lookup(%q) = nil, want a flag for mutant type %s", s, mt)
 
 			continue
 		}
 
 		if mtf.Value.Type() != boolType {
-			t.Errorf("expected %q to be a %q, got %q", s, boolType, mtf.Value.Type())
+			t.Errorf("flag %q type = %q, want %q", s, mtf.Value.Type(), boolType)
 		}
 		wantDef := fmt.Sprintf("%v", configuration.IsDefaultEnabled(mt))
 		if mtf.DefValue != wantDef {
-			t.Errorf("expected %q have default %q, got %q", s, wantDef, mtf.DefValue)
+			t.Errorf("flag %q default = %q, want %q", s, mtf.DefValue, wantDef)
 		}
 	}
 }
@@ -456,4 +457,21 @@ func newUnleashWorkspace(t *testing.T) string {
 	}
 
 	return workspace
+}
+
+func TestFeatureUnleashRegistersMemoryBudgetFlag(t *testing.T) {
+	c, err := newUnleashCmd(context.Background())
+	if err != nil {
+		t.Fatalf("newUnleashCmd() = %v, want nil", err)
+	}
+	f := c.cmd.Flags().Lookup("memory-budget")
+	if f == nil {
+		t.Fatal("flag memory-budget is not registered")
+	}
+	if got := f.Value.Type(); got != "string" {
+		t.Errorf("memory-budget type = %q, want %q", got, "string")
+	}
+	if f.DefValue != "" {
+		t.Errorf("memory-budget default = %q, want empty", f.DefValue)
+	}
 }

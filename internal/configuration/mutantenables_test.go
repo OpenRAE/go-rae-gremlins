@@ -83,7 +83,7 @@ func TestMutantDefaultStatus(t *testing.T) {
 			got := configuration.IsDefaultEnabled(tc.mutantType)
 
 			if got != tc.expected {
-				t.Errorf("expected %s to be %q, got %q", tc.mutantType, enabled(tc.expected), enabled(got))
+				t.Errorf("IsDefaultEnabled(%s) = %q, want %q", tc.mutantType, enabled(got), enabled(tc.expected))
 			}
 		})
 	}

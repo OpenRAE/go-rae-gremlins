@@ -17,7 +17,6 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -28,9 +27,11 @@ import (
 	"time"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
+	"github.com/OpenRAE/go-rae-gremlins/internal/coverage"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workdir"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
+	"github.com/OpenRAE/go-rae-gremlins/internal/log"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 	"github.com/OpenRAE/go-rae-gremlins/internal/process"
 )
@@ -67,6 +68,7 @@ type MutantExecutorDealer struct {
 	execContext       execContext
 	mod               gomodule.GoModule
 	buildTags         string
+	memory            memoryPlan
 	testExecutionTime time.Duration
 	dryRun            bool
 	integrationMode   bool
@@ -85,8 +87,13 @@ func WithExecContext(c execContext) ExecutorDealerOption {
 	}
 }
 
-// NewExecutorDealer initialises a MutantExecutorDealer.
-func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.Duration, opts ...ExecutorDealerOption) *MutantExecutorDealer {
+// NewExecutorDealer initialises a MutantExecutorDealer. The elapsed time
+// and the peak memory of baseline, the coverage run, give the timeout and
+// the memory limit of each mutant test run. It returns an error when it
+// cannot find the memory budget.
+func NewExecutorDealer(
+	mod gomodule.GoModule, wdd workdir.Dealer, baseline coverage.Result, opts ...ExecutorDealerOption,
+) (*MutantExecutorDealer, error) {
 	buildTags := configuration.Get[string](configuration.UnleashTagsKey)
 	dryRun := configuration.Get[bool](configuration.UnleashDryRunKey)
 	integrationMode := configuration.Get[bool](configuration.UnleashIntegrationMode)
@@ -104,10 +111,13 @@ func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.D
 
 	// Use a minimum of 1 second for timeout calculation to prevent
 	// unreasonably short timeouts when coverage runs very quickly
-	baseTime := elapsed
-	if baseTime < time.Second {
-		baseTime = time.Second
+	baseTime := max(baseline.Elapsed, time.Second)
+
+	memory, err := newMemoryPlan(baseline.Peak, process.AvailableMemory)
+	if err != nil {
+		return nil, err
 	}
+	log.Infof("Memory limit of each test run: %d MiB, for %d test runs at a time\n", memory.limit>>20, cap(memory.slots))
 
 	jd := MutantExecutorDealer{
 		mod:               mod,
@@ -116,6 +126,7 @@ func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.D
 		dryRun:            dryRun,
 		integrationMode:   integrationMode,
 		testCPU:           testCPU,
+		memory:            memory,
 		testExecutionTime: baseTime * time.Duration(coefficient),
 		execContext:       exec.CommandContext,
 	}
@@ -124,7 +135,7 @@ func NewExecutorDealer(mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.D
 		jd = opt(jd)
 	}
 
-	return &jd
+	return &jd, nil
 }
 
 // NewExecutor returns a new workerpool.Executor for the given mutator.Mutator.
@@ -145,6 +156,7 @@ func (m MutantExecutorDealer) NewExecutor(
 		buildTags:         m.buildTags,
 		execContext:       m.execContext,
 		testCPU:           m.testCPU,
+		memory:            m.memory,
 		testExecutionTime: m.testExecutionTime,
 	}
 
@@ -161,6 +173,7 @@ type mutantExecutor struct {
 	execContext       execContext
 	module            gomodule.GoModule
 	buildTags         string
+	memory            memoryPlan
 	testExecutionTime time.Duration
 	dryRun            bool
 	integrationMode   bool
@@ -248,17 +261,25 @@ func (m *mutantExecutor) discard(workerName string, cause error) error {
 	return cause
 }
 
-// runTests runs the tests for pkg and classifies the mutant status from the
-// result. A mutant whose package does not compile must be NOT VIABLE, not
-// KILLED: the test suite never ran, so it has no opinion on the mutation.
-// go test exits 1 for both a build failure and a genuine assertion failure,
-// so the exit code alone cannot distinguish them; the classification reads
-// the compiler's own "[build failed]"/"[setup failed]" markers from the
-// captured output instead.
+// runTests waits for a free slot of the memory budget, runs the tests for
+// pkg, and classifies the mutant status from the result. The timeout starts
+// when the slot is free. A test run that passes its memory limit is MEMORY
+// ERROR. A mutant whose package does not compile must be NOT
+// VIABLE, not KILLED: the test suite never ran, so it has no opinion on the
+// mutation. go test exits 1 for both a build failure and a genuine assertion
+// failure, so the exit code alone cannot distinguish them; the
+// classification reads the compiler's own "[build failed]"/"[setup failed]"
+// markers from the output instead.
 // An error not caused by the test run itself (for example a missing `go`
 // executable) is returned as an error rather than folded into a status, so
 // an infrastructure failure is never reported as a passing mutant.
 func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mutator.Status, error) {
+	release, err := m.memory.reserve(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+
 	ctx, cancel := context.WithTimeout(ctx, m.testExecutionTime)
 	defer cancel()
 
@@ -270,19 +291,22 @@ func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mut
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, fmt.Sprintf("GOTMPDIR=%s", m.wdDealer.WorkDir()))
 
-	var output bytes.Buffer
-	cmd.Stdout = &output
-	cmd.Stderr = &output
+	output := newMarkerWriter(buildFailureMarkers)
+	cmd.Stdout = output
+	cmd.Stderr = output
 
-	err := process.Run(cmd)
+	usage, err := process.RunBounded(cmd, m.memory.limit)
 
+	if usage.OverLimit {
+		return mutator.MemoryError, nil
+	}
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return mutator.TimedOut, nil
 	}
 
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		return getTestFailedStatus(output.Bytes()), nil
+		return getTestFailedStatus(output), nil
 	}
 
 	if err != nil {
@@ -309,6 +333,9 @@ func (m *mutantExecutor) getTestArgs(pkg string) []string {
 
 	path := pkg
 	if m.integrationMode {
+		// One package at a time keeps the test run, which builds and runs
+		// every package, within the memory limit of one mutant.
+		args = append(args, "-p", "1")
 		path = "./..."
 	}
 	args = append(args, path)
@@ -324,11 +351,10 @@ var buildFailureMarkers = [][]byte{
 	[]byte("[setup failed]"),
 }
 
-func getTestFailedStatus(output []byte) mutator.Status {
-	for _, marker := range buildFailureMarkers {
-		if bytes.Contains(output, marker) {
-			return mutator.NotViable
-		}
+// getTestFailedStatus classifies a failed test run from its output.
+func getTestFailedStatus(output *markerWriter) mutator.Status {
+	if output.found() {
+		return mutator.NotViable
 	}
 
 	return mutator.Killed

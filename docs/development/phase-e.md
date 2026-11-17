@@ -3,14 +3,18 @@
 The [Phase E workflow](../../.github/workflows/ground-control-phase-e.yml) runs after a PR merges into `dev` or `main`.
 It calls Ground Control's existing merged-PR finalizer to post the delivery report and close the delivered issue.
 It does not merge PRs or execute delivered Go code, tests, hooks, or workflow commands.
-PRs without a trusted delivery handoff are successful no-ops.
+
+The finalizer finds the issue from the `<issue>-<slug>` head branch of the merged PR.
+The issue must have a pickup record for that branch from a user with write access.
+`/implement` and `/quickfix` write this record when they start work on the issue.
+A PR without such a branch and record is a successful no-op, for example a `dev` to `main` promotion.
 
 ## Configure release access
 
 Add the Actions secret `GROUND_CONTROL_READ_TOKEN` to `OpenRAE/go-rae-gremlins`.
 Use a fine-grained token restricted to `autarchy-ai/Ground-Control` with **Contents: read-only** and its mandatory metadata read access.
 Authorize organization access if required. Do not reuse an operator-wide write token.
-Keep the existing `SONAR_TOKEN` secret configured for finalizer settings.
+The finalizer needs no Sonar access.
 
 The release token is available only to the download step.
 The finalizer uses this repository's automatic token for evidence reads, issue comments, and closure.
@@ -27,10 +31,12 @@ Later deliveries use automatic finalization once their base includes the workflo
 
 Manual dispatch becomes available after the workflow reaches the default branch, `main`, through an approved promotion.
 GitHub restricts secrets and write tokens on ordinary fork PR events.
+
 The [fork dispatcher](../../.github/workflows/ground-control-fork-finalization.yml) handles merged fork PRs through a trusted merge-only event.
 It checks out no source and reads no private secret. It can only dispatch this repository's fixed Phase E workflow on `main`.
 The dispatcher has PR-read and Actions-write access; it has no issue-write access.
 The finalizer runs under the supported `workflow_dispatch` event with its original permissions.
+
 Automatic fork finalization requires the Phase E definition on `main`, just like manual dispatch.
 No Ground Control source change is needed.
 Merges made with `GITHUB_TOKEN` can suppress follow-up events; use the same recovery paths.
@@ -57,6 +63,10 @@ The workflow pins the release version, asset name, SHA256, Node version, and ext
 The [installation manifest](../../.github/ground-control/package.json) and [lockfile](../../.github/ground-control/package-lock.json)
 pin the utility dependency graph and integrity values.
 Change the release tuple and regenerate the lockfile together in a reviewed PR.
+
+Copy the `overrides` of the release's `package.json` into the manifest, because npm applies overrides only from the root package.
+Seed the lockfile from the release's own lockfile, so the installed versions match the versions the release tested.
+Run `npm audit --omit=dev` on the result, and fix each finding before the PR merges.
 Verify the selected release's CLI, workflow recognition, and Actions provenance compatibility.
 Never commit the downloaded private tarball or installed dependencies.
 
@@ -74,14 +84,21 @@ Point `GROUND_CONTROL_TEST_ROOT` at that directory and run:
 node --test .github/ground-control/phase-e.integration.test.mjs
 ```
 
-The sixteen cases execute the actual workflow shell steps and installed CLI against a stateful GitHub stand-in.
-No finalizer, authorization, evidence-discovery, or provenance function is substituted.
-They verify both events and branches, production repository authorization, trusted evidence discovery, Actions provenance, correct issue/report binding, retries, invalid deliveries, permission denial, untrusted authors, mismatched provenance, immutable revision selection, tampered-download rejection, locked installation, and automatic fork dispatch.
-The stand-in enforces each job's permission map, including refusal without issue-write access.
-All finalization cases use a fresh checksum-verified, locked installation; the reference package supplies only the YAML parser during setup.
-They do not use a live GitHub credential or change a real issue.
-For issue #97, all sixteen cases passed against the checksum-verified v1.9.0 installation.
-Another 47 targeted upstream release tests passed for readiness, merge gates, reporting, and automated finalization.
-These results do not replace the first configured Actions run.
+The 16 cases run the actual workflow shell steps and the installed CLI against a stateful GitHub stand-in.
+They do not replace a finalizer, authorization, issue-discovery, or provenance function.
+The cases cover:
 
-Verification evidence: [TAP results](evidence/phase-e-v1.9.0.tap) and [release/source/file hashes](evidence/phase-e-v1.9.0.json).
+- Both events and both base branches, with the correct issue and report, and retries without duplicate writes.
+- The `/implement` and `/quickfix` lanes.
+- A `dev` to `main` promotion that has no required checks and is not a delivery.
+- Skips for a missing pickup record, a pickup record for another branch, and an untrusted pickup author.
+- Refusal of an unmerged PR, of a token without issue-write access, and of a mismatched Actions run.
+- Rejection of a tampered download, the locked installation, and the fork dispatch.
+
+The stand-in enforces the permission map of each job. Each finalization case uses a fresh checksum-verified, locked installation.
+The reference package supplies only the YAML parser.
+The cases use no live GitHub credential and change no real issue.
+For issue #182, all 16 cases passed against the checksum-verified v1.12.0 installation.
+With the earlier workflow and v1.9.0, the 11 finalization, promotion, and skip cases failed.
+
+Verification evidence: [TAP results](evidence/phase-e-v1.12.0.tap) and [release and file hashes](evidence/phase-e-v1.12.0.json).

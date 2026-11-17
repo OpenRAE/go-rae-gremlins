@@ -168,6 +168,7 @@ Output
 - `l` - LIVED
 - `c` - NOT COVERED
 - `t` - TIMED OUT
+- `m` - MEMORY ERROR
 - `k` - KILLED
 - `v` - NOT VIABLE
 - `s` - SKIPPED
@@ -451,6 +452,33 @@ coefficient. For example:
 
 ```shell
 gremlins unleash --timeout-coefficient=10
+```
+
+### Memory budget
+
+:material-flag: `--memory-budget` · :material-sign-direction:
+Default: empty (uses the smaller of `1G` and half of the available memory)
+
+The memory budget is the memory that all the mutant test runs can use together.
+Write it as a byte count with an optional binary unit: `K`, `M`, `G`, or `T`.
+For example, `2G` is 2 GiB. Gremlins rejects other values before it starts the tests.
+
+In a cgroup, the available memory is the smaller of the system value and the free memory of the cgroup.
+
+Gremlins gives each mutant test run a memory limit of two times the peak memory of the largest process of the coverage run.
+The limit is never larger than the budget.
+Each test run reserves its limit from the budget before it starts.
+When the budget has no free memory, a worker waits until another test run completes.
+
+A watchdog measures the total memory of the test run every 50 ms.
+This total includes the `go` command, the compiler, the linker, and the test binary.
+On Linux and macOS, the watchdog measures the resident memory.
+On Windows, it measures the peak committed memory of the job object.
+When the total is more than the limit, Gremlins stops the test run and reports the mutant as `MEMORY ERROR`.
+The efficacy and the mutant coverage do not include `MEMORY ERROR` mutants.
+
+```shell
+gremlins unleash --memory-budget=2G
 ```
 
 [//]: # (@formatter:off)
