@@ -7,6 +7,8 @@ LINTER_CMD=mise exec -- golangci-lint
 LINT_BASE ?= origin/dev
 LINT_ADOPTION_BASE ?=
 GOVULNCHECK_VERSION=v1.9.0
+# The golang.org/x/tools version that go.mod requires. Review the tool before a change.
+FIELDALIGNMENT_VERSION=v0.48.0
 BINARY_NAME=gremlins
 COVER_OUT=coverage.out
 TARGET=dist
@@ -33,7 +35,7 @@ cover:
 .PHONY: requirements
 requirements:
 	mise install
-	go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
+	mise exec -- go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@${FIELDALIGNMENT_VERSION}
 
 .PHONY: lint
 lint:

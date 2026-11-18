@@ -23,12 +23,16 @@ Copied upstream issues and PRs need a keep, rework, or close decision under
 ## Prepare the clone
 
 Install [mise](https://mise.jdx.dev) and [pre-commit](https://pre-commit.com).
-Install the pinned linter and the `go.mod` Go toolchain from `mise.toml`:
+Install the pinned tools:
 
 ```shell
-mise install
+make requirements
 make hooks
 ```
+
+`make requirements` installs the linter and the `go.mod` Go toolchain from `mise.toml`. It then installs fieldalignment
+v0.48.0, the `golang.org/x/tools` version that `go.mod` requires, with that Go. `FIELDALIGNMENT_VERSION` in the
+[Makefile](../Makefile) sets this version. Review the tool before you change it.
 
 `make hooks` installs and verifies the clone's commit-time hook dispatch and runs an initial check of all files.
 That initial check runs the fast file-hygiene and secret checks. Run it for each new clone; Git does not copy local
