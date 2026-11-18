@@ -117,12 +117,6 @@
     },
     {
       "linter": "revive",
-      "file": "tools/architecture/git.go",
-      "fingerprint": "745f72b3eef2e3666efe5bd77e3a14c1f48bcb20d42686c35d0dd02b7ec4df11",
-      "count": 1
-    },
-    {
-      "linter": "revive",
       "file": "tools/architecture/input.go",
       "fingerprint": "b3441b99b5b2f899d86dbbda9426a9754502bfeee5122179629b2fe4ed52a223",
       "count": 1

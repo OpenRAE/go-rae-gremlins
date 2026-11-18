@@ -102,15 +102,12 @@ func checkProposedChanges(root, base string, c *compiledModel, modelData []byte)
 
 		return nil
 	}
-	for _, path := range designs {
-		var d design
-		if err := loadJSON(root, path, &d); err != nil {
-			return err
-		}
-		if err := checkDesign(c, d); err != nil {
-			return err
-		}
-		logDesignPass(c, modelData, path, d.Issue)
+	checked, err := checkDesigns(root, revision, c, designs)
+	if err != nil {
+		return err
+	}
+	for i, d := range checked {
+		logDesignPass(c, modelData, designs[i], d.Issue)
 	}
 
 	return nil
