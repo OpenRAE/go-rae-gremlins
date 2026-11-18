@@ -119,3 +119,9 @@ architecture-design:
 .PHONY: memcheck
 memcheck:
 	bash scripts/memory-budget-check.sh
+
+# Run the Phase E transport harness. Set GROUND_CONTROL_TEST_ROOT to the installed
+# node_modules/grndctl directory of the pinned utility (docs/development/phase-e.md).
+.PHONY: phase-e-test
+phase-e-test:
+	node --test .github/ground-control/phase-e.integration.test.mjs

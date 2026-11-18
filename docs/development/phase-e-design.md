@@ -113,6 +113,82 @@ The finalizer reads no Sonar settings, so the job writes no settings file and re
 No new HTTP controller, application auth layer, error hierarchy, or persistent state is introduced.
 The workflow uses no self-hosted runner.
 
+## Pre-merge transport verification
+
+Issue #124 runs the integration harness in CI when a change touches the transport.
+The harness, its GitHub stand-in, the release tuple, the manifest, and the lockfile do not change.
+Three CI jobs run on separate runners:
+
+| Job | Secret | Candidate code | Responsibility |
+| --- | --- | --- | --- |
+| `Phase E transport scope` | None | None | Select the change. Read and validate the release tuple and the Node pin from the Phase E workflow. |
+| `Phase E release` | `GROUND_CONTROL_READ_TOKEN` | None, and no checkout | Download the pinned tarball, verify its SHA256, and save it to an Actions cache. |
+| `Phase E transport tests` | None | The harness and the workflow shell | Restore the tarball, verify it again, install the locked utility, and run `make phase-e-test`. |
+
+The scope job compares the candidate with the PR base or the merge group base.
+It selects the change when a changed path is in the two transport workflows, `.github/ground-control/`, `ci.yml`, or `Makefile`.
+A renamed path counts with its old and new names. A failed comparison fails the job.
+
+Only `pull_request` and `merge_group` runs select a change.
+Push and manual runs select nothing, because fork PRs can restore cache entries from `dev` and `main`.
+The merge queue verifies each change before it gets to `dev`.
+Fork and Dependabot PRs get no secrets. Their PR runs skip the check with a warning, and the merge queue runs it.
+
+`PR Gate` requires a successful scope job.
+When the scope job selects the change, `PR Gate` requires a successful test job. Otherwise, the test job must skip.
+A failed release job skips the test job, so `PR Gate` fails.
+
+### Tarball handoff
+
+This repository is public, and the Ground Control release is private.
+An Actions artifact would publish the tarball, so the jobs use no artifact.
+ADR 0004 permits candidate code only in jobs without secrets, so the token job runs no candidate code.
+An Actions cache entry moves the tarball from the release job to the test job.
+
+A PR run writes its cache entry to the PR merge ref. Only reruns of that PR can restore it.
+A merge group run writes its cache entry to its temporary queue branch. Other branches cannot restore it.
+A fork PR run can restore only its own entries and the entries of the base and default branches.
+The cache key contains the SHA256. Each restore verifies the SHA256 before installation.
+
+The test job runs candidate code next to the tarball.
+A user who can push a branch here or queue a PR can read the tarball.
+That user can already change a workflow and read the secret, so the cache adds no access.
+
+```mermaid
+flowchart LR
+  candidate[(Candidate checkout)] -->|changed paths, release tuple, Node pin| scope
+  candidate -->|harness, workflows, manifests| tests
+  subgraph clean1[Runner without secrets]
+    scope[Scope job]
+  end
+  subgraph token[Runner with the read-only release token]
+    release[Release job: no checkout]
+  end
+  subgraph clean2[Runner without secrets]
+    tests[Test job]
+  end
+  scope -->|validated tuple| release
+  private[(Private release)] -->|pinned tarball| release
+  release -->|verified tarball| cache[(Actions cache: PR or queue scope)]
+  cache -->|tarball| tests
+  registry[(npm registry)] -->|locked dependency bytes| tests
+  scope -->|selection| gate[PR Gate]
+  tests -->|test result| gate
+```
+
+| Boundary or threat | Control | Verification |
+| --- | --- | --- |
+| Credential in candidate execution | The release job checks out nothing. It runs only `gh`, `sha256sum`, and the pinned cache action. The test job has no secret and only `contents: read`. | Workflow review and actionlint. |
+| Untrusted release tuple | The scope job validates the version, asset, SHA256, and Node pin as fixed patterns. Jobs pass them through environment variables. | Workflow review. |
+| Tarball replacement in the cache | The key contains the SHA256. The test job and the harness verify the SHA256 before installation. | The harness tampered-download case. |
+| Tarball disclosure | No artifact. No cache entry from push or manual runs. Forks cannot restore PR or queue entries. | Workflow review of events and cache scope. |
+| Check that does not run | `PR Gate` separates a selected change from no change. A missing secret fails the release job. | Local failure run and the first CI run. |
+
+The model adds the `transport_verification` trust boundary for these jobs.
+The `development_checks`, `delivery_finalization`, and `merge_queue_policy` boundaries do not change.
+For issue #124, `make architecture-design` passed with ARCH001–ARCH004 and model SHA256
+`c28bab810f1497d79aea1fcac11781ad83abf8d2e7b36cb8c78a8e7225243f6b`.
+
 ## Verification and maintenance
 
 The design input declares the affected model, contributor guide, workflow, manifest, and lockfile policies.
@@ -149,6 +225,8 @@ Keep those documents and model declarations current when changing the transport 
 - [GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax): permissions, concurrency, conditions, run names, and inputs.
 - [GitHub script injection guidance](https://docs.github.com/en/actions/concepts/security/script-injections): pass data through environment variables.
 - [Workflow triggering](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow): `workflow_dispatch` can be triggered by `GITHUB_TOKEN`.
+- [GitHub dependency caching](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching): cache scope by ref and immutable keys.
+- [GitHub secure use](https://docs.github.com/en/actions/reference/security/secure-use): keep secrets out of jobs that run untrusted code.
 - [npm clean installation](https://docs.npmjs.com/cli/v11/commands/npm-ci/) and [lockfile integrity](https://docs.npmjs.com/cli/v11/configuring-npm/package-lock-json/): fixed dependency graph with integrity verification.
 
 Verification evidence: [TAP results](evidence/phase-e-v1.12.0.tap) and [release and file hashes](evidence/phase-e-v1.12.0.json).
