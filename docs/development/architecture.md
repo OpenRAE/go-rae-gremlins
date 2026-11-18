@@ -7,6 +7,7 @@ ADR 0004 records the decision and its limits.
 
 The separate [delivery finalization boundary](phase-e-design.md) models the post-merge workflow,
 its pinned utility installation, and GitHub evidence access. It does not broaden the static checker's permissions.
+The [transport verification boundary](phase-e-design.md#pre-merge-transport-verification) models the CI jobs that test transport changes with the private release.
 
 ## Components and data flow
 
@@ -90,6 +91,9 @@ An initial branch push with no preceding commit compares with an empty baseline.
 CI requires an updated design for package, contract, and policy changes.
 It verifies coverage of each changed package, canonical contract, and policy.
 CI checks declared relationships with the same compiler used by the source scan.
+
+CI checks each changed design against the model in the commit that last changed that design.
+An uncommitted design uses the checkout model. At least one changed design must also pass the checkout model.
 CI cannot prove when a developer ran a command. The issue plan records the pre-code evidence.
 
 A new checker cannot execute before it exists. For #76, review the initial model and design manually before implementation.

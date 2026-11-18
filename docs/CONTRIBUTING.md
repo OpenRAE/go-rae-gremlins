@@ -23,21 +23,27 @@ Copied upstream issues and PRs need a keep, rework, or close decision under
 ## Prepare the clone
 
 Install [mise](https://mise.jdx.dev) and [pre-commit](https://pre-commit.com).
-Install the pinned linter and the `go.mod` Go toolchain from `mise.toml`:
+Install the pinned tools:
 
 ```shell
-mise install
+make requirements
 make hooks
 ```
 
-`make hooks` installs and verifies the clone's hook dispatch and runs an initial check of all files. That initial
-check includes the configured Go checks and race tests. Run it for each new clone; Git does not copy local hooks.
-If installation reports an existing unmanaged hook or a dispatcher problem, inspect and resolve that problem
+`make requirements` installs the linter and the `go.mod` Go toolchain from `mise.toml`. It then installs fieldalignment
+v0.48.0, the `golang.org/x/tools` version that `go.mod` requires, with that Go. `FIELDALIGNMENT_VERSION` in the
+[Makefile](../Makefile) sets this version. Review the tool before you change it.
+
+`make hooks` installs and verifies the clone's commit-time hook dispatch and runs an initial check of all files.
+That initial check runs the fast file-hygiene and secret checks. Run it for each new clone; Git does not copy local
+hooks. If installation reports an existing unmanaged hook or a dispatcher problem, inspect and resolve that problem
 before committing. Do not bypass the hooks or overwrite a shared hook configuration.
 
 The [pre-commit configuration](../.pre-commit-config.yaml) checks file hygiene, syntax, merge conflicts, private
-keys, and secrets. Go changes also run lint, vulnerability checks, and race tests. These are publication gates;
-daily development checks should target the changed behavior.
+keys, and secrets at commit time. The broad Go checks (lint, vulnerability analysis, and the race test suite) run at
+the `manual` stage. The hosted CI jobs enforce them for every push and pull request. During development, run the
+targeted checks for the changed behavior. To run a broad check on demand, use
+`pre-commit run <hook-id> --hook-stage manual`.
 
 ## Branch and implement
 
@@ -160,7 +166,7 @@ The current hosted checks are defined in the repository:
 
 | Workflow | Verification |
 | --- | --- |
-| [CI](../.github/workflows/ci.yml) | Architecture model and design checks, shrink-only baselines, and lint. STE checks on changed Markdown. Python line and branch coverage. Race tests and Go coverage on Linux, macOS, and Windows. Policy hooks, the memory budget, Sonar admission, and SonarCloud. `PR Gate` combines the architecture, lint, docs, test, policy, memory, and Sonar results. |
+| [CI](../.github/workflows/ci.yml) | Architecture model and design checks, shrink-only baselines, and lint. STE checks on changed Markdown. Python line and branch coverage. Race tests and Go coverage on Linux, macOS, and Windows. Policy hooks, the memory budget, Sonar admission, and SonarCloud. [Phase E transport tests](development/phase-e-design.md#pre-merge-transport-verification) when a change touches the transport. `PR Gate` combines the architecture, lint, docs, test, policy, memory, Sonar, and transport results. |
 | [Gremlins](../.github/workflows/gremlins.yml) | Mutation testing with the Gremlins source from the candidate commit. |
 | [PR title](../.github/workflows/pr-title.yml) | A Conventional Commit PR title with a lowercase subject. |
 | [GitGuardian](../.github/workflows/ggshield.yml) | A `ggshield` secret scan of the new commits of the PR or merge group. |
@@ -182,6 +188,8 @@ check has no workflow job that runs on `merge_group`.
 
 CI deliberately skips the Sonar jobs for PRs from other repositories because they have no access to the token;
 `PR Gate` accepts that specific skip. Ground Control readiness still requires the configured Sonar result.
+Fork and Dependabot PRs also skip the Phase E transport tests, because they get no secrets. The merge queue runs them.
+
 Inspect every check on the current PR head, including installed security checks. A green `PR Gate` alone does
 not establish that every hosted check passed.
 

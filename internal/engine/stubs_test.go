@@ -241,6 +241,10 @@ func (*mutantStub) MutatedSnippet() []byte {
 	return nil
 }
 
+func (*mutantStub) EquivalentReason() string {
+	return ""
+}
+
 // blockingDealerStub creates executors that hold their worker until the run
 // context is done, and then report nothing.
 type blockingDealerStub struct {

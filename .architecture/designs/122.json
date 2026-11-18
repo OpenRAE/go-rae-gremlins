@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "issue": 122,
+  "summary": "Move the broad Go checks off commit time to the hosted CI setup. In .pre-commit-config.yaml, the golangci-lint, govulncheck, and go-test hooks move to the manual stage, so commit time runs only the fast file-hygiene and secret checks, and a developer can run the broad checks on demand. The Makefile adds a vuln target that pins the govulncheck version in one place. .github/workflows/ci.yml adds a vuln job that runs make vuln, and the PR Gate requires it, so the vulnerability scan stays enforced for every push and pull request. scripts/install-hooks.sh installs only the pre-commit hook, because no hook selects the pre-push stage. docs/CONTRIBUTING.md describes the fast commit checks and the on-demand manual checks. No Go package, dependency, CLI flag, configuration key, JSON report field, exit code, architecture rule, or baseline changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The commit-time hooks keep the fast file-hygiene and secret checks. The broad Go checks move to the manual stage and to the hosted CI vuln job. The vuln job runs go run govulncheck, which downloads the pinned govulncheck tool from the Go module proxy, the same provisioning class as the existing go run, mise, and pre-commit tool downloads. The CI job uses pinned actions, contents read, no secrets, and checkout without persisted credentials. The change adds no new network destination and does not execute scanned source. The installer writes only the pre-commit hook into this clone's resolved git hook path, as before. The trust_changes entries restate the model's existing development-check, delivery-finalization, and merge-queue boundaries.",
+  "conflicts": [],
+  "policies": [
+    "build",
+    "ci",
+    "contributing",
+    "hooks"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

@@ -29,6 +29,15 @@
       ],
       "network": true,
       "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
     }
   }
 }

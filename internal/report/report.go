@@ -64,6 +64,7 @@ type reportStatus struct {
 	skipped    int
 	notViable  int
 	runnable   int
+	equivalent int
 
 	mutatorStatistics internal.MutatorType
 
@@ -82,10 +83,11 @@ func newReport(results Results) (*reportStatus, bool) {
 	rep.files = make(map[string][]internal.Mutation)
 	for _, m := range results.Mutants {
 		rep.files[m.Position().Filename] = append(rep.files[m.Position().Filename], internal.Mutation{
-			Line:   m.Position().Line,
-			Column: m.Position().Column,
-			Type:   m.Type().String(),
-			Status: m.Status().String(),
+			Line:             m.Position().Line,
+			Column:           m.Position().Column,
+			Type:             m.Type().String(),
+			Status:           m.Status().String(),
+			EquivalentReason: m.EquivalentReason(),
 		})
 
 		reportMutationStatus(m, rep)
@@ -123,6 +125,8 @@ func reportMutationStatus(m mutator.Mutator, rep *reportStatus) {
 		rep.notViable++
 	case mutator.Runnable:
 		rep.runnable++
+	case mutator.Equivalent:
+		rep.equivalent++
 	}
 }
 
@@ -190,6 +194,7 @@ func (r *reportStatus) fileReport() (err error) {
 		MutantsLived:      r.lived,
 		MutantsNotViable:  r.notViable,
 		MutantsNotCovered: r.notCovered,
+		MutantsEquivalent: r.equivalent,
 		ElapsedTime:       r.elapsed.Duration().Seconds(),
 		MutatorStatistics: r.mutatorStatistics,
 		Files:             files,
@@ -222,6 +227,7 @@ func (r *reportStatus) dryRunReport() {
 	log.Infoln("")
 	log.Infof("Dry run completed in %s\n", r.elapsed.String())
 	log.Infof("Runnable: %s, Not covered: %s\n", runnable, notCovered)
+	r.equivalentReport()
 	log.Infof("Mutator coverage: %.2f%%\n", r.mCovered)
 }
 
@@ -237,8 +243,17 @@ func (r *reportStatus) fullRunReport() {
 	log.Infof("Mutation testing completed in %s\n", r.elapsed.String())
 	log.Infof("Killed: %s, Lived: %s, Not covered: %s\n", killed, lived, notCovered)
 	log.Infof("Timed out: %s, Memory errors: %s, Not viable: %s, Skipped: %s\n", timedOut, memErrors, notViable, skipped)
+	r.equivalentReport()
 	log.Infof("Test efficacy: %.2f%%\n", r.tEfficacy)
 	log.Infof("Mutator coverage: %.2f%%\n", r.mCovered)
+}
+
+// equivalentReport logs the count of the equivalent mutants, when there are
+// any.
+func (r *reportStatus) equivalentReport() {
+	if r.equivalent > 0 {
+		log.Infof("Equivalent: %s\n", fgHiBlack(r.equivalent))
+	}
 }
 
 func (r *reportStatus) assess(tEfficacy, rCoverage float64) error {
@@ -265,6 +280,8 @@ func (r *reportStatus) assess(tEfficacy, rCoverage float64) error {
 //
 // An empty Results skips the threshold assessment and always returns nil,
 // since there are no mutants to compute an efficacy or coverage percent from.
+// Results with only skipped and equivalent mutants also skip it. The efficacy
+// and coverage percents do not count equivalent mutants.
 //
 // Do returns an error when the configured JSON output file cannot be
 // created, written, or closed.
@@ -278,7 +295,7 @@ func Do(results Results) error {
 	if err := rep.reportFindings(); err != nil {
 		return err
 	}
-	if rep.skipped == len(results.Mutants) {
+	if rep.skipped+rep.equivalent == len(results.Mutants) {
 		return nil
 	}
 
@@ -301,7 +318,7 @@ func Mutant(m mutator.Mutator) {
 		status = fgHiYellow(m.Status())
 	case mutator.TimedOut, mutator.MemoryError:
 		status = fgGreen(m.Status())
-	case mutator.NotViable, mutator.Skipped:
+	case mutator.NotViable, mutator.Skipped, mutator.Equivalent:
 		status = fgHiBlack(m.Status())
 	}
 	log.Infof("%s%s %s at %s\n", padding(m.Status()), status, m.Type(), m.Position())

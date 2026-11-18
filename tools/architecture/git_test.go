@@ -177,13 +177,13 @@ func TestFeaturePreCodeDesignStep(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name, input, rule string
-		bad               bool
+		name, input, rule, subject string
+		bad                        bool
 	}{
-		{"valid", "tools/architecture/testdata/valid-design.json", "", false},
-		{"forbidden", "tools/architecture/testdata/invalid-design.json", "ARCH002", true},
-		{"breaking contract", "tools/architecture/testdata/invalid-contract.json", "ARCH003", true},
-		{"prohibited transfer", "tools/architecture/testdata/invalid-trust.json", "ARCH004", true},
+		{"valid", "tools/architecture/testdata/valid-design.json", "", "", false},
+		{"forbidden", "tools/architecture/testdata/invalid-design.json", "ARCH002", "cmd", true},
+		{"breaking contract", "tools/architecture/testdata/invalid-contract.json", "ARCH003", "cli", true},
+		{"prohibited transfer", "tools/architecture/testdata/invalid-trust.json", "ARCH004", "development_checks", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := exec.CommandContext(t.Context(), "bash", "scripts/check-design.sh", tc.input) //nolint:gosec // Literal test fixture paths.
@@ -194,6 +194,9 @@ func TestFeaturePreCodeDesignStep(t *testing.T) {
 			}
 			if tc.bad && !strings.Contains(string(output), tc.rule) {
 				t.Fatalf("design step did not evaluate the import rule: %s", output)
+			}
+			if tc.bad && !strings.Contains(string(output), `subject="`+tc.subject+`"`) {
+				t.Fatalf("design step did not reject subject %q: %s", tc.subject, output)
 			}
 		})
 	}
@@ -290,5 +293,90 @@ func TestFeatureCLIContractSourcesRequireCompatibilityReview(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+// writeModel writes a model that adds one trust boundary for each name, and returns the compiled model.
+func writeModel(t *testing.T, root string, boundaries ...string) *compiledModel {
+	t.Helper()
+	m := testModel(t).model
+	for _, name := range boundaries {
+		m.TrustBoundaries[name] = trustBoundary{Destinations: []string{localBoundary}}
+	}
+	data, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, modelFile, string(data))
+	c, err := compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return c
+}
+
+func writeTrustDesign(t *testing.T, root, file string, boundaries ...string) {
+	t.Helper()
+	trust := localTrust()
+	for _, name := range boundaries {
+		trust[name] = trustBoundary{Destinations: []string{localBoundary}}
+	}
+	data, err := json.Marshal(design{
+		Version: 1, Issue: 76, Summary: changeSummary, TrustChanges: trust, TrustBoundaries: localBoundary,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, file, string(data))
+}
+
+func TestFeatureDesignUsesItsCommitModel(t *testing.T) {
+	const later = ".architecture/designs/77.json"
+	root := gitFixture(t)
+	base, err := resolveRevision(root, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeModel(t, root)
+	writeTrustDesign(t, root, proposalFile)
+	commitFixture(t, root)
+	c := writeModel(t, root, "release")
+	writeTrustDesign(t, root, later, "release")
+	commitFixture(t, root)
+	paths := []string{proposalFile, later}
+	if _, err := checkDesigns(root, base, c, paths); err != nil {
+		t.Fatalf("earlier design rejected by a later model change: %v", err)
+	}
+
+	c = writeModel(t, root, "release", "extra")
+	commitFixture(t, root)
+	_, err = checkDesigns(root, base, c, paths)
+	if err == nil || !strings.Contains(err.Error(), "no changed design passes the current model") {
+		t.Fatalf("checkDesigns() after an uncovered model change = %v; want current-model error", err)
+	}
+
+	writeTrustDesign(t, root, later, "release", "extra")
+	if _, err := checkDesigns(root, base, c, paths); err != nil {
+		t.Fatalf("uncommitted design for the current model rejected: %v", err)
+	}
+	writeTrustDesign(t, root, proposalFile, "unknown-boundary")
+	_, err = checkDesigns(root, base, c, paths)
+	if err == nil || !strings.Contains(err.Error(), proposalFile) {
+		t.Fatalf("checkDesigns() with an invalid uncommitted design = %v; want error for %s", err, proposalFile)
+	}
+}
+
+func TestFeatureDesignCommitNeedsModel(t *testing.T) {
+	root := gitFixture(t)
+	base, err := resolveRevision(root, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTrustDesign(t, root, proposalFile)
+	commitFixture(t, root)
+	_, err = checkDesigns(root, base, testModel(t), []string{proposalFile})
+	if err == nil || !strings.Contains(err.Error(), "missing model") {
+		t.Fatalf("checkDesigns() without a committed model = %v; want missing-model error", err)
 	}
 }

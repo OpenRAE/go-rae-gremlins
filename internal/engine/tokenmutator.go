@@ -53,6 +53,8 @@ type TokenMutator struct {
 
 	origSnippet    []byte
 	mutatedSnippet []byte
+
+	equivalentReason string
 }
 
 // NewTokenMutant initialises a TokenMutator.
@@ -228,6 +230,18 @@ func (m *TokenMutator) OrigSnippet() []byte {
 // MutatedSnippet returns the mutated code snippet around the mutation point.
 func (m *TokenMutator) MutatedSnippet() []byte {
 	return m.mutatedSnippet
+}
+
+// EquivalentReason returns the review reason of the annotation that marks
+// the mutant as equivalent, or an empty string.
+func (m *TokenMutator) EquivalentReason() string {
+	return m.equivalentReason
+}
+
+// SetEquivalentReason sets the review reason of the annotation that marks
+// the mutant as equivalent.
+func (m *TokenMutator) SetEquivalentReason(reason string) {
+	m.equivalentReason = reason
 }
 
 // extractSnippet extracts lines around the target line with the given context size.

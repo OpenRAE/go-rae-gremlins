@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "issue": 207,
+  "summary": "Check each changed design against the model in the commit that last changed that design, so a later model change in the same comparison range does not reject an earlier design. A design that is uncommitted, or that no commit in the range changed, uses the checkout model. At least one changed design must also pass the checkout model, so a model change that no design covers still fails. The snapshot model comes from Git history with the existing fixed read-only Git commands and the existing strict JSON decoder and model compiler. targetBaseline and the snapshot read share one helper that reads a regular file from a commit. The helper removes one lint finding, so the lint baseline shrinks. No production Go code, import, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "tools/architecture"
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "No trust boundary changes. The checker reads the model from local Git history with the existing fixed Git commands. It executes no candidate code and uses no network.",
+  "conflicts": [],
+  "policies": [
+    "lint_baseline"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  },
+  "contract_changes": {}
+}

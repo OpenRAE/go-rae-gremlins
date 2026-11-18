@@ -33,7 +33,8 @@ jobs:
         # loginctl enable-linger starts the per-user manager for the runner user.
         # It needs no sudo; polkit authorizes a user for their own account.
         run: |
-          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          export XDG_RUNTIME_DIR
           loginctl enable-linger "$(id -un)"
           for _ in $(seq 1 30); do
             if systemctl --user show-environment >/dev/null 2>&1; then
@@ -46,12 +47,14 @@ jobs:
         env:
           BASE_COMMIT: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
         run: |
-          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          export XDG_RUNTIME_DIR
           scripts/run-bounded.sh --budget 10G -- "$RUNNER_TEMP/gremlins" unleash --diff "$BASE_COMMIT"
       - name: Mutate the full repository inside a memory budget
         if: github.event_name == 'push'
         run: |
-          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          export XDG_RUNTIME_DIR
           scripts/run-bounded.sh --budget 10G -- "$RUNNER_TEMP/gremlins" unleash --memory-budget 4G
 
   regression-proof:

@@ -45,3 +45,4 @@ Gremlins will report each mutation as:
   explicitly.
 - `NOT VIABLE`: The mutation makes the build fail.
 - `MEMORY ERROR`: The test run used more memory than its limit, so Gremlins stopped it.
+- `EQUIVALENT`: A reviewed annotation marks the mutation as equivalent; it will not be tested.

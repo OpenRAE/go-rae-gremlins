@@ -44,25 +44,16 @@ func targetBaseline(root, ref string) (baseline, string, error) {
 	if ref == "" {
 		return empty, "", nil
 	}
-	raw, err := gitRead(root, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}")
+	revision, err := resolveRevision(root, ref)
 	if err != nil {
 		return baseline{}, "", err
 	}
-	revision := strings.TrimSpace(string(raw))
-	listing, err := gitRead(root, "ls-tree", revision, "--", baselineFile)
+	data, err := commitFile(root, revision, baselineFile)
 	if err != nil {
 		return baseline{}, "", err
 	}
-	if len(listing) == 0 {
+	if data == nil {
 		return empty, revision, nil
-	}
-	// A tree symlink or submodule must never become policy data.
-	if !bytes.HasPrefix(listing, []byte("100644 blob ")) && !bytes.HasPrefix(listing, []byte("100755 blob ")) {
-		return baseline{}, "", fmt.Errorf("invalid target baseline mode; fix: restore a regular baseline file")
-	}
-	data, err := gitRead(root, "show", revision+":"+baselineFile)
-	if err != nil {
-		return baseline{}, "", err
 	}
 	var b baseline
 	if err := decode(data, &b); err != nil {
@@ -70,6 +61,20 @@ func targetBaseline(root, ref string) (baseline, string, error) {
 	}
 
 	return b, revision, nil
+}
+
+// commitFile reads a regular file from a commit, and returns nil data when the commit has no such file.
+func commitFile(root, revision, file string) ([]byte, error) {
+	listing, err := gitRead(root, "ls-tree", revision, "--", file)
+	if err != nil || len(listing) == 0 {
+		return nil, err
+	}
+	// A tree symlink or submodule must never become policy data.
+	if !bytes.HasPrefix(listing, []byte("100644 blob ")) && !bytes.HasPrefix(listing, []byte("100755 blob ")) {
+		return nil, fmt.Errorf("invalid %s mode at the comparison commit; fix: restore a regular file", file)
+	}
+
+	return gitRead(root, "show", revision+":"+file)
 }
 
 func changedPaths(root, revision string) ([]string, error) {
@@ -179,21 +184,85 @@ func checkChangedDesign(root, revision string, c *compiledModel) error {
 			designDir,
 		)
 	}
+	checked, err := checkDesigns(root, revision, c, designs)
+	if err != nil {
+		return err
+	}
 	var covered design
-	for _, p := range designs {
-		var d design
-		if err := loadJSON(root, p, &d); err != nil {
-			return err
-		}
-		if err := checkDesign(c, d); err != nil {
-			return err
-		}
+	for _, d := range checked {
 		covered.Changes = append(covered.Changes, d.Changes...)
 		covered.Contracts = append(covered.Contracts, d.Contracts...)
 		covered.Policies = append(covered.Policies, d.Policies...)
 	}
 
 	return checkDesignCoverage(covered, packages, contracts, policies)
+}
+
+// checkDesigns checks each design against the model in the commit that last changed it.
+// At least one design must also pass the checkout model, so a design must cover each later model change.
+func checkDesigns(root, revision string, c *compiledModel, paths []string) ([]design, error) {
+	designs := make([]design, 0, len(paths))
+	matched := false
+	var mismatch error
+	for _, p := range paths {
+		var d design
+		if err := loadJSON(root, p, &d); err != nil {
+			return nil, err
+		}
+		snapshot, err := designModel(root, revision, p, c)
+		if err != nil {
+			return nil, err
+		}
+		if err := checkDesign(snapshot, d); err != nil {
+			return nil, fmt.Errorf("%s: %w", p, err)
+		}
+		if !matched {
+			if snapshot == c {
+				matched = true
+			} else if mismatch = checkDesign(c, d); mismatch == nil {
+				matched = true
+			}
+		}
+		designs = append(designs, d)
+	}
+	if !matched {
+		return nil, fmt.Errorf("no changed design passes the current model; fix: update a design for the model change: %w", mismatch)
+	}
+
+	return designs, nil
+}
+
+// designModel returns the model in the commit that last changed a design.
+// An uncommitted design, or a design that no commit after the comparison changed, uses the checkout model.
+func designModel(root, revision, p string, c *compiledModel) (*compiledModel, error) {
+	status, err := gitRead(root, "status", "--porcelain", "-z", "--", p)
+	if err != nil {
+		return nil, err
+	}
+	if len(status) > 0 {
+		return c, nil
+	}
+	raw, err := gitRead(root, "log", "-1", "--format=%H", revision+"..HEAD", "--", p)
+	if err != nil {
+		return nil, err
+	}
+	commit := strings.TrimSpace(string(raw))
+	if commit == "" {
+		return c, nil
+	}
+	data, err := commitFile(root, commit, modelFile)
+	if err != nil {
+		return nil, err
+	}
+	if data == nil {
+		return nil, fmt.Errorf("missing model in the commit that changed %s; fix: commit the model with the design", p)
+	}
+	var m model
+	if err := decode(data, &m); err != nil {
+		return nil, fmt.Errorf("model for %s: %w", p, err)
+	}
+
+	return compile(m)
 }
 
 func checkDesignCoverage(d design, packages, contracts, policies []string) error {

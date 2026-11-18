@@ -28,6 +28,7 @@ type OutputResult struct {
 	MutantsLived      int          `json:"mutants_lived"`
 	MutantsNotViable  int          `json:"mutants_not_viable"`
 	MutantsNotCovered int          `json:"mutants_not_covered"`
+	MutantsEquivalent int          `json:"mutants_equivalent"`
 	ElapsedTime       float64      `json:"elapsed_time"`
 	MutatorStatistics MutatorType  `json:"mutator_statistics"`
 }
@@ -39,11 +40,14 @@ type OutputFile struct {
 }
 
 // Mutation represents a single mutation in the OutputResult data structure.
+// EquivalentReason is the review reason of the annotation that marks the
+// mutation as equivalent. It is absent when no annotation marks it.
 type Mutation struct {
-	Type   string `json:"type"`
-	Status string `json:"status"`
-	Line   int    `json:"line"`
-	Column int    `json:"column"`
+	Type             string `json:"type"`
+	Status           string `json:"status"`
+	EquivalentReason string `json:"equivalent_reason,omitempty"`
+	Line             int    `json:"line"`
+	Column           int    `json:"column"`
 }
 
 // MutatorType contains the list of all supported mutator types.

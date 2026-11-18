@@ -31,6 +31,9 @@ import "go/token"
 //     means they are effective in covering this regression.
 //   - MemoryError means that the test run of the TokenMutant reached its memory
 //     limit, so the Go runtime stopped it.
+//   - Equivalent means that a reviewed annotation marks the TokenMutant as
+//     equivalent: it does not change the observable behavior, so a test
+//     cannot kill it. Gremlins does not run its tests.
 type Status int
 
 // Currently supported MutantStatus.
@@ -43,6 +46,7 @@ const (
 	NotViable
 	TimedOut
 	MemoryError
+	Equivalent
 )
 
 func (ms Status) String() string {
@@ -63,6 +67,8 @@ func (ms Status) String() string {
 		return "TIMED OUT"
 	case MemoryError:
 		return "MEMORY ERROR"
+	case Equivalent:
+		return "EQUIVALENT"
 	default:
 		panic("this should not happen")
 	}
@@ -180,4 +186,8 @@ type Mutator interface {
 
 	// MutatedSnippet returns the mutated code snippet around the mutation point.
 	MutatedSnippet() []byte
+
+	// EquivalentReason returns the review reason of the annotation that marks
+	// the Mutator as equivalent, or an empty string when no annotation marks it.
+	EquivalentReason() string
 }

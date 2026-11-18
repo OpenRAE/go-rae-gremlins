@@ -83,14 +83,21 @@ func newRootCmd(ctx context.Context, version string) (*gremlinsCmd, error) {
 	}
 	cmd.AddCommand(uc.cmd)
 
-	flag := &flags.Flag{Name: "silent", CfgKey: configuration.GremlinsSilentKey, Shorthand: "s", DefaultV: false, Usage: "suppress output and run in silent mode"}
-	if err := flags.SetPersistent(cmd, flag); err != nil {
+	if err := flags.SetPersistent(cmd, silentFlag()); err != nil {
 		return nil, err
 	}
 
 	return &gremlinsCmd{
 		cmd: cmd,
 	}, nil
+}
+
+// silentFlag returns the persistent flag of the top-level silent key.
+func silentFlag() *flags.Flag {
+	return &flags.Flag{
+		Name: "silent", CfgKey: configuration.GremlinsSilentKey, Shorthand: "s", DefaultV: false,
+		Usage: "suppress output and run in silent mode",
+	}
 }
 
 func shortExplainer() string {

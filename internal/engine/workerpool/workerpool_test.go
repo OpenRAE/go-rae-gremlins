@@ -296,6 +296,10 @@ func (fakeMutant) MutatedSnippet() []byte {
 	panic("not used in test")
 }
 
+func (fakeMutant) EquivalentReason() string {
+	panic("not used in test")
+}
+
 func TestFeaturePoolCancelledSubmissionReturnsWhileQueueIsFull(t *testing.T) {
 	configuration.Set(configuration.UnleashWorkersKey, 1)
 	defer configuration.Reset()

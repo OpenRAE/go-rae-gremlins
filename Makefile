@@ -6,6 +6,9 @@ RELEASE=${RELEASER_CMD} release
 LINTER_CMD=mise exec -- golangci-lint
 LINT_BASE ?= origin/dev
 LINT_ADOPTION_BASE ?=
+GOVULNCHECK_VERSION=v1.9.0
+# The golang.org/x/tools version that go.mod requires. Review the tool before a change.
+FIELDALIGNMENT_VERSION=v0.48.0
 BINARY_NAME=gremlins
 COVER_OUT=coverage.out
 TARGET=dist
@@ -32,11 +35,17 @@ cover:
 .PHONY: requirements
 requirements:
 	mise install
-	go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
+	mise exec -- go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@${FIELDALIGNMENT_VERSION}
 
 .PHONY: lint
 lint:
 	python3 scripts/lint.py --base "${LINT_BASE}" --adoption-base "${LINT_ADOPTION_BASE}"
+
+# Scans the module against the Go vulnerability database. The hosted CI job and
+# the manual-stage pre-commit hook both call this target.
+.PHONY: vuln
+vuln:
+	${GO_CMD} run golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION} ./...
 
 .PHONY: lint-shrink lint-test lint-cover
 lint-shrink:
@@ -110,3 +119,9 @@ architecture-design:
 .PHONY: memcheck
 memcheck:
 	bash scripts/memory-budget-check.sh
+
+# Run the Phase E transport harness. Set GROUND_CONTROL_TEST_ROOT to the installed
+# node_modules/grndctl directory of the pinned utility (docs/development/phase-e.md).
+.PHONY: phase-e-test
+phase-e-test:
+	node --test .github/ground-control/phase-e.integration.test.mjs

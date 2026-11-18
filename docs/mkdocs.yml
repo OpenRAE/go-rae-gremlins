@@ -1,15 +1,13 @@
 site_name: Gremlins
-site_url: https://gremlins.dev
-repo_url: https://github.com/go-gremlins/gremlins
-edit_uri: edit/main/docs/docs
+repo_url: https://github.com/OpenRAE/go-rae-gremlins
+edit_uri: edit/dev/docs/docs
 site_description: A mutation testing tool for Go.
 copyright: Made with ❤️ by Gremlins contributors. <span xmlns:cc="http://creativecommons.org/ns#" >This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/?ref=chooser-v1" target="_blank" rel="license noopener noreferrer" style="display:inline-block;">CC BY-SA 4.0<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1"><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1"><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/sa.svg?ref=chooser-v1"></a></span>
-repo_name: go-gremlins/gremlins
+repo_name: OpenRAE/go-rae-gremlins
 theme:
   name: material
   logo: assets/images/logo.png
   favicon: assets/images/favicon.png
-  custom_dir: overrides
   language: en
   palette:
     primary: cyan
@@ -27,16 +25,8 @@ theme:
 extra:
   social:
     - icon: fontawesome/brands/github-alt
-      link: https://github.com/go-gremlins
+      link: https://github.com/OpenRAE/go-rae-gremlins
       name: GitHub
-    - icon: fontawesome/brands/docker
-      link: https://hub.docker.com/r/gogremlins/gremlins
-      name: Docker
-  version:
-    provider: mike
-  release:
-    full_version: !ENV [GR_FULL_VERSION, 'X.Y.Z']
-    short_version: !ENV [GR_SHORT_VERSION, 'X.Y']
 
 nav:
   - Home: index.md
@@ -49,6 +39,7 @@ nav:
             - usage/commands/unleash/index.md
             - usage/commands/unleash/workers.md
       - usage/configuration.md
+      - usage/equivalent-mutants.md
       - Mutations:
           - usage/mutations/index.md
           - usage/mutations/arithmetic_base.md
@@ -65,10 +56,9 @@ nav:
       - Continuous integration:
           - usage/ci/github-action.md
           - usage/ci/docker.md
-  - Contributing: CONTRIBUTING.md
+  - Contributing: https://github.com/OpenRAE/go-rae-gremlins/blob/dev/docs/CONTRIBUTING.md
 
 plugins:
-  - macros
   - search
 
 markdown_extensions:
@@ -92,8 +82,8 @@ markdown_extensions:
   - pymdownx.caret
   - pymdownx.details
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight
   - pymdownx.inlinehilite
   - pymdownx.keys
