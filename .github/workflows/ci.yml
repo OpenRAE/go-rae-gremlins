@@ -212,7 +212,8 @@ jobs:
         # loginctl enable-linger starts the per-user manager for the runner user.
         # It needs no sudo; polkit authorizes a user for their own account.
         run: |
-          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          export XDG_RUNTIME_DIR
           loginctl enable-linger "$(id -un)"
           for _ in $(seq 1 30); do
             if systemctl --user show-environment >/dev/null 2>&1; then
@@ -222,8 +223,145 @@ jobs:
           done
       - name: Prove the memory budget enforcement
         run: |
-          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          export XDG_RUNTIME_DIR
           make memcheck
+
+  # Selects Phase E transport tests for a change to the transport or its verification
+  # wiring (docs/development/phase-e-design.md). Only PR and merge group runs select a
+  # change: a cache entry from dev or main would be readable by fork PRs.
+  transport-scope:
+    name: Phase E transport scope
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.select.outputs.run }}
+      release: ${{ steps.tuple.outputs.release }}
+      asset: ${{ steps.tuple.outputs.asset }}
+      sha256: ${{ steps.tuple.outputs.sha256 }}
+      node: ${{ steps.tuple.outputs.node }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select affected transport changes
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
+          # Fork and Dependabot PR runs get no repository secrets.
+          NO_SECRETS: ${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.actor == 'dependabot[bot]') }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" != pull_request && "$EVENT_NAME" != merge_group ]]; then
+            echo "::notice::$EVENT_NAME runs do not run the Phase E transport tests; the merge queue ran them."
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ ! "$BASE" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The comparison base '$BASE' is not a commit SHA."
+            exit 1
+          fi
+          selected=false
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              .github/workflows/ground-control-phase-e.yml | .github/workflows/ground-control-fork-finalization.yml | \
+                .github/ground-control/* | .github/workflows/ci.yml | Makefile)
+                selected=true ;;
+            esac
+          done < <(git diff --name-only --no-renames -z "$BASE" HEAD)
+          wait $! # A failed comparison fails the step.
+          if [[ "$selected" == true && "$NO_SECRETS" == true ]]; then
+            echo '::warning::This PR run has no repository secrets. The merge queue runs the Phase E transport tests.'
+            selected=false
+          fi
+          echo "run=$selected" >> "$GITHUB_OUTPUT"
+      - name: Read the pinned release from the Phase E workflow
+        id: tuple
+        if: steps.select.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          workflow=.github/workflows/ground-control-phase-e.yml
+          release="$(yq -e '.jobs.finalize.env.GC_RELEASE' "$workflow")"
+          asset="$(yq -e '.jobs.finalize.env.GC_ASSET' "$workflow")"
+          sha256="$(yq -e '.jobs.finalize.env.GC_SHA256' "$workflow")"
+          node="$(yq -e '[.jobs.finalize.steps[] | select((.uses // "") | test("^actions/setup-node@")) | .with."node-version"] | .[0]' "$workflow")"
+          [[ "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$asset" =~ ^grndctl-[0-9]+\.[0-9]+\.[0-9]+\.tgz$ ]]
+          [[ "$sha256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$node" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'release=%s\nasset=%s\nsha256=%s\nnode=%s\n' "$release" "$asset" "$sha256" "$node" >> "$GITHUB_OUTPUT"
+
+  # Holds GROUND_CONTROL_READ_TOKEN, so it checks out and runs no candidate code.
+  # The tarball goes to the test job through a cache entry with the scope of this
+  # PR or merge group. The public repository must not publish it as an artifact.
+  transport-release:
+    name: Phase E release
+    needs: transport-scope
+    if: needs.transport-scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - name: Download and verify the pinned release
+        env:
+          GH_TOKEN: ${{ secrets.GROUND_CONTROL_READ_TOKEN }}
+          GC_RELEASE: ${{ needs.transport-scope.outputs.release }}
+          GC_ASSET: ${{ needs.transport-scope.outputs.asset }}
+          GC_SHA256: ${{ needs.transport-scope.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo '::error::Set GROUND_CONTROL_READ_TOKEN with read-only access to the Ground Control release repository.'
+            exit 1
+          fi
+          umask 077
+          mkdir -p "$RUNNER_TEMP/ground-control"
+          gh release download "$GC_RELEASE" --repo autarchy-ai/Ground-Control \
+            --pattern "$GC_ASSET" --dir "$RUNNER_TEMP/ground-control"
+          cd "$RUNNER_TEMP/ground-control"
+          printf '%s  %s\n' "$GC_SHA256" "$GC_ASSET" | sha256sum --check --status
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ground-control
+          key: ground-control-release-${{ needs.transport-scope.outputs.sha256 }}
+
+  # Runs the candidate harness and workflow shell without secrets.
+  transport:
+    name: Phase E transport tests
+    needs: [transport-scope, transport-release]
+    if: needs.transport-scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ needs.transport-scope.outputs.node }}
+          package-manager-cache: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ground-control
+          key: ground-control-release-${{ needs.transport-scope.outputs.sha256 }}
+          fail-on-cache-miss: true
+      - name: Verify and install the locked utility
+        env:
+          GC_ASSET: ${{ needs.transport-scope.outputs.asset }}
+          GC_SHA256: ${{ needs.transport-scope.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          install="$RUNNER_TEMP/ground-control"
+          cp .github/ground-control/package.json .github/ground-control/package-lock.json "$install/"
+          cd "$install"
+          printf '%s  %s\n' "$GC_SHA256" "$GC_ASSET" | sha256sum --check --status
+          npm ci --ignore-scripts --omit=dev --no-audit --no-fund --userconfig=/dev/null \
+            --globalconfig="$install/global.npmrc" --cache="$RUNNER_TEMP/ground-control-cache"
+      - name: Run the Phase E transport harness
+        env:
+          GROUND_CONTROL_TEST_ROOT: ${{ runner.temp }}/ground-control/node_modules/grndctl
+        run: make phase-e-test
 
   # Validates coverage reports and scanner settings in a secret-free job.
   # The token-bearing scan runs separately. Secrets are not available to
@@ -349,11 +487,14 @@ jobs:
   gate:
     name: PR Gate
     if: always()
-    needs: [architecture, lint, vuln, docs, test, policy, memory, sonar]
+    needs: [architecture, lint, vuln, docs, test, policy, memory, sonar, transport-scope, transport]
     runs-on: ubuntu-latest
     steps:
-      - name: Require architecture, lint, vulnerability scan, docs, tests, policy, memory, and SonarCloud
+      - name: Require architecture, lint, vulnerability scan, docs, tests, policy, memory, SonarCloud, and transport tests
         env:
+          TRANSPORT_SCOPE_RESULT: ${{ needs.transport-scope.result }}
+          TRANSPORT_SELECTED: ${{ needs.transport-scope.outputs.run }}
+          TRANSPORT_RESULT: ${{ needs.transport.result }}
           ARCHITECTURE_RESULT: ${{ needs.architecture.result }}
           LINT_RESULT: ${{ needs.lint.result }}
           VULN_RESULT: ${{ needs.vuln.result }}
@@ -375,4 +516,10 @@ jobs:
             test "$SONAR_RESULT" = skipped
           else
             test "$SONAR_RESULT" = success
+          fi
+          test "$TRANSPORT_SCOPE_RESULT" = success
+          if [ "$TRANSPORT_SELECTED" = true ]; then
+            test "$TRANSPORT_RESULT" = success
+          else
+            test "$TRANSPORT_RESULT" = skipped
           fi

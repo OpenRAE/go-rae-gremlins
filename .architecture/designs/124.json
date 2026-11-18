@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "issue": 124,
+  "summary": "Run the existing Phase E integration harness in CI when a change touches the transport. A secret-free scope job selects the change from the Git diff against the PR or merge group base and reads the release tuple and Node pin from the Phase E workflow. A release job holds GROUND_CONTROL_READ_TOKEN, checks out nothing, downloads the pinned tarball, verifies its SHA256, and saves it to an Actions cache with a key from that SHA256. A secret-free test job restores the tarball, verifies it again, installs the locked utility, and runs make phase-e-test. PR Gate requires the test job when the scope job selects the change. Push and manual runs do not run the jobs, so no cache entry gets a dev or main scope that fork PRs can read. Fork and Dependabot PRs have no secret; the merge queue runs the check for them. The model adds the transport_verification trust boundary. No Go package, import, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The new transport_verification boundary covers the three CI jobs. The release job reaches the private Ground Control release with a read-only token and executes no candidate code. The test job executes the candidate harness and workflow shell with no secret and reaches the npm registry for locked dependencies. The tarball moves between the jobs through an Actions cache entry with a PR or merge group scope. The development_checks, delivery_finalization, and merge_queue_policy boundaries do not change.",
+  "conflicts": [],
+  "policies": [
+    "ci",
+    "build",
+    "model",
+    "contributing"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  },
+  "contract_changes": {}
+}

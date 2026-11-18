@@ -7,6 +7,7 @@ ADR 0004 records the decision and its limits.
 
 The separate [delivery finalization boundary](phase-e-design.md) models the post-merge workflow,
 its pinned utility installation, and GitHub evidence access. It does not broaden the static checker's permissions.
+The [transport verification boundary](phase-e-design.md#pre-merge-transport-verification) models the CI jobs that test transport changes with the private release.
 
 ## Components and data flow
 

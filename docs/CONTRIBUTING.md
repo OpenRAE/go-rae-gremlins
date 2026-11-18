@@ -162,7 +162,7 @@ The current hosted checks are defined in the repository:
 
 | Workflow | Verification |
 | --- | --- |
-| [CI](../.github/workflows/ci.yml) | Architecture model and design checks, shrink-only baselines, and lint. STE checks on changed Markdown. Python line and branch coverage. Race tests and Go coverage on Linux, macOS, and Windows. Policy hooks, the memory budget, Sonar admission, and SonarCloud. `PR Gate` combines the architecture, lint, docs, test, policy, memory, and Sonar results. |
+| [CI](../.github/workflows/ci.yml) | Architecture model and design checks, shrink-only baselines, and lint. STE checks on changed Markdown. Python line and branch coverage. Race tests and Go coverage on Linux, macOS, and Windows. Policy hooks, the memory budget, Sonar admission, and SonarCloud. [Phase E transport tests](development/phase-e-design.md#pre-merge-transport-verification) when a change touches the transport. `PR Gate` combines the architecture, lint, docs, test, policy, memory, Sonar, and transport results. |
 | [Gremlins](../.github/workflows/gremlins.yml) | Mutation testing with the Gremlins source from the candidate commit. |
 | [PR title](../.github/workflows/pr-title.yml) | A Conventional Commit PR title with a lowercase subject. |
 | [GitGuardian](../.github/workflows/ggshield.yml) | A `ggshield` secret scan of the new commits of the PR or merge group. |
@@ -184,6 +184,8 @@ check has no workflow job that runs on `merge_group`.
 
 CI deliberately skips the Sonar jobs for PRs from other repositories because they have no access to the token;
 `PR Gate` accepts that specific skip. Ground Control readiness still requires the configured Sonar result.
+Fork and Dependabot PRs also skip the Phase E transport tests, because they get no secrets. The merge queue runs them.
+
 Inspect every check on the current PR head, including installed security checks. A green `PR Gate` alone does
 not establish that every hosted check passed.
 

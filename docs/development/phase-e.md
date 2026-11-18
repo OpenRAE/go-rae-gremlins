@@ -16,7 +16,9 @@ Use a fine-grained token restricted to `autarchy-ai/Ground-Control` with **Conte
 Authorize organization access if required. Do not reuse an operator-wide write token.
 The finalizer needs no Sonar access.
 
-The release token is available only to the download step.
+In the Phase E workflow, the release token is available only to the download step.
+CI's `Phase E release` job also reads this secret to test transport changes. That job checks out no code.
+
 The finalizer uses this repository's automatic token for evidence reads, issue comments, and closure.
 No write access to repository contents or PRs is granted.
 The local developer `.env` is not copied or changed.
@@ -78,10 +80,10 @@ The [design](phase-e-design.md) records data flow, permissions, integrity, and f
 
 Install the pinned utility in a temporary directory using the committed manifest, lockfile, and checksum-verified tarball.
 Use the same disabled lifecycle scripts as the workflow.
-Point `GROUND_CONTROL_TEST_ROOT` at that directory and run:
+Point `GROUND_CONTROL_TEST_ROOT` at the installed `node_modules/grndctl` directory and run:
 
 ```shell
-node --test .github/ground-control/phase-e.integration.test.mjs
+make phase-e-test
 ```
 
 The 16 cases run the actual workflow shell steps and the installed CLI against a stateful GitHub stand-in.
@@ -100,5 +102,8 @@ The reference package supplies only the YAML parser.
 The cases use no live GitHub credential and change no real issue.
 For issue #182, all 16 cases passed against the checksum-verified v1.12.0 installation.
 With the earlier workflow and v1.9.0, the 11 finalization, promotion, and skip cases failed.
+
+CI runs the same cases when a PR changes the transport. See [pre-merge transport verification](phase-e-design.md#pre-merge-transport-verification).
+Fork and Dependabot PRs get no secrets, so the merge queue runs the cases for them.
 
 Verification evidence: [TAP results](evidence/phase-e-v1.12.0.tap) and [release and file hashes](evidence/phase-e-v1.12.0.json).
