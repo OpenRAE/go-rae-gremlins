@@ -101,8 +101,8 @@ For further information check the specific command documentation.
 
 [//]: # (@formatter:off)
 !!! tip
-    You can validate the configuration file using the provided JSON Schema (ex. using it in your editor). The schema
-    can be found at [{{ config.site_url }}/schema/configuration.json]({{ config.site_url }}/schema/configuration.json).
+    You can validate the configuration file with the [JSON Schema](../schema/configuration.json), for example in your
+    editor.
 
 [//]: # (@formatter:on)
 

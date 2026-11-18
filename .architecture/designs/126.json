@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "issue": 126,
+  "summary": "Correct the documentation destinations of the fork. docs/mkdocs.yml names the fork repository and drops the upstream site URL, the mike version selector and its template override, the Docker Hub link, and the macros plugin that only filled upstream release and site values. The emoji settings use the Material module. The site Contributing entry links to the repository guide instead of a symlink whose relative links have no site target. The configuration page links to the schema file in the site. The CI pages install the fork with go install from its module path. README.md links to the fork documentation and shows only badges of checks that the fork runs. No Go package, import, CLI flag, configuration key, schema identity, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "No modeled trust boundary changes. The change edits documentation and the MkDocs settings only. No workflow builds or publishes the site. The examples install a released module from the Go module proxy and run actions pinned to commit SHAs with read-only contents permission. The trust_changes entries restate the existing boundaries.",
+  "conflicts": [],
+  "policies": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}
