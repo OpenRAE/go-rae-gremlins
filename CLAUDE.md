@@ -104,7 +104,7 @@ make clean
   `InvertBitwise`, `InvertBitwiseAssignments`, `InvertLogical`,
   `InvertLoopCtrl`, `InvertNegatives`, `RemoveSelfAssignments`
 - Status values: `NotCovered`, `Runnable`, `Skipped`, `Lived`,
-  `Killed`, `NotViable`, `TimedOut`, `MemoryError`
+  `Killed`, `NotViable`, `TimedOut`, `MemoryError`, `Equivalent`
 - Each mutator implements: `Apply()` (mutate code), `Rollback()`
   (restore original)
 
@@ -142,7 +142,9 @@ make clean
 3. `Engine.Run()` walks file tree, parses Go AST
 4. For each token, check `TokenMutantType` mapping for applicable
    mutations
-5. Create mutators with status (`Runnable`, `NotCovered`, `Skipped`)
+5. Create mutators with status (`Runnable`, `NotCovered`, `Skipped`,
+   `Equivalent`). A `//gremlins:equivalent` directive selects an
+   `Equivalent` mutant (see `internal/engine/equivalent.go`)
 6. Worker pool processes runnable mutants:
    - Copy code to temp workdir
    - Apply mutation via `Mutator.Apply()`

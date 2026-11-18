@@ -78,10 +78,10 @@
         },
         "output-statuses": {
           "title": "Output statuses",
-          "description": "Prints only the mutants with these statuses to the console: l LIVED, c NOT COVERED, t TIMED OUT, m MEMORY ERROR, k KILLED, v NOT VIABLE, s SKIPPED, r RUNNABLE. Empty prints all. Gremlins ignores an invalid filter with a warning. The JSON output does not change",
+          "description": "Prints only the mutants with these statuses to the console: l LIVED, c NOT COVERED, t TIMED OUT, m MEMORY ERROR, k KILLED, v NOT VIABLE, s SKIPPED, r RUNNABLE, e EQUIVALENT. Empty prints all. Gremlins ignores an invalid filter with a warning. The JSON output does not change",
           "type": "string",
           "default": "",
-          "pattern": "^[lctmkvsr]*$",
+          "pattern": "^[lctmkvsre]*$",
           "examples": [
             "lc"
           ]

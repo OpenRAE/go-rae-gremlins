@@ -182,9 +182,23 @@ func goIgnored(name string) bool {
 	return strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
 }
 
+// sourceFile is a parsed Go file of the module and the data that decides the
+// status of its mutants.
+type sourceFile struct {
+	set         *token.FileSet
+	file        *ast.File
+	equivalents equivalents
+	name        string
+	cov         fileCoverage
+}
+
 func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	set := token.NewFileSet()
-	file, err := mu.parseFile(set, fileName)
+	src, file, err := mu.parseFile(set, fileName)
+	if err != nil {
+		return err
+	}
+	eqs, err := fileEquivalents(set, file, src)
 	if err != nil {
 		return err
 	}
@@ -193,7 +207,13 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	if err != nil {
 		return err
 	}
-	cov := newFileCoverage(set, file, mu.codeData.Cov, built)
+	sf := &sourceFile{
+		set:         set,
+		file:        file,
+		equivalents: eqs,
+		name:        fileName,
+		cov:         newFileCoverage(set, file, mu.codeData.Cov, built),
+	}
 	stopped := false
 	ast.Inspect(file, func(node ast.Node) bool {
 		if stopped {
@@ -203,7 +223,7 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 		if !ok {
 			return true
 		}
-		stopped = !mu.findMutations(ctx, fileName, set, file, n, cov)
+		stopped = !mu.findMutations(ctx, sf, n)
 
 		return !stopped
 	})
@@ -214,21 +234,29 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	return nil
 }
 
-// parseFile parses a Go file of the module file system.
-func (mu *Engine) parseFile(set *token.FileSet, fileName string) (*ast.File, error) {
-	src, err := mu.fs.Open(fileName)
+// parseFile reads and parses a Go file of the module file system. It
+// returns the source and the parsed file.
+func (mu *Engine) parseFile(set *token.FileSet, fileName string) ([]byte, *ast.File, error) {
+	f, err := mu.fs.Open(fileName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	file, err := parser.ParseFile(set, fileName, src, parser.ParseComments)
-	if closeErr := src.Close(); closeErr != nil {
+	src, err := io.ReadAll(f)
+	if err != nil {
+		err = fmt.Errorf("read %s: %w", fileName, err)
+	}
+	if closeErr := f.Close(); closeErr != nil {
 		err = errors.Join(err, fmt.Errorf("close: %w", closeErr))
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	file, err := parser.ParseFile(set, fileName, src, parser.ParseComments)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return file, nil
+	return src, file, nil
 }
 
 // hostBuilds tells if the host build with the configured build tags includes
@@ -252,23 +280,27 @@ func (mu *Engine) hostBuilds(fileName string) (bool, error) {
 
 // findMutations sends the mutants of node to the mutant stream. It returns
 // false when ctx is done before a mutant is sent.
-func (mu *Engine) findMutations(
-	ctx context.Context, fileName string, set *token.FileSet, file *ast.File, node *NodeToken, cov fileCoverage,
-) bool {
+func (mu *Engine) findMutations(ctx context.Context, sf *sourceFile, node *NodeToken) bool {
 	mutantTypes, ok := TokenMutantType[node.Tok()]
 	if !ok {
 		return true
 	}
 
-	pkg := mu.pkgName(fileName)
+	pkg := mu.pkgName(sf.name)
 	for _, mt := range mutantTypes {
 		if !configuration.Get[bool](configuration.MutantTypeEnabledKey(mt)) {
 			continue
 		}
-		mutantType := mt
-		tm := NewTokenMutant(pkg, set, file, node)
-		tm.SetType(mutantType)
-		tm.SetStatus(mu.mutationStatus(cov, node.TokPos))
+		tm := NewTokenMutant(pkg, sf.set, sf.file, node)
+		tm.SetType(mt)
+		status := mu.mutationStatus(sf.cov, node.TokPos)
+		if reason, ok := sf.equivalents[equivalentKey{pos: node.TokPos, mt: mt}]; ok {
+			tm.SetEquivalentReason(reason)
+			if status != mutator.Skipped {
+				status = mutator.Equivalent
+			}
+		}
+		tm.SetStatus(status)
 
 		select {
 		case mu.mutantStream <- tm:

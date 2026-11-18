@@ -221,7 +221,7 @@ func (m *mutantExecutor) execute(ctx context.Context, workerName string) error {
 	workingDir := filepath.Join(rootDir, m.module.CallingDir)
 	m.mutant.SetWorkdir(workingDir)
 
-	if m.mutant.Status() == mutator.NotCovered || m.mutant.Status() == mutator.Skipped || m.dryRun {
+	if m.mutant.Status() != mutator.Runnable || m.dryRun {
 		return nil
 	}
 

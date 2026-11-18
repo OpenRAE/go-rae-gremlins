@@ -23,13 +23,13 @@ complete.
 
 ## Gremlins version
 
-Gremlins is still in its 0.x.x release, which, as per SemVer, does not guarantee backward compatibility. What this
+Gremlins is still in its 0.y.z release, which, as per SemVer, does not guarantee backward compatibility. What this
 means for Gremlins is that configuration flags and/or configuration files can change among minor releases. This may
 be important if you use Gremlins in automated builds, for example in _continuous integration_ pipelines.
 
-Also, while in 0.x.x releases, only the current minor release will be maintained. If we are in v0.2.0, no patch
+Also, while in 0.y.z releases, only the current minor release will be maintained. If we are in v0.2.0, no patch
 releases will be provided for the v0.1.0 line.
-Once Gremlins reaches its 1.x.x release, it will start to be backward compatible. Then we will decide how many
+Once Gremlins reaches its 1.y.z release, it will start to be backward compatible. Then we will decide how many
 releases to maintain at the same time (ex. up to two minors before, as Go itself does).
 
 ## What is Mutation Testing
@@ -69,6 +69,7 @@ Gremlins will report each mutation as:
   explicitly.
 - `NOT VIABLE`: The mutation makes the build fail.
 - `MEMORY ERROR`: The test run used more memory than its limit, so Gremlins stopped it.
+- `EQUIVALENT`: A reviewed annotation marks the mutation as equivalent; it will not be tested.
 
 ## What inspired Gremlins
 

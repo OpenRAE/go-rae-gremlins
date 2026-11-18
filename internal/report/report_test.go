@@ -691,11 +691,12 @@ func sortMutation(x, y internal.Mutation) bool {
 }
 
 type stubMutant struct {
-	position       token.Position
-	status         mutator.Status
-	mutantType     mutator.Type
-	originSnippet  []byte
-	mutatedSnippet []byte
+	position         token.Position
+	status           mutator.Status
+	mutantType       mutator.Type
+	originSnippet    []byte
+	mutatedSnippet   []byte
+	equivalentReason string
 }
 
 func (s stubMutant) Type() mutator.Type {
@@ -748,6 +749,10 @@ func (s stubMutant) OrigSnippet() []byte {
 
 func (s stubMutant) MutatedSnippet() []byte {
 	return s.mutatedSnippet
+}
+
+func (s stubMutant) EquivalentReason() string {
+	return s.equivalentReason
 }
 
 func TestRegressionThresholdFlags(t *testing.T) {
