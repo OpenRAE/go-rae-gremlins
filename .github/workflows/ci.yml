@@ -268,6 +268,7 @@ jobs:
               .github/workflows/ground-control-phase-e.yml | .github/workflows/ground-control-fork-finalization.yml | \
                 .github/ground-control/* | .github/workflows/ci.yml | Makefile)
                 selected=true ;;
+              *) ;; # Other paths do not select the tests.
             esac
           done < <(git diff --name-only --no-renames -z "$BASE" HEAD)
           wait $! # A failed comparison fails the step.
