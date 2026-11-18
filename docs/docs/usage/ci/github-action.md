@@ -1,11 +1,11 @@
 ---
-title: GitHub Action
+title: GitHub Actions
 ---
 
-# GitHub Action
+# GitHub Actions
 
-Gremlins can be used in [GitHub Actions](https://github.com/features/actions) through the
-official [Run gremlins unleash action](https://github.com/marketplace/actions/run-gremlins-unleash).
+go-rae-gremlins has no GitHub Action of its own. Install the fork with `go install` in a workflow step, then run
+`gremlins unleash`.
 
 ## Example usage
 
@@ -16,24 +16,26 @@ on:
   pull_request:
   push:
 
+permissions:
+  contents: read
+
 jobs:
   gremlins:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-go@v3
-    - uses: go-gremlins/gremlins-action@v1
-      with:
-        version: latest
-        args: --tags="tag1,tag2"
-        workdir: test/dir
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install Gremlins
+        run: go install github.com/OpenRAE/go-rae-gremlins/cmd/gremlins@v<version>
+      - name: Run Gremlins
+        run: gremlins unleash
 ```
 
-## Customization
+Replace `<version>` with a version from the [release page](https://github.com/OpenRAE/go-rae-gremlins/releases).
+Gremlins needs Go 1.25 or later. If your `go.mod` selects an earlier Go version, set `go-version` to 1.25 or later.
 
-| Name          | Type     | Default  | Description                                              |
-|---------------|----------|----------|----------------------------------------------------------|
-| `version`[^1] | `string` | `latest` | Te version of Gremlins to use                            |
-| `args`        | `string` |          | The command line arguments to pass to `gremlins unleash` |
-| `workdir`     | `string` | `.`      | Working directory relative to repository root            |
-
-[^1]: Can be `latest`, a fixed version like `v0.1.2` or a semver range like `~0.2`. In this case this will
-     return `v0.2.2`.
+To set flags, add them to the `gremlins unleash` command. For example, `gremlins unleash --tags="tag1,tag2"`.

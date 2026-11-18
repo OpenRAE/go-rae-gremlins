@@ -6,13 +6,8 @@ To get started and run a scenario, see [LilRÆ](https://github.com/openrae/lilra
   <p align="center" style="text-align: center">A mutation testing tool for Go</p>
 </p>
 
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/go-gremlins/gremlins/ci.yml?logo=github)](https://github.com/go-gremlins/gremlins/actions/workflows/ci.yml)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/go-gremlins/gremlins/gremlins.yml?label=gremlins&logo=github)](https://github.com/go-gremlins/gremlins/actions/workflows/gremlins.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/go-gremlins/gremlins)](https://goreportcard.com/report/github.com/go-gremlins/gremlins)
-[![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability/go-gremlins/gremlins?logo=codeclimate)](https://codeclimate.com/github/go-gremlins/gremlins/maintainability)
-[![DeepSource](https://deepsource.io/gh/go-gremlins/gremlins.svg/?label=active+issues&token=posNnh5FHpZG9DhM23YH7h6d)](https://deepsource.io/gh/go-gremlins/gremlins/?ref=repository-badge)
-[![Codacy grade](https://img.shields.io/codacy/grade/744b4ac720c34518b7578204cfc61997?logo=codacy)](https://www.codacy.com/gh/go-gremlins/gremlins/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=go-gremlins/gremlins&amp;utm_campaign=Badge_Grade)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgo-gremlins%2Fgremlins.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgo-gremlins%2Fgremlins?ref=badge_shield)
+[![CI](https://img.shields.io/github/actions/workflow/status/OpenRAE/go-rae-gremlins/ci.yml?branch=dev&logo=github)](https://github.com/OpenRAE/go-rae-gremlins/actions/workflows/ci.yml)
+[![Gremlins](https://img.shields.io/github/actions/workflow/status/OpenRAE/go-rae-gremlins/gremlins.yml?branch=dev&label=gremlins&logo=github)](https://github.com/OpenRAE/go-rae-gremlins/actions/workflows/gremlins.yml)
 
 Gremlins is a mutation testing tool for Go. It has been made to work well on _smallish_ Go modules, for example
 _microservices_. On these modules, it helps validate the tests and aids the TDD process. You can also use it as a CI
@@ -23,13 +18,13 @@ complete.
 
 ## Gremlins version
 
-Gremlins is still in its 0.x.x release, which, as per SemVer, does not guarantee backward compatibility. What this
+Gremlins is still in its 0.x release, which, as per SemVer, does not guarantee backward compatibility. What this
 means for Gremlins is that configuration flags and/or configuration files can change among minor releases. This may
 be important if you use Gremlins in automated builds, for example in _continuous integration_ pipelines.
 
-Also, while in 0.x.x releases, only the current minor release will be maintained. If we are in v0.2.0, no patch
+Also, while in 0.x releases, only the current minor release will be maintained. If we are in v0.2.0, no patch
 releases will be provided for the v0.1.0 line.
-Once Gremlins reaches its 1.x.x release, it will start to be backward compatible. Then we will decide how many
+Once Gremlins reaches its 1.x release, it will start to be backward compatible. Then we will decide how many
 releases to maintain at the same time (ex. up to two minors before, as Go itself does).
 
 ## What is Mutation Testing
@@ -44,11 +39,11 @@ Here is a nice [intro to mutation testing](https://pedrorijo.com/blog/intro-muta
 
 ## How to use Gremlins
 
-Please refer to the [documentation](https://gremlins.dev) for instructions on how to obtain, configure and use Gremlins.
+See the [documentation](docs/docs/) to install, configure, and use Gremlins.
 
 ### Quick start
 
-This is just to get you started, do not forget to check the complete [documentation](https://gremlins.dev).
+For all options, see the [documentation](docs/docs/).
 
 Download the pre-built binary for your OS/ARCH from
 the [release page](https://github.com/OpenRAE/go-rae-gremlins/releases/latest)
