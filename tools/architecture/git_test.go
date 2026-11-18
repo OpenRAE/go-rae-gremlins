@@ -177,13 +177,13 @@ func TestFeaturePreCodeDesignStep(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name, input, rule string
-		bad               bool
+		name, input, rule, subject string
+		bad                        bool
 	}{
-		{"valid", "tools/architecture/testdata/valid-design.json", "", false},
-		{"forbidden", "tools/architecture/testdata/invalid-design.json", "ARCH002", true},
-		{"breaking contract", "tools/architecture/testdata/invalid-contract.json", "ARCH003", true},
-		{"prohibited transfer", "tools/architecture/testdata/invalid-trust.json", "ARCH004", true},
+		{"valid", "tools/architecture/testdata/valid-design.json", "", "", false},
+		{"forbidden", "tools/architecture/testdata/invalid-design.json", "ARCH002", "cmd", true},
+		{"breaking contract", "tools/architecture/testdata/invalid-contract.json", "ARCH003", "cli", true},
+		{"prohibited transfer", "tools/architecture/testdata/invalid-trust.json", "ARCH004", "development_checks", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := exec.CommandContext(t.Context(), "bash", "scripts/check-design.sh", tc.input) //nolint:gosec // Literal test fixture paths.
@@ -194,6 +194,9 @@ func TestFeaturePreCodeDesignStep(t *testing.T) {
 			}
 			if tc.bad && !strings.Contains(string(output), tc.rule) {
 				t.Fatalf("design step did not evaluate the import rule: %s", output)
+			}
+			if tc.bad && !strings.Contains(string(output), `subject="`+tc.subject+`"`) {
+				t.Fatalf("design step did not reject subject %q: %s", tc.subject, output)
 			}
 		})
 	}
