@@ -883,3 +883,28 @@ func TestFeatureExecutorCancellation(t *testing.T) {
 		})
 	}
 }
+
+// TestFeatureExecutorDoesNotRunEquivalentMutant checks that the executor
+// neither mutates the source nor runs the tests of an EQUIVALENT mutant, and
+// reports it with its status unchanged.
+func TestFeatureExecutorDoesNotRunEquivalentMutant(t *testing.T) {
+	viperSet(map[string]any{configuration.UnleashDryRunKey: false})
+	defer viperReset()
+	holder := &commandHolder{}
+	mut := &mutantStub{status: mutator.Equivalent, mutType: mutator.ConditionalsBoundary, pkg: expectedModule}
+
+	got := runExecutorOnce(t, newWdDealerStub(t), fakeExecCommandWithHolder(holder, fakeExecCommandSuccess), mut)
+
+	if got.Err != nil {
+		t.Errorf("result error = %v, want nil", got.Err)
+	}
+	if got.Mutant.Status() != mutator.Equivalent {
+		t.Errorf("result Status() = %v, want %v", got.Mutant.Status(), mutator.Equivalent)
+	}
+	if mut.applyCalled || mut.rollbackCalled {
+		t.Errorf("apply called = %t, rollback called = %t, want both false", mut.applyCalled, mut.rollbackCalled)
+	}
+	if holder.cmd != nil {
+		t.Errorf("executor ran %q %v, want no test run", holder.command, holder.args)
+	}
+}

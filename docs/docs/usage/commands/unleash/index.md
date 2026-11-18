@@ -74,6 +74,7 @@ gremlins unleash --coverpkg "./internal/...,./pkg/..."
 Allows to exclude generated or not important files.
 
 If a file path matches a regular expression, it is skipped from execution and threshold calculation.
+To skip one mutant instead of a file, see [equivalent mutants](../../equivalent-mutants.md).
 
 The default is to skip only test files.
 
@@ -174,6 +175,7 @@ Output
 - `v` - NOT VIABLE
 - `s` - SKIPPED
 - `r` - RUNNABLE
+- `e` - EQUIVALENT
 
 ### Diff statuses output
 
@@ -407,6 +409,7 @@ zero, which
 means Gremlins never exits with an error.
 
 The _test efficacy_ is calculated as `KILLED / (KILLED + LIVED)` and assesses how effective are the tests.
+The calculation does not include [`EQUIVALENT`](../../equivalent-mutants.md) mutants.
 The value must be from 0 to 100. Gremlins rejects other values before it starts the tests.
 
 ```shell
@@ -422,7 +425,7 @@ it is zero, which means Gremlins never exits with an error.
 
 The _mutant coverage_ is calculated as `(KILLED + LIVED) / (KILLED + LIVED + NOT_COVERED)` and assesses how many mutants
 are covered by tests.
-The calculation does not include `SKIPPED` mutants.
+The calculation does not include `SKIPPED` and [`EQUIVALENT`](../../equivalent-mutants.md) mutants.
 The value must be from 0 to 100. Gremlins rejects other values before it starts the tests.
 
 ```shell

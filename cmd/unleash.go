@@ -234,7 +234,7 @@ func unleashFlags() []*flags.Flag {
 		},
 		{
 			Name: paramOutputStatuses, CfgKey: configuration.UnleashOutputStatusesKey, Shorthand: "S", DefaultV: "",
-			Usage: "print only statuses from this flag, allowed values - 'lctmkvsr'",
+			Usage: "print only statuses from this flag, allowed values - 'lctmkvsre'",
 		},
 		{
 			Name: paramOutputDiffStatuses, CfgKey: configuration.UnleashOutputDiffStatusesKey, DefaultV: "",

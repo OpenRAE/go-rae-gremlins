@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "issue": 201,
+  "summary": "Support a reviewed annotation for one equivalent mutant. The engine binds each //gremlins:equivalent TYPE[@COLUMN] REASON directive comment of a parsed file to exactly one operator position and mutation type, over all the types of the operator, before it sends the mutants of the file. It matches physical positions and rejects a target that a //line directive moves. An unknown directive, a missing reason, an unknown type, a bad column, or a stale, ambiguous, or duplicate directive stops the run with an error. A matched mutant gets the new EQUIVALENT status, unless it is SKIPPED, and carries its reason through the Mutator contract. The executor runs only RUNNABLE mutants. The JSON report adds equivalent_reason and mutants_equivalent. Test efficacy and mutant coverage do not count EQUIVALENT mutants, and a run with only SKIPPED and EQUIVALENT mutants skips the threshold assessment. The output-statuses filter accepts e. ADR 0008 records the decision.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "internal/configuration",
+        "internal/engine",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    },
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/process",
+        "internal/report"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/gomodule",
+        "internal/mutator",
+        "internal/report"
+      ]
+    },
+    {
+      "package": "internal/engine/workerpool"
+    },
+    {
+      "package": "internal/mutator"
+    },
+    {
+      "package": "internal/report",
+      "imports": [
+        "internal/configuration",
+        "internal/execution",
+        "internal/log",
+        "internal/mutator",
+        "internal/report/internal"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/execution",
+        "internal/log",
+        "internal/mutator",
+        "internal/report",
+        "internal/report/internal"
+      ]
+    },
+    {
+      "package": "internal/report/internal"
+    }
+  ],
+  "contracts": [
+    "cli",
+    "schema",
+    "report"
+  ],
+  "contract_changes": {
+    "cli": "compatible",
+    "schema": "compatible",
+    "report": "compatible"
+  },
+  "policies": [
+    "guidance"
+  ],
+  "trust_boundaries": "Runtime annotations remain data from source files already discovered locally. They supply no paths, commands, network requests, or credentials. Existing mutant test execution is unchanged for runnable neighbors; reviewed equivalents never execute. Reasons flow only through canonical mutants to local console output and the existing configured JSON destination. Runtime test execution is distinct from the modeled static development-check boundary. Existing delivery-finalization and merge-queue boundaries remain unchanged. No data transfer or publication is performed by this preflight.",
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "conflicts": []
+}
