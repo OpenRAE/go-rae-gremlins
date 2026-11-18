@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "issue": 125,
+  "summary": "Pin the fieldalignment tool. The Makefile FIELDALIGNMENT_VERSION value selects golang.org/x/tools v0.48.0, the version that go.mod requires. make requirements installs fieldalignment at that version with the mise-selected Go, not at latest. A pre-commit pygrep hook rejects @latest in the Makefile, the scripts, and the workflows. The contributor guide names the pinned version. No Go package, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "trust_boundaries": "The development checks keep their offline analysis environment. The new hook reads tracked files only. make requirements is a provisioning command, not a development check, and keeps Go's module authentication. The trust_changes entries restate the model's existing boundaries.",
+  "conflicts": [],
+  "policies": [
+    "build",
+    "contributing",
+    "hooks"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    }
+  },
+  "contract_changes": {}
+}

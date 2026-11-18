@@ -55,6 +55,15 @@ repos:
         stages: [manual]
         always_run: true
 
+  # A tool install at @latest can change between two runs of the same revision.
+  - repo: local
+    hooks:
+      - id: no-latest-install
+        name: Reject unpinned @latest tool versions
+        entry: '@latest\b'
+        language: pygrep
+        files: ^(Makefile|scripts/.+|\.github/workflows/.+)$
+
   - repo: local
     hooks:
       - id: govulncheck
