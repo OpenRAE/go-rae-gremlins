@@ -250,13 +250,15 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 			wantLine: 5,
 		},
 		{
-			name:     "next line has no target",
-			src:      "package main\n\nfunc f(a, b int) bool {\n\t//gremlins:equivalent CONDITIONALS_BOUNDARY r\n\t_ = a\n\treturn a < b\n}\n",
+			name: "next line has no target",
+			src: "package main\n\nfunc f(a, b int) bool {\n\t//gremlins:equivalent CONDITIONALS_BOUNDARY r\n" +
+				"\t_ = a\n\treturn a < b\n}\n",
 			wantLine: 4,
 		},
 		{
-			name:     "line directive moves the target",
-			src:      "package main\n\nfunc f(a, b int) bool {\n//line other.go:40\n\treturn a < b //gremlins:equivalent CONDITIONALS_BOUNDARY r\n}\n",
+			name: "line directive moves the target",
+			src: "package main\n\nfunc f(a, b int) bool {\n//line other.go:40\n" +
+				"\treturn a < b //gremlins:equivalent CONDITIONALS_BOUNDARY r\n}\n",
 			wantLine: 5,
 		},
 	}

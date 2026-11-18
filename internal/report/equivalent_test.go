@@ -190,6 +190,8 @@ func TestFeatureThresholdsExcludeEquivalentMutants(t *testing.T) {
 				t.Errorf("Do() error = %v, want exit code %d", err, tc.wantExitCode)
 			case tc.wantExitCode != 0 && exitErr.ExitCode() != tc.wantExitCode:
 				t.Errorf("Do() exit code = %d, want %d", exitErr.ExitCode(), tc.wantExitCode)
+			default:
+				// The result is the expected one.
 			}
 		})
 	}

@@ -164,32 +164,36 @@ func bindAnnotations(set *token.FileSet, anns []*annotation) (equivalents, error
 	eqs := make(equivalents, len(anns))
 	var errs []error
 	for _, a := range anns {
-		switch {
-		case len(a.matches) == 0:
-			errs = append(errs, annotationError(a.at, "selects no %s mutant on line %d", a.mt, a.line))
-
-			continue
-		case len(a.matches) > 1:
-			errs = append(errs, annotationError(a.at,
-				"selects %d %s mutants on line %d; add @COLUMN", len(a.matches), a.mt, a.line))
+		if err := bindingError(set, a, eqs); err != nil {
+			errs = append(errs, err)
 
 			continue
 		}
-		key := equivalentKey{pos: a.matches[0], mt: a.mt}
-		if _, dup := eqs[key]; dup {
-			errs = append(errs, annotationError(a.at, "selects the same mutant as another annotation"))
-
-			continue
-		}
-		if set.Position(key.pos) != set.PositionFor(key.pos, false) {
-			errs = append(errs, annotationError(a.at, "a //line directive moves the selected mutant"))
-
-			continue
-		}
-		eqs[key] = a.reason
+		eqs[equivalentKey{pos: a.matches[0], mt: a.mt}] = a.reason
 	}
 
 	return eqs, errors.Join(errs...)
+}
+
+// bindingError returns the error of an annotation that does not select
+// exactly one mutant, that selects a mutant of eqs, or whose mutant a //line
+// directive moves. It returns nil for a valid annotation.
+func bindingError(set *token.FileSet, a *annotation, eqs equivalents) error {
+	if len(a.matches) == 0 {
+		return annotationError(a.at, "selects no %s mutant on line %d", a.mt, a.line)
+	}
+	if len(a.matches) > 1 {
+		return annotationError(a.at, "selects %d %s mutants on line %d; add @COLUMN", len(a.matches), a.mt, a.line)
+	}
+	key := equivalentKey{pos: a.matches[0], mt: a.mt}
+	if _, dup := eqs[key]; dup {
+		return annotationError(a.at, "selects the same mutant as another annotation")
+	}
+	if set.Position(key.pos) != set.PositionFor(key.pos, false) {
+		return annotationError(a.at, "a //line directive moves the selected mutant")
+	}
+
+	return nil
 }
 
 // codeBefore reports whether the line of the physical position at has
@@ -228,5 +232,7 @@ func mutationType(name string) (mutator.Type, bool) {
 // at the physical position at. It quotes the position, because the file name
 // comes from the module.
 func annotationError(at token.Position, format string, args ...any) error {
-	return fmt.Errorf("%q: %w: %s; want %s", at.String(), ErrEquivalentAnnotation, fmt.Sprintf(format, args...), equivalentSyntax)
+	detail := fmt.Sprintf(format, args...)
+
+	return fmt.Errorf("%q: %w: %s; want %s", at.String(), ErrEquivalentAnnotation, detail, equivalentSyntax)
 }
