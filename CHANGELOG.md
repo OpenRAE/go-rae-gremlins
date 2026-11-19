@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0](https://github.com/OpenRAE/go-rae-gremlins/compare/v0.8.0...v0.9.0) (2026-11-19)
+
+
+### Features
+
+* support reviewed annotations for individual equivalent mutants ([#204](https://github.com/OpenRAE/go-rae-gremlins/issues/204)) ([9ff03d3](https://github.com/OpenRAE/go-rae-gremlins/commit/9ff03d368481b097bb999476a59aa389f01e7320))
+
+
+### Bug Fixes
+
+* align the configuration schema with the runtime settings ([#200](https://github.com/OpenRAE/go-rae-gremlins/issues/200)) ([bd52c78](https://github.com/OpenRAE/go-rae-gremlins/commit/bd52c783d808ac70a250016c25b68f783b42b31b))
+* check each design against the model of its own commit ([#208](https://github.com/OpenRAE/go-rae-gremlins/issues/208)) ([96a6e0a](https://github.com/OpenRAE/go-rae-gremlins/commit/96a6e0a21291f501d051b6cb914df739000f2b16)), closes [#207](https://github.com/OpenRAE/go-rae-gremlins/issues/207)
+
 ## [0.8.0](https://github.com/OpenRAE/go-rae-gremlins/compare/v0.7.0...v0.8.0) (2026-11-17)
 
 
