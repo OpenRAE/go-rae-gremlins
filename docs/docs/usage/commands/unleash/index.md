@@ -15,6 +15,21 @@ If the module build requires tags
 gremlins unleash --tags "tag1,tag2"
 ```
 
+## Go command settings
+
+Gremlins runs `go test` for the coverage step and for each mutant.
+Each `go test` run gets the environment of Gremlins, so it uses the `GOFLAGS` environment variable.
+Use `GOFLAGS` to give the same build flags to all test runs.
+For example, monkey-patching libraries need tests that the compiler builds without inlining:
+
+```shell
+GOFLAGS='-gcflags=all=-l' gremlins unleash
+```
+
+This example uses POSIX shell syntax.
+For the `GOFLAGS` format, see the [Go command documentation](https://pkg.go.dev/cmd/go#hdr-Environment_variables).
+Use the [`--tags`](#tags) flag for build tags. Gremlins does not read build tags from `GOFLAGS` when it finds mutants.
+
 ## Cancellation
 
 An interrupt (`SIGINT`) or a termination signal (`SIGTERM`) stops the run.

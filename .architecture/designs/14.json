@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "issue": 14,
+  "summary": "Support -gcflags=all=-l for issue 14 through the existing GOFLAGS environment variable. Coverage commands inherit the parent environment, mutant commands append os.Environ and GOTMPDIR, and run-bounded.sh already allowlists GOFLAGS. A cmd/gremlins process test runs unleash on a probe module whose test fails unless its test binary records -gcflags=all=-l in its build information. It checks package mode, integration mode, and a failed coverage run without the setting. The unleash usage page documents GOFLAGS. No Gremlins flag, configuration key, schema, report field, exit code, production import, or workflow changes. See docs/development/compiler-flags-preflight.md.",
+  "changes": [
+    {
+      "package": "cmd/gremlins"
+    }
+  ],
+  "contracts": [],
+  "contract_changes": {},
+  "policies": [],
+  "trust_boundaries": "No trust boundary changes. Go retains GOFLAGS parsing and compiler option semantics. Existing Gremlins configuration validation, shell-free commands, process-tree control, resource limits, work-directory cleanup, Logger, and wrapped errors remain canonical. Characterization uses synthetic local temporary modules and existing secret-free CI without a new dependency or destination. The bounded runner already forwards non-secret GOFLAGS using env arguments; do not widen its allowlist or place credentials in settings. The declarations below restrict static development checks to their existing destinations and do not authorize execution of scanned target source or expand delivery, queue, or transport permissions.",
+  "conflicts": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    }
+  }
+}
