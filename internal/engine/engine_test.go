@@ -1308,7 +1308,8 @@ func (e *applyingExecutorStub) applyAndRollback() error {
 // shared AST. Each original ! gives exactly one mutant. Run the test with the
 // race detector to check that discovery and Apply do not share the AST.
 func TestFeatureRunDiscoversOnlyOriginalNegations(t *testing.T) {
-	const src = "package main\n\nfunc f(a, b bool) bool {\n\tx := !a\n\ty := !!b\n\tz := !(a && !b)\n\n\treturn !x && !y && !z\n}\n"
+	const src = "package main\n\nfunc f(a, b bool) bool {\n" +
+		"\tx := !a\n\ty := !!b\n\tz := !(a && !b)\n\n\treturn !x && !y && !z\n}\n"
 	const fileName = "negations.go"
 	want := []string{"4:7", "5:7", "5:8", "6:14", "6:7", "8:15", "8:21", "8:9"}
 

@@ -298,8 +298,7 @@ func TestFeatureTokenMutatorApplyDoubleNegation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			src := "package main\n\nfunc f() bool {\n\treturn true\n}\n\nfunc g(a, b bool) bool {\n\treturn " + tc.expr + "\n}\n"
-			wantSrc := "package main\n\nfunc f() bool {\n\treturn true\n}\n\nfunc g(a, b bool) bool {\n\treturn " + tc.want + "\n}\n"
+			src := negationSrc(tc.expr)
 			workdir := t.TempDir()
 			fileFullPath := filepath.Join(workdir, sourceFileName)
 			if err := os.WriteFile(fileFullPath, []byte(src), 0o600); err != nil {
@@ -310,37 +309,14 @@ func TestFeatureTokenMutatorApplyDoubleNegation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var nots []*ast.UnaryExpr
-			ast.Inspect(f, func(n ast.Node) bool {
-				if u, ok := n.(*ast.UnaryExpr); ok && u.Op == token.NOT {
-					nots = append(nots, u)
-				}
-
-				return true
-			})
-			if len(nots) <= tc.nthNode {
-				t.Fatalf("found %d ! operators, want more than %d", len(nots), tc.nthNode)
-			}
-			node, ok := engine.NewTokenNode(nots[tc.nthNode])
-			if !ok {
-				t.Fatal("NewTokenNode(!) ok = false, want true")
-			}
-			mut := engine.NewTokenMutant("example.com/test", set, f, node)
+			mut := engine.NewTokenMutant("example.com/test", set, f, nthNegation(t, f, tc.nthNode))
 			mut.SetType(mutator.InvertLogical)
 			mut.SetWorkdir(workdir)
 
 			if err := mut.Apply(); err != nil {
 				t.Fatalf("Apply() error = %v, want nil", err)
 			}
-
-			//nolint:gosec // test code reading test file
-			got, err := os.ReadFile(fileFullPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(wantSrc, string(got)); diff != "" {
-				t.Errorf("source after Apply() mismatch (-want +got):\n%s", diff)
-			}
+			checkFile(t, "source after Apply()", fileFullPath, negationSrc(tc.want))
 			var printed bytes.Buffer
 			if err := printer.Fprint(&printed, set, f); err != nil {
 				t.Fatal(err)
@@ -351,15 +327,49 @@ func TestFeatureTokenMutatorApplyDoubleNegation(t *testing.T) {
 			if err := mut.Rollback(); err != nil {
 				t.Fatalf("Rollback() error = %v, want nil", err)
 			}
-			//nolint:gosec // test code reading test file
-			got, err = os.ReadFile(fileFullPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(src, string(got)); diff != "" {
-				t.Errorf("source after Rollback() mismatch (-want +got):\n%s", diff)
-			}
+			checkFile(t, "source after Rollback()", fileFullPath, src)
 		})
+	}
+}
+
+// negationSrc returns a file whose function g returns expr.
+func negationSrc(expr string) string {
+	return "package main\n\nfunc f() bool {\n\treturn true\n}\n\n" +
+		"func g(a, b bool) bool {\n\treturn " + expr + "\n}\n"
+}
+
+// nthNegation returns the token node of the nth unary ! of f.
+func nthNegation(t *testing.T, f *ast.File, nth int) *engine.NodeToken {
+	t.Helper()
+	var nots []*ast.UnaryExpr
+	ast.Inspect(f, func(n ast.Node) bool {
+		if u, ok := n.(*ast.UnaryExpr); ok && u.Op == token.NOT {
+			nots = append(nots, u)
+		}
+
+		return true
+	})
+	if len(nots) <= nth {
+		t.Fatalf("found %d ! operators, want more than %d", len(nots), nth)
+	}
+	node, ok := engine.NewTokenNode(nots[nth])
+	if !ok {
+		t.Fatal("NewTokenNode(!) ok = false, want true")
+	}
+
+	return node
+}
+
+// checkFile checks that the file at path contains want.
+func checkFile(t *testing.T, what, path, want string) {
+	t.Helper()
+	//nolint:gosec // test code reading test file
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(want, string(got)); diff != "" {
+		t.Errorf("%s mismatch (-want +got):\n%s", what, diff)
 	}
 }
 
@@ -403,12 +413,5 @@ func TestFeatureTokenMutatorApplyRejectsMissingMutation(t *testing.T) {
 	if got := node.Tok(); got != token.ADD {
 		t.Errorf("AST token after Apply() = %v, want %v", got, token.ADD)
 	}
-	//nolint:gosec // test code reading test file
-	got, err := os.ReadFile(fileFullPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff := cmp.Diff(src, string(got)); diff != "" {
-		t.Errorf("source after Apply() mismatch (-want +got):\n%s", diff)
-	}
+	checkFile(t, "source after Apply()", fileFullPath, src)
 }
