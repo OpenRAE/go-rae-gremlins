@@ -141,11 +141,7 @@ func matchAnnotations(set *token.FileSet, file *ast.File, anns []*annotation) {
 	for _, a := range anns {
 		byLine[a.line] = append(byLine[a.line], a)
 	}
-	ast.Inspect(file, func(n ast.Node) bool {
-		node, ok := NewTokenNode(n)
-		if !ok {
-			return true
-		}
+	inspectTokens(file, func(node *NodeToken) bool {
 		pos := set.PositionFor(node.TokPos, false)
 		for _, a := range byLine[pos.Line] {
 			if (a.column == 0 || a.column == pos.Column) && slices.Contains(TokenMutantType[node.Tok()], a.mt) {
