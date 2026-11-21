@@ -36,6 +36,15 @@ const (
 	unleashCmd      = "unleash"
 )
 
+// The file names and contents that the probe modules share.
+const (
+	probeModFile  = "go.mod"
+	probeSrcFile  = "probe.go"
+	probeTestFile = "probe_test.go"
+	probeMod      = "module probe\n\ngo 1.25\n"
+	probeAddSrc   = "package probe\n\nfunc Add(a, b int) int { return a + b }\n"
+)
+
 // TestMain runs main in place of the tests when mainHelperEnv is set, so the
 // tests can check the exit status of the actual binary entry point.
 func TestMain(m *testing.M) {
@@ -51,9 +60,9 @@ func TestMain(m *testing.M) {
 // kill and one mutant that no test covers. Its efficacy and its mutant
 // coverage are both below 100 percent.
 var probeFiles = map[string]string{
-	"go.mod":   "module probe\n\ngo 1.25\n",
-	"probe.go": "package probe\n\nfunc Add(a, b int) int { return a + b }\n\nfunc Sub(a, b int) int { return a - b }\n",
-	"probe_test.go": `package probe
+	probeModFile: probeMod,
+	probeSrcFile: probeAddSrc + "\nfunc Sub(a, b int) int { return a - b }\n",
+	probeTestFile: `package probe
 
 import "testing"
 
@@ -185,4 +194,83 @@ func exitCode(t *testing.T, err error) int {
 	}
 
 	return 0
+}
+
+// gcflagsProbeFiles is a module whose test fails unless its test binary was
+// built with -gcflags=all=-l. The test does not check the result of Add, so
+// its one covered mutant lives when the mutant run gets the same flags and
+// is killed when it does not.
+var gcflagsProbeFiles = map[string]string{
+	probeModFile: probeMod,
+	probeSrcFile: probeAddSrc,
+	probeTestFile: `package probe
+
+import (
+	"runtime/debug"
+	"testing"
+)
+
+func TestAdd(t *testing.T) {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		t.Fatal("no build information")
+	}
+	for _, s := range info.Settings {
+		if s.Key == "-gcflags" && s.Value == "all=-l" {
+			_ = Add(1, 2)
+
+			return
+		}
+	}
+	t.Fatal("the test binary was not built with -gcflags=all=-l")
+}
+`,
+}
+
+func TestFeatureGOFLAGSReachesEveryTestRun(t *testing.T) {
+	testCases := []struct {
+		name       string
+		goflags    string
+		wantOutput string
+		args       []string
+		wantCode   int
+	}{
+		{
+			name:       "package mode",
+			goflags:    "-gcflags=all=-l",
+			args:       []string{unleashCmd},
+			wantCode:   0,
+			wantOutput: "Killed: 0, Lived: 1",
+		},
+		{
+			name:       "integration mode",
+			goflags:    "-gcflags=all=-l",
+			args:       []string{unleashCmd, "--integration"},
+			wantCode:   0,
+			wantOutput: "Killed: 0, Lived: 1",
+		},
+		{
+			name:       "coverage run fails without the flags",
+			goflags:    "",
+			args:       []string{unleashCmd},
+			wantCode:   1,
+			wantOutput: "not built with -gcflags=all=-l",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			module := writeModule(t, gcflagsProbeFiles)
+			cmd, output := mainCommand(t, module, tc.args...)
+			// exec.Cmd uses the last value of a duplicate variable.
+			cmd.Env = append(cmd.Env, "GOFLAGS="+tc.goflags)
+			code := exitCode(t, cmd.Run())
+			if code != tc.wantCode {
+				t.Errorf("exit code = %d, want %d; output:\n%s", code, tc.wantCode, output)
+			}
+			if !strings.Contains(output.String(), tc.wantOutput) {
+				t.Errorf("output does not contain %q; output:\n%s", tc.wantOutput, output)
+			}
+		})
+	}
 }
