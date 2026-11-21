@@ -243,14 +243,6 @@ var mutationsTests = []mutationsTest{
 		mutStatus:  mutator.NotCovered,
 	},
 	{
-		name:       "it recognizes INVERT_LOGICAL with NOT",
-		fixture:    "testdata/fixtures/not_go",
-		mutantType: mutator.InvertLogical,
-		token:      token.NOT,
-		covResult:  notCoveredPosition("testdata/fixtures/not_go"),
-		mutStatus:  mutator.NotCovered,
-	},
-	{
 		name:       "it recognizes INVERT_LOOPCTRL with CONTINUE",
 		fixture:    "testdata/fixtures/loop_continue_go",
 		mutantType: mutator.InvertLoopCtrl,
@@ -511,29 +503,46 @@ func TestMutations(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			viperSet(map[string]any{configuration.UnleashDryRunKey: true})
-			defer viperReset()
-
-			mapFS, mod := loadFixture(t, tc.fixture, ".")
-
-			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := runEngine(t, mut)
-			got := res.Mutants
-
-			if res.Module != expectedModule {
-				t.Errorf("Run() Module = %q, want %q", res.Module, expectedModule)
-			}
-
-			for _, g := range got {
-				if g.Type() == tc.mutantType && g.Status() == tc.mutStatus && g.Pos() > 0 {
-					// PASS
-					return
-				}
-			}
-
-			t.Errorf("Run() mutants = %v, want a %v mutant with status %v and a position", got, tc.mutantType, tc.mutStatus)
+			checkMutation(t, tc)
 		})
 	}
+}
+
+func TestFeatureMutationsRecognizeInvertLogicalWithNot(t *testing.T) {
+	t.Parallel()
+	checkMutation(t, mutationsTest{
+		fixture:    "testdata/fixtures/not_go",
+		mutantType: mutator.InvertLogical,
+		token:      token.NOT,
+		covResult:  notCoveredPosition("testdata/fixtures/not_go"),
+		mutStatus:  mutator.NotCovered,
+	})
+}
+
+// checkMutation runs the engine on the fixture of tc and checks that it finds
+// a mutant of the type and status of tc.
+func checkMutation(t *testing.T, tc mutationsTest) {
+	t.Helper()
+	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+	defer viperReset()
+
+	mapFS, mod := loadFixture(t, tc.fixture, ".")
+
+	mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
+	res := runEngine(t, mut)
+	got := res.Mutants
+
+	if res.Module != expectedModule {
+		t.Errorf("Run() Module = %q, want %q", res.Module, expectedModule)
+	}
+
+	for _, g := range got {
+		if g.Type() == tc.mutantType && g.Status() == tc.mutStatus && g.Pos() > 0 {
+			return
+		}
+	}
+
+	t.Errorf("Run() mutants = %v, want a %v mutant with status %v and a position", got, tc.mutantType, tc.mutStatus)
 }
 
 func TestMutantSkipDisabled(t *testing.T) {
