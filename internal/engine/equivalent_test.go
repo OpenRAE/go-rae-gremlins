@@ -168,6 +168,28 @@ func TestFeatureEquivalentAnnotationSelectsOneMutant(t *testing.T) {
 	})
 }
 
+// TestRegressionEquivalentAnnotationIgnoresTypeConstraintOperators checks
+// that an annotation without a column selects the one bitwise | of its line.
+// The | of the type union on the same line is not a mutant.
+func TestRegressionEquivalentAnnotationIgnoresTypeConstraintOperators(t *testing.T) {
+	src := "package main\n\n" +
+		"func Or[T ~int | ~uint](a, b T) T { return a | b } //gremlins:equivalent INVERT_BITWISE no effect\n"
+	sys := fstest.MapFS{fileA: {Data: []byte(src)}}
+	settings := map[string]any{configuration.MutantTypeEnabledKey(mutator.InvertBitwise): true}
+
+	res, err := runEquivalentEngine(t, sys, engine.CodeData{Cov: wholeFileProfile(fileA)}, settings)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	got := mutantsByKey(t, res.Mutants)
+	want := map[string]wantMutant{"a.go:3:46 INVERT_BITWISE": {status: mutator.Equivalent, reason: "no effect"}}
+	checkMutants(t, got, want)
+	if len(got) != len(want) {
+		t.Errorf("Run() returned %d mutants, want %d", len(got), len(want))
+	}
+}
+
 func TestFeatureEquivalentAnnotationMarksUncoveredMutant(t *testing.T) {
 	sys := fstest.MapFS{fileA: {Data: []byte(annotatedSrc)}}
 

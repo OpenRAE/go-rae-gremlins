@@ -88,3 +88,62 @@ func (n *NodeToken) wrapOperand(op token.Token) (func(), bool) {
 
 	return func() { *n.operand = orig }, true
 }
+
+// inspectTokens calls fn for each node of root that NewTokenNode supports, in
+// depth-first order. It does not go into the type constraints of type
+// parameters and interfaces. An operator in a constraint, for example the |
+// of a type union, is a type term and not an operation. fn returns false to
+// stop the walk. inspectTokens returns false if fn stopped the walk.
+func inspectTokens(root ast.Node, fn func(*NodeToken) bool) bool {
+	constraints := make(map[ast.Expr]struct{})
+	stopped := false
+	ast.Inspect(root, func(n ast.Node) bool {
+		if stopped {
+			return false
+		}
+		if e, ok := n.(ast.Expr); ok {
+			if _, skip := constraints[e]; skip {
+				return false
+			}
+		}
+		addConstraints(constraints, n)
+		t, ok := NewTokenNode(n)
+		if !ok {
+			return true
+		}
+		stopped = !fn(t)
+
+		return !stopped
+	})
+
+	return !stopped
+}
+
+// addConstraints adds to constraints the type constraint expressions that are
+// direct parts of n: the constraints of type parameters and the embedded
+// elements of an interface.
+func addConstraints(constraints map[ast.Expr]struct{}, n ast.Node) {
+	switch n := n.(type) {
+	case *ast.FuncType:
+		addFieldTypes(constraints, n.TypeParams, true)
+	case *ast.TypeSpec:
+		addFieldTypes(constraints, n.TypeParams, true)
+	case *ast.InterfaceType:
+		addFieldTypes(constraints, n.Methods, false)
+	default:
+		// Other nodes have no type constraints.
+	}
+}
+
+// addFieldTypes adds to constraints the types of the fields of list. If named
+// is false, it adds only the types of the fields without names.
+func addFieldTypes(constraints map[ast.Expr]struct{}, list *ast.FieldList, named bool) {
+	if list == nil {
+		return
+	}
+	for _, f := range list.List {
+		if named || len(f.Names) == 0 {
+			constraints[f.Type] = struct{}{}
+		}
+	}
+}

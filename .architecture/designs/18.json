@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "issue": 18,
+  "summary": "Do not make mutants of the operators in type constraints. The | of a type union in an interface or a type parameter list is a type term, not a bitwise operation. A new inspectTokens helper in internal/engine walks the file and does not go into the constraint expressions of type parameters and the embedded elements of interfaces. Mutant discovery and equivalent annotation matching both use it. Regression tests cover both paths. No import, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/process",
+        "internal/report"
+      ],
+      "test_imports": []
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "No trust boundary changes. The engine parses the module source as before. It executes no new code and uses no network.",
+  "conflicts": [],
+  "policies": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  },
+  "contract_changes": {}
+}

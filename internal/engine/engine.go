@@ -218,13 +218,11 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	// running mutant changes the shared AST, so the discovery must not read
 	// the AST after that.
 	var mutants []*TokenMutator
-	ast.Inspect(file, func(node ast.Node) bool {
+	inspectTokens(file, func(n *NodeToken) bool {
 		if ctx.Err() != nil {
 			return false
 		}
-		if n, ok := NewTokenNode(node); ok {
-			mutants = append(mutants, mu.findMutations(sf, n)...)
-		}
+		mutants = append(mutants, mu.findMutations(sf, n)...)
 
 		return true
 	})
