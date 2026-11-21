@@ -214,20 +214,7 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 		name:        fileName,
 		cov:         newFileCoverage(set, file, mu.codeData.Cov, built),
 	}
-	stopped := false
-	ast.Inspect(file, func(node ast.Node) bool {
-		if stopped {
-			return false
-		}
-		n, ok := NewTokenNode(node)
-		if !ok {
-			return true
-		}
-		stopped = !mu.findMutations(ctx, sf, n)
-
-		return !stopped
-	})
-	if stopped {
+	if !inspectTokens(file, func(n *NodeToken) bool { return mu.findMutations(ctx, sf, n) }) {
 		return fs.SkipAll
 	}
 

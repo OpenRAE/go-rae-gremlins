@@ -21,6 +21,7 @@ import (
 	"errors"
 	"go/token"
 	"io/fs"
+	"maps"
 	"os"
 	"runtime"
 	"strings"
@@ -1040,6 +1041,40 @@ func TestRegressionSkipTypeDeclarationsAndSignatures(t *testing.T) {
 
 			checkObservableStatuses(t, res.Mutants, observable, tc.observedState)
 		})
+	}
+}
+
+// TestRegressionSkipTypeConstraintOperators checks that the operators of the
+// type constraints of interfaces and type parameters produce no mutant. The |
+// of a type union is a type term and not a bitwise operation. The | in the
+// function body is a bitwise operation and produces mutants.
+func TestRegressionSkipTypeConstraintOperators(t *testing.T) {
+	const genFile = "gen.go"
+	sys := fstest.MapFS{
+		genFile: {Data: []byte("package p\n\n" +
+			"type Number interface {\n\t~int | ~int64\n\tString() string\n}\n\n" +
+			"type Pair[K ~int | ~string, V any] struct{ k K }\n\n" +
+			"func Or[T ~int | ~uint](a, b T) T {\n\treturn a | b\n}\n\n" +
+			"var f = func(a, b int) int { return a | b }\n")},
+	}
+	mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+	viperSet(map[string]any{
+		configuration.UnleashDryRunKey:                            true,
+		configuration.MutantTypeEnabledKey(mutator.InvertBitwise): true,
+	})
+	defer viperReset()
+
+	full := coverage.Profile{genFile: {{StartLine: 1, StartCol: 1, EndLine: 100, EndCol: 1}}}
+	mut := engine.New(mod, engine.CodeData{Cov: full}, newJobDealerStub(t), engine.WithDirFs(sys))
+	res := runEngine(t, mut)
+
+	lines := make(map[int]bool)
+	for _, m := range res.Mutants {
+		lines[m.Position().Line] = true
+	}
+	want := map[int]bool{11: true, 14: true}
+	if !maps.Equal(lines, want) {
+		t.Errorf("Run() mutant lines = %v, want %v", lines, want)
 	}
 }
 
