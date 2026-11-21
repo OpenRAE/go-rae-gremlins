@@ -218,6 +218,25 @@ func TestFeatureEquivalentAnnotationOfDisabledTypeIsValid(t *testing.T) {
 	})
 }
 
+// TestFeatureEquivalentAnnotationSelectsNegation checks that a column
+// selects the INVERT_LOGICAL mutant of a ! on a line that also has a &&.
+func TestFeatureEquivalentAnnotationSelectsNegation(t *testing.T) {
+	const src = "package main\n\nfunc f(a, b bool) bool {\n" +
+		"\treturn !a && b //gremlins:equivalent INVERT_LOGICAL@9 a is always true here\n}\n"
+	sys := fstest.MapFS{fileA: {Data: []byte(src)}}
+	codeData := engine.CodeData{Cov: wholeFileProfile(fileA)}
+
+	res, err := runEquivalentEngine(t, sys, codeData, map[string]any{})
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	checkMutants(t, mutantsByKey(t, res.Mutants), map[string]wantMutant{
+		"a.go:4:9 INVERT_LOGICAL":  {status: mutator.Equivalent, reason: "a is always true here"},
+		"a.go:4:12 INVERT_LOGICAL": {status: mutator.Runnable},
+	})
+}
+
 // lineFourSrc returns a file whose line 4 has a < at column 11, a && at
 // column 15, and a < at column 20, followed by the comment.
 func lineFourSrc(comment string) string {
@@ -243,6 +262,12 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 		{name: "stale column", src: lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@12 r"), wantLine: 4},
 		{name: "type not on line", src: lineFourSrc("//gremlins:equivalent INVERT_LOOPCTRL r"), wantLine: 4},
 		{name: "ambiguous without column", src: lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY r"), wantLine: 4},
+		{
+			name: "ambiguous logical without column",
+			src: "package main\n\nfunc f(a, b bool) bool {\n" +
+				"\treturn !a && b //gremlins:equivalent INVERT_LOGICAL r\n}\n",
+			wantLine: 4,
+		},
 		{
 			name: "duplicate target",
 			src: "package main\n\nfunc f(a, b int) bool {\n\t//gremlins:equivalent CONDITIONALS_BOUNDARY r\n" +

@@ -49,6 +49,7 @@ return a < b
 
 When the line has only one operator that can produce `TYPE`, you can omit `@COLUMN`.
 When the line has more than one, you must give `@COLUMN`.
+For example, `!`, `&&`, and `||` can all produce `INVERT_LOGICAL`.
 
 ## Errors
 

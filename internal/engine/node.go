@@ -24,8 +24,9 @@ import (
 // NodeToken is the reference to the actualToken that will be mutated during
 // the mutation testing.
 type NodeToken struct {
-	tok    *token.Token
-	TokPos token.Pos
+	tok     *token.Token
+	operand *ast.Expr
+	TokPos  token.Pos
 }
 
 // NewTokenNode checks if the ast.Node implementation is supported by
@@ -34,6 +35,7 @@ type NodeToken struct {
 // supported.
 func NewTokenNode(n ast.Node) (*NodeToken, bool) {
 	var tok *token.Token
+	var operand *ast.Expr
 	var pos token.Pos
 	switch n := n.(type) {
 	case *ast.AssignStmt:
@@ -50,14 +52,16 @@ func NewTokenNode(n ast.Node) (*NodeToken, bool) {
 		pos = n.TokPos
 	case *ast.UnaryExpr:
 		tok = &n.Op
+		operand = &n.X
 		pos = n.OpPos
 	default:
 		return &NodeToken{}, false
 	}
 
 	return &NodeToken{
-		tok:    tok,
-		TokPos: pos,
+		tok:     tok,
+		operand: operand,
+		TokPos:  pos,
 	}, true
 }
 
@@ -69,4 +73,18 @@ func (n *NodeToken) Tok() token.Token {
 // SetTok sets the token.Token of the tokenNode.
 func (n *NodeToken) SetTok(t token.Token) {
 	*n.tok = t
+}
+
+// wrapOperand puts a unary expression of op in front of the operand of a
+// unary expression. It returns a function that puts back the original
+// operand, or false if the node has no operand. The added expression has no
+// position, so the original positions do not change.
+func (n *NodeToken) wrapOperand(op token.Token) (func(), bool) {
+	if n.operand == nil {
+		return nil, false
+	}
+	orig := *n.operand
+	*n.operand = &ast.UnaryExpr{Op: op, X: orig}
+
+	return func() { *n.operand = orig }, true
 }

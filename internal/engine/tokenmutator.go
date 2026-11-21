@@ -30,6 +30,10 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
+// ErrNoMutation means that the mutation type of a TokenMutator has no
+// mutation for its token.
+var ErrNoMutation = errors.New("no mutation for the token")
+
 // TokenMutator is a mutator.Mutator of a token.Token.
 //
 // Since the AST is shared among mutants, it is important to avoid that more
@@ -41,15 +45,14 @@ import (
 // Keeping a lock per file instead of a lock per TokenMutator allows to apply
 // mutations on different files in parallel.
 type TokenMutator struct {
-	pkg         string
-	fs          *token.FileSet
-	file        *ast.File
-	tokenNode   *NodeToken
-	workDir     string
-	origFile    []byte
-	status      mutator.Status
-	mutantType  mutator.Type
-	actualToken token.Token
+	pkg        string
+	fs         *token.FileSet
+	file       *ast.File
+	tokenNode  *NodeToken
+	workDir    string
+	origFile   []byte
+	status     mutator.Status
+	mutantType mutator.Type
 
 	origSnippet    []byte
 	mutatedSnippet []byte
@@ -102,13 +105,15 @@ func (m *TokenMutator) Pkg() string {
 	return m.pkg
 }
 
-// Apply saves the original token.Token of the mutator.Mutator and sets the
-// current token from the tokenMutations table.
+// Apply changes the AST to the mutation of the mutator.Mutator. It replaces
+// the token from the tokenMutations table, or it puts the operator from the
+// operandMutations table in front of the operand. When neither table has a
+// mutation for the token, Apply returns ErrNoMutation and writes nothing.
 // Apply overwrites the source code file with the mutated one. It also
 // stores the original file in the TokenMutator in order to allow
 // Rollback to put it back later.
 //
-// The AST is shared among mutants, so Apply puts back the original token on
+// The AST is shared among mutants, so Apply puts back the original AST on
 // every path before it returns. This also avoids locking in a method and
 // unlocking in another. When the mutated file cannot be written, Apply writes
 // back the original file and returns the error, joined with any restoration
@@ -127,9 +132,11 @@ func (m *TokenMutator) Apply() error {
 	m.origFile = origFile
 	m.origSnippet = extractSnippet(m.origFile, m.Position().Line, 3)
 
-	m.actualToken = m.tokenNode.Tok()
-	m.tokenNode.SetTok(tokenMutations[m.Type()][m.actualToken])
-	defer m.tokenNode.SetTok(m.actualToken)
+	restore, err := m.mutate()
+	if err != nil {
+		return err
+	}
+	defer restore()
 
 	if err = m.writeMutatedFile(filename); err != nil {
 		defer m.resetOrigFile()
@@ -141,6 +148,24 @@ func (m *TokenMutator) Apply() error {
 	}
 
 	return nil
+}
+
+// mutate changes the shared AST to the mutation of m. It returns a function
+// that puts back the original AST, or ErrNoMutation.
+func (m *TokenMutator) mutate() (func(), error) {
+	orig := m.tokenNode.Tok()
+	if mutated, ok := tokenMutations[m.Type()][orig]; ok {
+		m.tokenNode.SetTok(mutated)
+
+		return func() { m.tokenNode.SetTok(orig) }, nil
+	}
+	if op, ok := operandMutations[m.Type()][orig]; ok {
+		if restore, ok := m.tokenNode.wrapOperand(op); ok {
+			return restore, nil
+		}
+	}
+
+	return nil, fmt.Errorf("%w: %s %s", ErrNoMutation, m.Type(), orig)
 }
 
 func (m *TokenMutator) writeMutatedFile(filename string) error {
