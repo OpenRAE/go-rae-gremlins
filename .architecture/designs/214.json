@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "issue": 214,
+  "summary": "The Windows process ID check converts the int process ID to int64 before the comparison with math.MaxUint32, so internal/process compiles on 32-bit targets. The behavior on 64-bit targets does not change. A new Release build job in .github/workflows/ci.yml runs goreleaser build --snapshot --clean with the pinned GoReleaser action and version that the release workflow uses. The job builds every target in .goreleaser.yaml, and PR Gate requires it. No import, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/process",
+      "imports": []
+    }
+  ],
+  "contracts": [],
+  "trust_boundaries": "The Release build job holds no secret and has contents read permission. It runs the pinned GoReleaser action and version that the release workflow already uses. Snapshot mode does not use the Go module proxy and publishes nothing. The trust_changes entries restate the existing model boundaries; this change adds no new trust boundary.",
+  "conflicts": [],
+  "policies": [
+    "ci"
+  ],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  },
+  "contract_changes": {}
+}
