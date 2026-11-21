@@ -17,9 +17,11 @@
 package engine_test
 
 import (
+	"bytes"
 	"errors"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"io/fs"
 	"os"
@@ -270,4 +272,146 @@ func TestRegressionTokenMutatorApplyWriteFailureRestoresAST(t *testing.T) {
 	if !cmp.Equal(string(got), wantSecond) {
 		t.Errorf("source after second Apply() differs (-want +got):\n%s", cmp.Diff(wantSecond, string(got)))
 	}
+}
+
+// TestFeatureTokenMutatorApplyDoubleNegation checks that the INVERT_LOGICAL
+// mutation of a unary ! adds a second ! in front of the operand. Apply must
+// put back the AST before it returns, and Rollback must put back the file.
+func TestFeatureTokenMutatorApplyDoubleNegation(t *testing.T) {
+	t.Parallel()
+
+	const doubleNot = "!!a"
+	testCases := map[string]struct {
+		expr    string
+		want    string
+		nthNode int
+	}{
+		"identifier":        {expr: "!a", want: doubleNot},
+		"parenthesized":     {expr: "!(a || b)", want: "!!(a || b)"},
+		"call":              {expr: "!f()", want: "!!f()"},
+		"outer of a double": {expr: doubleNot, want: "!!!a"},
+		"inner of a double": {expr: doubleNot, want: "!!!a", nthNode: 1},
+		"comment after":     {expr: "!a\t/* c */", want: "!!a\t/* c */"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			src := negationSrc(tc.expr)
+			workdir := t.TempDir()
+			fileFullPath := filepath.Join(workdir, sourceFileName)
+			if err := os.WriteFile(fileFullPath, []byte(src), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			set := token.NewFileSet()
+			f, err := parser.ParseFile(set, sourceFileName, src, parser.ParseComments)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mut := engine.NewTokenMutant("example.com/test", set, f, nthNegation(t, f, tc.nthNode))
+			mut.SetType(mutator.InvertLogical)
+			mut.SetWorkdir(workdir)
+
+			if err := mut.Apply(); err != nil {
+				t.Fatalf("Apply() error = %v, want nil", err)
+			}
+			checkFile(t, "source after Apply()", fileFullPath, negationSrc(tc.want))
+			var printed bytes.Buffer
+			if err := printer.Fprint(&printed, set, f); err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(src, printed.String()); diff != "" {
+				t.Errorf("AST after Apply() mismatch (-want +got):\n%s", diff)
+			}
+			if err := mut.Rollback(); err != nil {
+				t.Fatalf("Rollback() error = %v, want nil", err)
+			}
+			checkFile(t, "source after Rollback()", fileFullPath, src)
+		})
+	}
+}
+
+// negationSrc returns a file whose function g returns expr.
+func negationSrc(expr string) string {
+	return "package main\n\nfunc f() bool {\n\treturn true\n}\n\n" +
+		"func g(a, b bool) bool {\n\treturn " + expr + "\n}\n"
+}
+
+// nthNegation returns the token node of the nth unary ! of f.
+func nthNegation(t *testing.T, f *ast.File, nth int) *engine.NodeToken {
+	t.Helper()
+	var nots []*ast.UnaryExpr
+	ast.Inspect(f, func(n ast.Node) bool {
+		if u, ok := n.(*ast.UnaryExpr); ok && u.Op == token.NOT {
+			nots = append(nots, u)
+		}
+
+		return true
+	})
+	if len(nots) <= nth {
+		t.Fatalf("found %d ! operators, want more than %d", len(nots), nth)
+	}
+	node, ok := engine.NewTokenNode(nots[nth])
+	if !ok {
+		t.Fatal("NewTokenNode(!) ok = false, want true")
+	}
+
+	return node
+}
+
+// checkFile checks that the file at path contains want.
+func checkFile(t *testing.T, what, path, want string) {
+	t.Helper()
+	//nolint:gosec // test code reading test file
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(want, string(got)); diff != "" {
+		t.Errorf("%s mismatch (-want +got):\n%s", what, diff)
+	}
+}
+
+// TestFeatureTokenMutatorApplyRejectsMissingMutation checks that Apply
+// returns an error and leaves the file unchanged when the mutation type has
+// no mutation for the token.
+func TestFeatureTokenMutatorApplyRejectsMissingMutation(t *testing.T) {
+	t.Parallel()
+
+	const src = "package main\n\nfunc main() {\n\ta := 1 + 2\n}\n"
+	workdir := t.TempDir()
+	fileFullPath := filepath.Join(workdir, sourceFileName)
+	if err := os.WriteFile(fileFullPath, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	set := token.NewFileSet()
+	f, err := parser.ParseFile(set, sourceFileName, src, parser.ParseComments)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var node *engine.NodeToken
+	ast.Inspect(f, func(n ast.Node) bool {
+		if be, ok := n.(*ast.BinaryExpr); ok {
+			node, _ = engine.NewTokenNode(be)
+		}
+
+		return true
+	})
+	if node == nil {
+		t.Fatal("binary expression node must be found")
+	}
+	mut := engine.NewTokenMutant("example.com/test", set, f, node)
+	mut.SetType(mutator.InvertLogical)
+	mut.SetWorkdir(workdir)
+
+	err = mut.Apply()
+
+	if !errors.Is(err, engine.ErrNoMutation) {
+		t.Errorf("Apply() error = %v, want %v", err, engine.ErrNoMutation)
+	}
+	if got := node.Tok(); got != token.ADD {
+		t.Errorf("AST token after Apply() = %v, want %v", got, token.ADD)
+	}
+	checkFile(t, "source after Apply()", fileFullPath, src)
 }

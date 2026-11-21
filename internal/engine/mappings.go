@@ -45,6 +45,7 @@ var TokenMutantType = map[token.Token][]mutator.Type{
 	token.MUL:            {mutator.ArithmeticBase},
 	token.MUL_ASSIGN:     {mutator.InvertAssignments, mutator.RemoveSelfAssignments},
 	token.NEQ:            {mutator.ConditionalsNegation},
+	token.NOT:            {mutator.InvertLogical},
 	token.OR:             {mutator.InvertBitwise},
 	token.OR_ASSIGN:      {mutator.RemoveSelfAssignments, mutator.InvertBitwiseAssignments},
 	token.QUO:            {mutator.ArithmeticBase},
@@ -61,6 +62,8 @@ var TokenMutantType = map[token.Token][]mutator.Type{
 	token.XOR_ASSIGN:     {mutator.RemoveSelfAssignments, mutator.InvertBitwiseAssignments},
 }
 
+// tokenMutations is the mapping from each mutator.Type and token.Token to
+// the token.Token that replaces it.
 var tokenMutations = map[mutator.Type]map[token.Token]token.Token{
 	mutator.ArithmeticBase: {
 		token.ADD: token.SUB,
@@ -133,5 +136,14 @@ var tokenMutations = map[mutator.Type]map[token.Token]token.Token{
 		token.SHR_ASSIGN:     token.ASSIGN,
 		token.SUB_ASSIGN:     token.ASSIGN,
 		token.XOR_ASSIGN:     token.ASSIGN,
+	},
+}
+
+// operandMutations is the mapping from each mutator.Type and token.Token of
+// a unary expression to the unary operator that the mutation puts in front
+// of the operand. Use it for a mutation that no single token can replace.
+var operandMutations = map[mutator.Type]map[token.Token]token.Token{
+	mutator.InvertLogical: {
+		token.NOT: token.NOT,
 	},
 }

@@ -19,20 +19,27 @@ package engine_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"go/token"
 	"io/fs"
 	"maps"
 	"os"
+	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 	"testing/synctest"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 	"github.com/OpenRAE/go-rae-gremlins/internal/coverage"
 	"github.com/OpenRAE/go-rae-gremlins/internal/diff"
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine"
+	"github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 	"github.com/OpenRAE/go-rae-gremlins/internal/report"
@@ -496,29 +503,46 @@ func TestMutations(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			viperSet(map[string]any{configuration.UnleashDryRunKey: true})
-			defer viperReset()
-
-			mapFS, mod := loadFixture(t, tc.fixture, ".")
-
-			mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
-			res := runEngine(t, mut)
-			got := res.Mutants
-
-			if res.Module != expectedModule {
-				t.Errorf("Run() Module = %q, want %q", res.Module, expectedModule)
-			}
-
-			for _, g := range got {
-				if g.Type() == tc.mutantType && g.Status() == tc.mutStatus && g.Pos() > 0 {
-					// PASS
-					return
-				}
-			}
-
-			t.Errorf("Run() mutants = %v, want a %v mutant with status %v and a position", got, tc.mutantType, tc.mutStatus)
+			checkMutation(t, tc)
 		})
 	}
+}
+
+func TestFeatureMutationsRecognizeInvertLogicalWithNot(t *testing.T) {
+	t.Parallel()
+	checkMutation(t, mutationsTest{
+		fixture:    "testdata/fixtures/not_go",
+		mutantType: mutator.InvertLogical,
+		token:      token.NOT,
+		covResult:  notCoveredPosition("testdata/fixtures/not_go"),
+		mutStatus:  mutator.NotCovered,
+	})
+}
+
+// checkMutation runs the engine on the fixture of tc and checks that it finds
+// a mutant of the type and status of tc.
+func checkMutation(t *testing.T, tc mutationsTest) {
+	t.Helper()
+	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
+	defer viperReset()
+
+	mapFS, mod := loadFixture(t, tc.fixture, ".")
+
+	mut := engine.New(mod, engine.CodeData{Cov: tc.covResult.Profile}, newJobDealerStub(t), engine.WithDirFs(mapFS))
+	res := runEngine(t, mut)
+	got := res.Mutants
+
+	if res.Module != expectedModule {
+		t.Errorf("Run() Module = %q, want %q", res.Module, expectedModule)
+	}
+
+	for _, g := range got {
+		if g.Type() == tc.mutantType && g.Status() == tc.mutStatus && g.Pos() > 0 {
+			return
+		}
+	}
+
+	t.Errorf("Run() mutants = %v, want a %v mutant with status %v and a position", got, tc.mutantType, tc.mutStatus)
 }
 
 func TestMutantSkipDisabled(t *testing.T) {
@@ -1234,5 +1258,87 @@ func TestPackageDiscovery(t *testing.T) {
 				t.Errorf("mutant Pkg() = %q, want %q", got, tc.wantPath)
 			}
 		})
+	}
+}
+
+// applyingDealerStub creates executors that apply and roll back each mutant
+// in its own copy of src while the discovery runs, as the real executors do.
+type applyingDealerStub struct {
+	base     string
+	fileName string
+	src      []byte
+}
+
+func (d *applyingDealerStub) NewExecutor(
+	mut mutator.Mutator, outCh chan<- engine.ExecutorResult, wg *sync.WaitGroup,
+) workerpool.Executor {
+	return &applyingExecutorStub{mut: mut, dealer: d, outCh: outCh, wg: wg}
+}
+
+type applyingExecutorStub struct {
+	mut    mutator.Mutator
+	dealer *applyingDealerStub
+	outCh  chan<- engine.ExecutorResult
+	wg     *sync.WaitGroup
+}
+
+func (e *applyingExecutorStub) Start(_ context.Context, _ *workerpool.Worker) {
+	defer e.wg.Done()
+	e.outCh <- engine.ExecutorResult{Mutant: e.mut, Err: e.applyAndRollback()}
+}
+
+func (e *applyingExecutorStub) applyAndRollback() error {
+	workdir, err := os.MkdirTemp(e.dealer.base, "mutant")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(workdir, e.dealer.fileName), e.dealer.src, 0o600); err != nil {
+		return err
+	}
+	e.mut.SetWorkdir(workdir)
+	if err := e.mut.Apply(); err != nil {
+		return err
+	}
+
+	return e.mut.Rollback()
+}
+
+// TestFeatureRunDiscoversOnlyOriginalNegations checks that the discovery of
+// a file never sees the ! that a running INVERT_LOGICAL mutant adds to the
+// shared AST. Each original ! gives exactly one mutant. Run the test with the
+// race detector to check that discovery and Apply do not share the AST.
+func TestFeatureRunDiscoversOnlyOriginalNegations(t *testing.T) {
+	const src = "package main\n\nfunc f(a, b bool) bool {\n" +
+		"\tx := !a\n\ty := !!b\n\tz := !(a && !b)\n\n\treturn !x && !y && !z\n}\n"
+	const fileName = "negations.go"
+	want := []string{"4:7", "5:7", "5:8", "6:14", "6:7", "8:15", "8:21", "8:9"}
+
+	enabled := make(map[string]any, len(mutator.Types))
+	for _, mt := range mutator.Types {
+		enabled[configuration.MutantTypeEnabledKey(mt)] = mt == mutator.InvertLogical
+	}
+	viperSet(enabled)
+	defer viperReset()
+	cov := coverage.Profile{fileName: {{StartLine: 1, EndLine: 9, StartCol: 1, EndCol: 2}}}
+	mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+	mapFS := fstest.MapFS{fileName: {Data: []byte(src)}}
+	dealer := &applyingDealerStub{base: t.TempDir(), fileName: fileName, src: []byte(src)}
+
+	mut := engine.New(mod, engine.CodeData{Cov: cov}, dealer, engine.WithDirFs(mapFS))
+	res := runEngine(t, mut)
+
+	var got []string
+	for _, m := range res.Mutants {
+		pos := m.Position()
+		if m.Type() != mutator.InvertLogical {
+			t.Errorf("mutant at %s has type %s, want %s", pos, m.Type(), mutator.InvertLogical)
+		}
+		if src[pos.Offset] == '!' {
+			got = append(got, fmt.Sprintf("%d:%d", pos.Line, pos.Column))
+		}
+	}
+	slices.Sort(got)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Run() ! mutant positions mismatch (-want +got):\n%s", diff)
 	}
 }

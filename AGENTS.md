@@ -1,8 +1,9 @@
 # Repository guidance
 
-This is the OpenRAE fork of Gremlins, a Go mutation testing CLI. Keep the
-upstream module path `github.com/go-gremlins/gremlins`; `origin` points to
-`OpenRAE/go-rae-gremlins`. Pull requests target `main`.
+This is the OpenRAE fork of Gremlins, a Go mutation testing CLI. The module
+path is `github.com/OpenRAE/go-rae-gremlins`, as
+[ADR 0001](docs/adr/0001-module-path.md) records. `origin` points to
+`OpenRAE/go-rae-gremlins`. Pull requests target `dev`.
 
 Read [CLAUDE.md](CLAUDE.md) for package responsibilities and
 [contributing](docs/CONTRIBUTING.md) for contribution conventions. The Go
@@ -26,13 +27,14 @@ new provider without approval.
 
 Preserve existing local changes and the shared
 Git hook dispatcher. Never bypass hooks or secret scanning. Commit only the
-files belonging to the issue. The user owns PR merges and changes into `main`.
+files belonging to the issue. The user owns PR merges and changes into `dev`
+and `main`.
 
 ## Ground Control context
 
 Ground Control is optional maintainer tooling. Repository commands and context
 live in `.ground-control.yaml`, plan rules in `.gc/plan-rules.md`, and decisions
-in `architecture/adrs/`. The MCP context tool is
+in `docs/adr/`. The MCP context tool is
 `gc_get_repo_ground_control_context`. Keep architecture references aligned with
 the Go code; do not copy another repository's configuration.
 

@@ -214,8 +214,27 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 		name:        fileName,
 		cov:         newFileCoverage(set, file, mu.codeData.Cov, built),
 	}
-	if !inspectTokens(file, func(n *NodeToken) bool { return mu.findMutations(ctx, sf, n) }) {
+	// Collect all the mutants of the file before the first one is sent. A
+	// running mutant changes the shared AST, so the discovery must not read
+	// the AST after that.
+	var mutants []*TokenMutator
+	inspectTokens(file, func(n *NodeToken) bool {
+		if ctx.Err() != nil {
+			return false
+		}
+		mutants = append(mutants, mu.findMutations(sf, n)...)
+
+		return true
+	})
+	if ctx.Err() != nil {
 		return fs.SkipAll
+	}
+	for _, tm := range mutants {
+		select {
+		case mu.mutantStream <- tm:
+		case <-ctx.Done():
+			return fs.SkipAll
+		}
 	}
 
 	return nil
@@ -265,15 +284,15 @@ func (mu *Engine) hostBuilds(fileName string) (bool, error) {
 	return ok, nil
 }
 
-// findMutations sends the mutants of node to the mutant stream. It returns
-// false when ctx is done before a mutant is sent.
-func (mu *Engine) findMutations(ctx context.Context, sf *sourceFile, node *NodeToken) bool {
+// findMutations returns the mutants of node with their status.
+func (mu *Engine) findMutations(sf *sourceFile, node *NodeToken) []*TokenMutator {
 	mutantTypes, ok := TokenMutantType[node.Tok()]
 	if !ok {
-		return true
+		return nil
 	}
 
 	pkg := mu.pkgName(sf.name)
+	var mutants []*TokenMutator
 	for _, mt := range mutantTypes {
 		if !configuration.Get[bool](configuration.MutantTypeEnabledKey(mt)) {
 			continue
@@ -288,15 +307,10 @@ func (mu *Engine) findMutations(ctx context.Context, sf *sourceFile, node *NodeT
 			}
 		}
 		tm.SetStatus(status)
-
-		select {
-		case mu.mutantStream <- tm:
-		case <-ctx.Done():
-			return false
-		}
+		mutants = append(mutants, tm)
 	}
 
-	return true
+	return mutants
 }
 
 // pkgName returns the import path of the package that fileName belongs to.
