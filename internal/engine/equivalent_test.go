@@ -66,6 +66,7 @@ const (
 	negationReason = "the result does not reach the caller"
 
 	fileA            = "a.go"
+	fileBad          = "bad.go"
 	boundaryAt4Col11 = "a.go:4:11 CONDITIONALS_BOUNDARY"
 	negationAt4Col11 = "a.go:4:11 CONDITIONALS_NEGATION"
 )
@@ -168,6 +169,28 @@ func TestFeatureEquivalentAnnotationSelectsOneMutant(t *testing.T) {
 	})
 }
 
+// TestRegressionEquivalentAnnotationIgnoresTypeConstraintOperators checks
+// that an annotation without a column selects the one bitwise | of its line.
+// The | of the type union on the same line is not a mutant.
+func TestRegressionEquivalentAnnotationIgnoresTypeConstraintOperators(t *testing.T) {
+	src := "package main\n\n" +
+		"func Or[T ~int | ~uint](a, b T) T { return a | b } //gremlins:equivalent INVERT_BITWISE no effect\n"
+	sys := fstest.MapFS{fileA: {Data: []byte(src)}}
+	settings := map[string]any{configuration.MutantTypeEnabledKey(mutator.InvertBitwise): true}
+
+	res, err := runEquivalentEngine(t, sys, engine.CodeData{Cov: wholeFileProfile(fileA)}, settings)
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	got := mutantsByKey(t, res.Mutants)
+	want := map[string]wantMutant{"a.go:3:46 INVERT_BITWISE": {status: mutator.Equivalent, reason: "no effect"}}
+	checkMutants(t, got, want)
+	if len(got) != len(want) {
+		t.Errorf("Run() returned %d mutants, want %d", len(got), len(want))
+	}
+}
+
 func TestFeatureEquivalentAnnotationMarksUncoveredMutant(t *testing.T) {
 	sys := fstest.MapFS{fileA: {Data: []byte(annotatedSrc)}}
 
@@ -218,6 +241,25 @@ func TestFeatureEquivalentAnnotationOfDisabledTypeIsValid(t *testing.T) {
 	})
 }
 
+// TestFeatureEquivalentAnnotationSelectsNegation checks that a column
+// selects the INVERT_LOGICAL mutant of a ! on a line that also has a &&.
+func TestFeatureEquivalentAnnotationSelectsNegation(t *testing.T) {
+	const src = "package main\n\nfunc f(a, b bool) bool {\n" +
+		"\treturn !a && b //gremlins:equivalent INVERT_LOGICAL@9 a is always true here\n}\n"
+	sys := fstest.MapFS{fileA: {Data: []byte(src)}}
+	codeData := engine.CodeData{Cov: wholeFileProfile(fileA)}
+
+	res, err := runEquivalentEngine(t, sys, codeData, map[string]any{})
+	if err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+
+	checkMutants(t, mutantsByKey(t, res.Mutants), map[string]wantMutant{
+		"a.go:4:9 INVERT_LOGICAL":  {status: mutator.Equivalent, reason: "a is always true here"},
+		"a.go:4:12 INVERT_LOGICAL": {status: mutator.Runnable},
+	})
+}
+
 // lineFourSrc returns a file whose line 4 has a < at column 11, a && at
 // column 15, and a < at column 20, followed by the comment.
 func lineFourSrc(comment string) string {
@@ -230,7 +272,6 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 		src      string
 		wantLine int
 	}{
-		{name: "unknown directive", src: lineFourSrc("//gremlins:equivalnt CONDITIONALS_BOUNDARY@11 r"), wantLine: 4},
 		{name: "no arguments", src: lineFourSrc("//gremlins:equivalent"), wantLine: 4},
 		{name: "missing reason", src: lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@11"), wantLine: 4},
 		{name: "blank reason", src: lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@11 \t "), wantLine: 4},
@@ -243,6 +284,12 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 		{name: "stale column", src: lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@12 r"), wantLine: 4},
 		{name: "type not on line", src: lineFourSrc("//gremlins:equivalent INVERT_LOOPCTRL r"), wantLine: 4},
 		{name: "ambiguous without column", src: lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY r"), wantLine: 4},
+		{
+			name: "ambiguous logical without column",
+			src: "package main\n\nfunc f(a, b bool) bool {\n" +
+				"\treturn !a && b //gremlins:equivalent INVERT_LOGICAL r\n}\n",
+			wantLine: 4,
+		},
 		{
 			name: "duplicate target",
 			src: "package main\n\nfunc f(a, b int) bool {\n\t//gremlins:equivalent CONDITIONALS_BOUNDARY r\n" +
@@ -264,7 +311,7 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sys := fstest.MapFS{"bad.go": {Data: []byte(tc.src)}}
+			sys := fstest.MapFS{fileBad: {Data: []byte(tc.src)}}
 
 			_, err := runEquivalentEngine(t, sys, engine.CodeData{}, map[string]any{})
 
@@ -282,7 +329,7 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 // engine binds the annotations of a file before it sends its mutants, so an
 // invalid annotation never lets a mutant of that file reach the results.
 func TestFeatureEquivalentAnnotationErrorSendsNoMutantOfTheFile(t *testing.T) {
-	sys := fstest.MapFS{"bad.go": {Data: []byte(lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@12 r"))}}
+	sys := fstest.MapFS{fileBad: {Data: []byte(lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@12 r"))}}
 
 	res, err := runEquivalentEngine(t, sys, engine.CodeData{}, map[string]any{})
 

@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "issue": 7,
+  "summary": "Extend the existing INVERT_LOGICAL mutation type with unary ! to !!. Keep TokenMutantType as the shared discovery and equivalent-annotation catalogue. Keep tokenMutations limited to token replacements; a private engine operation handles the unary AST edit and exact restoration. Finish candidate construction and status assignment for each file before dispatching any of its mutants, so discovery cannot traverse a temporary structural edit. Retain the existing per-file lock, printer, byte restoration, worker directory isolation, cancellation, bounded process execution, report interface, configuration enablement, and failure propagation. No new package, dependency, flag, key, report field, status, or exit code. Design rationale and evidence obligations are in docs/development/invert-logical-not-preflight.md.",
+  "changes": [
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/mutator",
+        "internal/report",
+        "internal/engine/workdir",
+        "internal/log",
+        "internal/process"
+      ],
+      "test_imports": []
+    }
+  ],
+  "contracts": [],
+  "contract_changes": {},
+  "policies": [],
+  "trust_boundaries": "The existing Go parser reads local source. Operator eligibility and equivalent selectors share TokenMutantType. The existing configuration validator checks the existing INVERT_LOGICAL enablement value. Only runnable mutants pass through the existing executor to worker module copies and bounded go test processes. A private structural edit cannot add command arguments, environment values, paths, subprocesses, or output channels. AST state is restored before Apply returns, including on failure; original file bytes are restored by the existing lifecycle. Logs and optional JSON remain at their existing destinations. This design adds no authentication, credentials, persistence store, service, or data transfer. The trust_changes entries restate existing checker boundaries; they do not authorize network use or runtime mutation during this preflight.",
+  "trust_changes": {
+    "development_checks": {
+      "destinations": ["local", "existing-ci"],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": ["existing-ci", "github-api", "ground-control-release", "npm-registry"],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": ["existing-ci", "github-api"],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": ["existing-ci", "ground-control-release", "npm-registry"],
+      "network": true,
+      "execute_source": true
+    }
+  },
+  "conflicts": []
+}

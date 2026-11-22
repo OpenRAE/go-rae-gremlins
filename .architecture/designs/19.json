@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "issue": 19,
+  "summary": "Give each mutant test run a timeout from the measured time of earlier runs in its package. A package with no measured run uses the existing timeout: the larger of the coverage run time and 1 second, multiplied by the timeout coefficient. After a run whose tests pass (LIVED), the executor records its elapsed time for the package. The record keeps the largest time. A later run in that package uses the larger of the recorded time and 1 second, multiplied by the new timeout safety margin (default 2). The adaptive timeout is never larger than the existing timeout. KILLED, NOT VIABLE, TIMED OUT, and MEMORY ERROR runs record nothing. Integration mode keeps the existing timeout, because each run tests ./... and not one package. Package runs add -count=1, so a cached test result cannot become a timing sample. Duration arithmetic saturates and does not overflow. The record is in memory, shared by the executors of one dealer under a mutex, and not kept after the run. New compatible contract additions: the --timeout-safety-margin flag and the unleash.timeout-safety-margin key, an integer with 0 for the default and no negative value, and its JSON schema entry. No import, dependency, report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "cmd"
+    },
+    {
+      "package": "internal/configuration"
+    },
+    {
+      "package": "internal/engine"
+    }
+  ],
+  "contracts": [
+    "cli",
+    "configuration",
+    "schema"
+  ],
+  "trust_boundaries": "No modeled trust boundary changes. The executor reads the monotonic clock and the configuration that Viper already reads. It reads no new input, uses no network, and adds no destination. The trust_changes entries restate the existing boundaries.",
+  "conflicts": [],
+  "policies": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  },
+  "contract_changes": {
+    "cli": "compatible",
+    "configuration": "compatible",
+    "schema": "compatible"
+  }
+}

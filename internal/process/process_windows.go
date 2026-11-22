@@ -83,7 +83,7 @@ func (t *processTree) start() error {
 	if t.killed {
 		return nil
 	}
-	if t.cmd.Process.Pid < 0 || t.cmd.Process.Pid > math.MaxUint32 {
+	if t.cmd.Process.Pid < 0 || int64(t.cmd.Process.Pid) > math.MaxUint32 {
 		return fmt.Errorf("process ID %d is not a Windows process ID", t.cmd.Process.Pid)
 	}
 	pid := uint32(t.cmd.Process.Pid)

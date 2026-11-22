@@ -28,8 +28,10 @@ import (
 )
 
 // New creates a new Diff by parsing git diff output using the default command executor.
-func New() (Diff, error) {
-	return NewWithCmd(exec.Command)
+// dir is the directory that the engine scans. The Diff file names are
+// slash-separated and relative to dir, and the Diff holds no change outside dir.
+func New(dir string) (Diff, error) {
+	return NewWithCmd(dir, exec.Command)
 }
 
 type execCmd interface {
@@ -37,8 +39,8 @@ type execCmd interface {
 }
 
 // NewWithCmd creates a new Diff by parsing git diff output using a custom command executor.
-// This is useful for testing.
-func NewWithCmd[T execCmd](cmdContext func(name string, args ...string) T) (Diff, error) {
+// This is useful for testing. dir has the same meaning as in New.
+func NewWithCmd[T execCmd](dir string, cmdContext func(name string, args ...string) T) (Diff, error) {
 	diffRef := configuration.Get[string](configuration.UnleashDiffRef)
 	if diffRef == "" {
 		return nil, nil
@@ -46,7 +48,7 @@ func NewWithCmd[T execCmd](cmdContext func(name string, args ...string) T) (Diff
 
 	log.Infoln("Gathering files diff...")
 
-	cmd := cmdContext("git", "diff", "--merge-base", diffRef)
+	cmd := cmdContext("git", diffArgs(dir, diffRef)...)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -59,4 +61,22 @@ func NewWithCmd[T execCmd](cmdContext func(name string, args ...string) T) (Diff
 	}
 
 	return newDiff(files), nil
+}
+
+// diffArgs returns the git arguments that compare the merge base of ref with
+// the working tree of dir.
+//
+// Git writes the paths of a plain diff relative to the repository root.
+// --relative in dir makes the paths relative to dir, as the engine names the
+// files, and omits the changes outside dir. The color, external diff, textconv,
+// and prefix options keep the user Git configuration from changing the patch
+// that the parser reads. --end-of-options and the final -- make Git read ref
+// only as a revision, never as an option or a path.
+func diffArgs(dir, ref string) []string {
+	return []string{
+		"-C", dir, "diff",
+		"--relative", "--no-color", "--no-ext-diff", "--no-textconv",
+		"--src-prefix=a/", "--dst-prefix=b/",
+		"--merge-base", "--end-of-options", ref, "--",
+	}
 }

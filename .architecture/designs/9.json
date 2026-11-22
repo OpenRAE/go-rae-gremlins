@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "issue": 9,
+  "summary": "Support the //gremlins:ignore [TYPE[,TYPE...]] directive as an engine-owned source filter. A directive after code ignores the mutants of its physical line. A directive alone on its line ignores the code that starts on the line after its comment group; before the package clause, that is the whole file. TYPE names come from the existing mutation type catalogue, as the report prints them. Bind all directives of a file before its mutants go to the workers; equivalent annotations still bind against the unfiltered catalogue. Ignored position and type pairs are not created, so they never reach the workers or the report. No new package, dependency, status, Mutator interface member, flag, configuration key, schema field, report field, or exit code. The only policy file change is one CLAUDE.md flow note about the directive; it changes no control. See ADR 0009 and docs/development/ignore-directive-preflight.md.",
+  "changes": [
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/process",
+        "internal/report"
+      ],
+      "test_imports": []
+    }
+  ],
+  "contracts": [],
+  "contract_changes": {},
+  "policies": [
+    "guidance"
+  ],
+  "trust_boundaries": "Directives are data in local source files already read by engine discovery. Physical scopes and known type names cannot select another file, set configuration, provide a command, or create an environment value. Invalid directives use existing wrapped discovery errors and Logger diagnostics. Only remaining candidates reach existing worker copies and test processes; original coverage and test execution remain unchanged. Existing local console and optional JSON destinations remain unchanged. There is no new credential, authentication, storage, network, publication, or provider boundary. The trust_changes entries restate existing architecture policies, not authorization to transfer data or execute mutation runs during preflight.",
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  },
+  "conflicts": []
+}

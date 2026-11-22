@@ -185,11 +185,11 @@ func goIgnored(name string) bool {
 // sourceFile is a parsed Go file of the module and the data that decides the
 // status of its mutants.
 type sourceFile struct {
-	set         *token.FileSet
-	file        *ast.File
-	equivalents equivalents
-	name        string
-	cov         fileCoverage
+	set        *token.FileSet
+	file       *ast.File
+	directives fileDirectives
+	name       string
+	cov        fileCoverage
 }
 
 func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
@@ -198,7 +198,7 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	if err != nil {
 		return err
 	}
-	eqs, err := fileEquivalents(set, file, src)
+	dirs, err := bindDirectives(set, file, src)
 	if err != nil {
 		return err
 	}
@@ -208,27 +208,33 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 		return err
 	}
 	sf := &sourceFile{
-		set:         set,
-		file:        file,
-		equivalents: eqs,
-		name:        fileName,
-		cov:         newFileCoverage(set, file, mu.codeData.Cov, built),
+		set:        set,
+		file:       file,
+		directives: dirs,
+		name:       fileName,
+		cov:        newFileCoverage(set, file, mu.codeData.Cov, built),
 	}
-	stopped := false
-	ast.Inspect(file, func(node ast.Node) bool {
-		if stopped {
+	// Collect all the mutants of the file before the first one is sent. A
+	// running mutant changes the shared AST, so the discovery must not read
+	// the AST after that.
+	var mutants []*TokenMutator
+	inspectTokens(file, func(n *NodeToken) bool {
+		if ctx.Err() != nil {
 			return false
 		}
-		n, ok := NewTokenNode(node)
-		if !ok {
-			return true
-		}
-		stopped = !mu.findMutations(ctx, sf, n)
+		mutants = append(mutants, mu.findMutations(sf, n)...)
 
-		return !stopped
+		return true
 	})
-	if stopped {
+	if ctx.Err() != nil {
 		return fs.SkipAll
+	}
+	for _, tm := range mutants {
+		select {
+		case mu.mutantStream <- tm:
+		case <-ctx.Done():
+			return fs.SkipAll
+		}
 	}
 
 	return nil
@@ -278,38 +284,35 @@ func (mu *Engine) hostBuilds(fileName string) (bool, error) {
 	return ok, nil
 }
 
-// findMutations sends the mutants of node to the mutant stream. It returns
-// false when ctx is done before a mutant is sent.
-func (mu *Engine) findMutations(ctx context.Context, sf *sourceFile, node *NodeToken) bool {
+// findMutations returns the mutants of node with their status. It does not
+// create the mutants of disabled or ignored types.
+func (mu *Engine) findMutations(sf *sourceFile, node *NodeToken) []*TokenMutator {
 	mutantTypes, ok := TokenMutantType[node.Tok()]
 	if !ok {
-		return true
+		return nil
 	}
 
 	pkg := mu.pkgName(sf.name)
+	var mutants []*TokenMutator
 	for _, mt := range mutantTypes {
-		if !configuration.Get[bool](configuration.MutantTypeEnabledKey(mt)) {
+		if !configuration.Get[bool](configuration.MutantTypeEnabledKey(mt)) ||
+			sf.directives.ignores.ignored(node.TokPos, mt) {
 			continue
 		}
 		tm := NewTokenMutant(pkg, sf.set, sf.file, node)
 		tm.SetType(mt)
 		status := mu.mutationStatus(sf.cov, node.TokPos)
-		if reason, ok := sf.equivalents[equivalentKey{pos: node.TokPos, mt: mt}]; ok {
+		if reason, ok := sf.directives.equivalents[equivalentKey{pos: node.TokPos, mt: mt}]; ok {
 			tm.SetEquivalentReason(reason)
 			if status != mutator.Skipped {
 				status = mutator.Equivalent
 			}
 		}
 		tm.SetStatus(status)
-
-		select {
-		case mu.mutantStream <- tm:
-		case <-ctx.Done():
-			return false
-		}
+		mutants = append(mutants, tm)
 	}
 
-	return true
+	return mutants
 }
 
 // pkgName returns the import path of the package that fileName belongs to.

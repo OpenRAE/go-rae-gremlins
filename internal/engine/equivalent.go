@@ -18,25 +18,22 @@ package engine
 
 import (
 	"errors"
-	"fmt"
 	"go/ast"
 	"go/token"
 	"slices"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
 const (
-	directivePrefix     = "//gremlins:"
 	equivalentDirective = "equivalent"
 	equivalentSyntax    = "//gremlins:equivalent TYPE[@COLUMN] REASON"
 )
 
-// ErrEquivalentAnnotation is the error of a //gremlins: directive comment
-// that is not a valid annotation of exactly one equivalent mutant.
+// ErrEquivalentAnnotation is the error of a //gremlins:equivalent directive
+// comment that is not a valid annotation of exactly one equivalent mutant.
 var ErrEquivalentAnnotation = errors.New("invalid equivalent mutant annotation")
 
 // equivalentKey identifies one mutant of a parsed file: the position of its
@@ -61,12 +58,12 @@ type annotation struct {
 }
 
 // fileEquivalents returns the mutants that the //gremlins:equivalent
-// directives of a parsed file annotate. src is the source of the file. Each
-// directive must select exactly one mutant among all the mutation types of
-// the operators of the file, enabled or not. fileEquivalents returns the
-// errors of all the invalid directives, which wrap ErrEquivalentAnnotation.
-func fileEquivalents(set *token.FileSet, file *ast.File, src []byte) (equivalents, error) {
-	anns, err := parseAnnotations(set, file, src)
+// directives dirs of a parsed file annotate. Each directive must select
+// exactly one mutant among all the mutation types of the operators of the
+// file, enabled or not. fileEquivalents returns the errors of all the invalid
+// directives, which wrap ErrEquivalentAnnotation.
+func fileEquivalents(set *token.FileSet, file *ast.File, dirs []directive) (equivalents, error) {
+	anns, err := parseAnnotations(dirs)
 	if err != nil || len(anns) == 0 {
 		return nil, err
 	}
@@ -75,40 +72,31 @@ func fileEquivalents(set *token.FileSet, file *ast.File, src []byte) (equivalent
 	return bindAnnotations(set, anns)
 }
 
-// parseAnnotations parses the //gremlins: directive comments of file.
-func parseAnnotations(set *token.FileSet, file *ast.File, src []byte) ([]*annotation, error) {
+// parseAnnotations parses the arguments of the //gremlins:equivalent
+// directives dirs.
+func parseAnnotations(dirs []directive) ([]*annotation, error) {
 	var anns []*annotation
 	var errs []error
-	for _, group := range file.Comments {
-		for _, c := range group.List {
-			if !strings.HasPrefix(c.Text, directivePrefix) {
-				continue
-			}
-			at := set.PositionFor(c.Pos(), false)
-			a, err := parseAnnotation(c.Text, at)
-			if err != nil {
-				errs = append(errs, err)
+	for _, d := range dirs {
+		a, err := parseAnnotation(d.args, d.at)
+		if err != nil {
+			errs = append(errs, err)
 
-				continue
-			}
-			a.line = at.Line
-			if !codeBefore(src, at) {
-				a.line++
-			}
-			anns = append(anns, a)
+			continue
 		}
+		a.line = d.at.Line
+		if !d.trailing {
+			a.line++
+		}
+		anns = append(anns, a)
 	}
 
 	return anns, errors.Join(errs...)
 }
 
-// parseAnnotation parses the text of a //gremlins: directive comment at the
-// physical position at.
-func parseAnnotation(text string, at token.Position) (*annotation, error) {
-	name, args := splitWord(strings.TrimPrefix(text, directivePrefix))
-	if name != equivalentDirective {
-		return nil, annotationError(at, "unknown directive %q", name)
-	}
+// parseAnnotation parses the arguments of a //gremlins:equivalent directive
+// at the physical position at.
+func parseAnnotation(args string, at token.Position) (*annotation, error) {
 	selector, reason := splitWord(args)
 	if selector == "" {
 		return nil, annotationError(at, "missing mutation type")
@@ -141,11 +129,7 @@ func matchAnnotations(set *token.FileSet, file *ast.File, anns []*annotation) {
 	for _, a := range anns {
 		byLine[a.line] = append(byLine[a.line], a)
 	}
-	ast.Inspect(file, func(n ast.Node) bool {
-		node, ok := NewTokenNode(n)
-		if !ok {
-			return true
-		}
+	inspectTokens(file, func(node *NodeToken) bool {
 		pos := set.PositionFor(node.TokPos, false)
 		for _, a := range byLine[pos.Line] {
 			if (a.column == 0 || a.column == pos.Column) && slices.Contains(TokenMutantType[node.Tok()], a.mt) {
@@ -196,43 +180,8 @@ func bindingError(set *token.FileSet, a *annotation, eqs equivalents) error {
 	return nil
 }
 
-// codeBefore reports whether the line of the physical position at has
-// source code before at.
-func codeBefore(src []byte, at token.Position) bool {
-	lineStart := at.Offset - (at.Column - 1)
-
-	return strings.TrimSpace(string(src[lineStart:at.Offset])) != ""
-}
-
-// splitWord returns the first word of s and the rest of s, without the
-// surrounding white space.
-func splitWord(s string) (string, string) {
-	s = strings.TrimSpace(s)
-	end := strings.IndexFunc(s, unicode.IsSpace)
-	if end < 0 {
-		return s, ""
-	}
-
-	return s[:end], strings.TrimSpace(s[end:])
-}
-
-// mutationType returns the mutation type with the name that Type.String
-// returns.
-func mutationType(name string) (mutator.Type, bool) {
-	for _, mt := range mutator.Types {
-		if mt.String() == name {
-			return mt, true
-		}
-	}
-
-	return 0, false
-}
-
 // annotationError returns an ErrEquivalentAnnotation error of the directive
-// at the physical position at. It quotes the position, because the file name
-// comes from the module.
+// at the physical position at.
 func annotationError(at token.Position, format string, args ...any) error {
-	detail := fmt.Sprintf(format, args...)
-
-	return fmt.Errorf("%q: %w: %s; want %s", at.String(), ErrEquivalentAnnotation, detail, equivalentSyntax)
+	return directiveError(at, ErrEquivalentAnnotation, equivalentSyntax, format, args...)
 }

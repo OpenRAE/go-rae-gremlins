@@ -80,9 +80,9 @@ func sendSignal(t *testing.T, sig syscall.Signal) {
 // then blocks for at most one minute. The operating system releases the lock
 // when the test process exits, also while the process is a zombie.
 var blockingProbeFiles = map[string]string{
-	"go.mod":   "module probe\n\ngo 1.25\n",
-	"probe.go": "package probe\n\nfunc Add(a, b int) int { return a + b }\n",
-	"probe_test.go": `package probe
+	probeModFile: probeMod,
+	probeSrcFile: probeAddSrc,
+	probeTestFile: `package probe
 
 import (
 	"os"

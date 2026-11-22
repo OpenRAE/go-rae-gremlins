@@ -4,6 +4,7 @@ Status: Accepted when #201 merges.
 
 Design guidance: [equivalent mutants preflight](../development/equivalent-mutants-preflight.md).
 User guide: [equivalent mutants](../docs/usage/equivalent-mutants.md).
+Amended by: [ADR 0009](0009-ignore-mutant-directives.md) adds the `ignore` directive.
 
 ## Context
 

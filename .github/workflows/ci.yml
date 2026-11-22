@@ -199,6 +199,25 @@ jobs:
           fi
           make docs-changed DOCS_BASE="$COMPARISON"
 
+  # Builds every release target with the release tool and configuration.
+  # A target-only compile error then fails the pull request, not the release.
+  release-build:
+    name: Release build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.19.0
+          args: build --snapshot --clean
+
   # Proves the cgroup-v2 memory budget stops a runaway allocator. The job fails
   # when the runner lacks an effective memory controller; it never runs unbounded.
   memory:
@@ -488,10 +507,10 @@ jobs:
   gate:
     name: PR Gate
     if: always()
-    needs: [architecture, lint, vuln, docs, test, policy, memory, sonar, transport-scope, transport]
+    needs: [architecture, lint, vuln, docs, test, release-build, policy, memory, sonar, transport-scope, transport]
     runs-on: ubuntu-latest
     steps:
-      - name: Require architecture, lint, vulnerability scan, docs, tests, policy, memory, SonarCloud, and transport tests
+      - name: Require architecture, lint, vulnerability scan, docs, tests, release build, policy, memory, SonarCloud, and transport tests
         env:
           TRANSPORT_SCOPE_RESULT: ${{ needs.transport-scope.result }}
           TRANSPORT_SELECTED: ${{ needs.transport-scope.outputs.run }}
@@ -501,6 +520,7 @@ jobs:
           VULN_RESULT: ${{ needs.vuln.result }}
           DOCS_RESULT: ${{ needs.docs.result }}
           TEST_RESULT: ${{ needs.test.result }}
+          RELEASE_BUILD_RESULT: ${{ needs.release-build.result }}
           POLICY_RESULT: ${{ needs.policy.result }}
           MEMORY_RESULT: ${{ needs.memory.result }}
           SONAR_RESULT: ${{ needs.sonar.result }}
@@ -511,6 +531,7 @@ jobs:
           test "$VULN_RESULT" = success
           test "$DOCS_RESULT" = success
           test "$TEST_RESULT" = success
+          test "$RELEASE_BUILD_RESULT" = success
           test "$POLICY_RESULT" = success
           test "$MEMORY_RESULT" = success
           if [ "$FOREIGN_PR" = true ]; then
