@@ -10,7 +10,7 @@
   ],
   "contracts": ["cli"],
   "contract_changes": { "cli": "compatible" },
-  "policies": [],
+  "policies": ["guidance"],
   "trust_boundaries": "The operator still selects local Go code and runs it with the caller's permissions. Only the child GOCACHE location changes, and one added go list command compiles the same packages that go test compiles. The CLI owns creation, absolute-path resolution, placement outside the module, and deletion; coverage and the engine borrow an immutable path. Preserve inherited child environments and helper markers, applying the cache override last without logging environment values. Reuse internal/process for all Go execution and existing worker shutdown before deleting the root. Setup errors use wrapped ordinary errors; cleanup keeps the existing Logger policy and exit-code behavior. GOCACHEPROG is an operator-managed alternate backend, outside the local-directory deletion guarantee. No authentication layer, credential transfer, new persistent store, network destination, or workflow change is introduced.",
   "trust_changes": {
     "development_checks": {
