@@ -24,6 +24,8 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 )
 
+const testDir = "module/dir"
+
 func TestNewWithCmd(t *testing.T) {
 	t.Run("must return nil on empty flag", testNewWithCmdEmptyRef)
 	t.Run("must return error", testNewWithCmdGitFailure)
@@ -36,7 +38,7 @@ func testNewWithCmdEmptyRef(t *testing.T) {
 
 	m := &mock{}
 
-	d, err := NewWithCmd(m.call)
+	d, err := NewWithCmd(testDir, m.call)
 
 	if err != nil {
 		t.Errorf("NewWithCmd() with empty diff ref error = %v, want nil", err)
@@ -56,7 +58,7 @@ func testNewWithCmdGitFailure(t *testing.T) {
 		outputErr: errors.New("test"),
 	}
 
-	_, err := NewWithCmd(m.call)
+	_, err := NewWithCmd(testDir, m.call)
 	if err == nil {
 		t.Error("NewWithCmd() with a failing git command error = nil, want an error")
 	}
@@ -65,7 +67,12 @@ func testNewWithCmdGitFailure(t *testing.T) {
 		t.Fatalf("NewWithCmd() made %d git calls, want 1", m.calls)
 	}
 
-	expectedArgs := []string{"diff", "--merge-base", "test"}
+	expectedArgs := []string{
+		"-C", testDir, "diff",
+		"--relative", "--no-color", "--no-ext-diff", "--no-textconv",
+		"--src-prefix=a/", "--dst-prefix=b/",
+		"--merge-base", "--end-of-options", "test", "--",
+	}
 
 	if m.callName != "git" || !reflect.DeepEqual(m.callArgs, expectedArgs) {
 		t.Errorf("NewWithCmd() ran %q %q, want %q %q", m.callName, m.callArgs, "git", expectedArgs)
@@ -79,7 +86,7 @@ func testNewWithCmdInvalidDiff(t *testing.T) {
 		output: []byte(testErrDiff),
 	}
 
-	_, err := NewWithCmd(m.call)
+	_, err := NewWithCmd(testDir, m.call)
 	if err == nil {
 		t.Error("NewWithCmd() with an invalid diff error = nil, want an error")
 	}
@@ -96,7 +103,7 @@ func testNewWithCmdChanges(t *testing.T) {
 		"test/test": {{StartLine: 44, EndLine: 44}},
 	}
 
-	result, err := NewWithCmd(m.call)
+	result, err := NewWithCmd(testDir, m.call)
 
 	if err != nil {
 		t.Errorf("NewWithCmd() error = %v, want nil", err)
