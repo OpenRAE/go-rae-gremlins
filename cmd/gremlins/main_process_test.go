@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,12 +51,22 @@ const (
 
 // TestMain runs main in place of the tests when mainHelperEnv is set, so the
 // tests can check the exit status of the actual binary entry point.
+// testBuildCache is the build cache of the go command of the test process.
+// Each helper process gets it in GOCACHE, so a run does not compile the
+// standard library in a new cache.
+var testBuildCache string
+
 func TestMain(m *testing.M) {
 	if os.Getenv(mainHelperEnv) == "1" {
 		main()
 
 		return
 	}
+	out, err := exec.CommandContext(context.Background(), "go", "env", "GOCACHE").Output()
+	if err != nil {
+		log.Fatalf("go env GOCACHE: %v", err)
+	}
+	testBuildCache = strings.TrimSpace(string(out))
 	os.Exit(m.Run()) // skipcq: RVV-A0003
 }
 
@@ -164,7 +175,8 @@ func mainCommand(t *testing.T, dir string, args ...string) (*exec.Cmd, *bytes.Bu
 
 // helperEnv returns the environment of the test process without Gremlins
 // overrides, with a Go configuration that cannot use a workspace, another
-// toolchain, or the network.
+// toolchain, or the network, and that uses the build cache of the test
+// process.
 func helperEnv() []string {
 	var env []string
 	for _, v := range os.Environ() {
@@ -174,7 +186,8 @@ func helperEnv() []string {
 	}
 
 	// exec.Cmd uses the last value of a duplicate variable.
-	return append(env, mainHelperEnv+"=1", "GOWORK=off", "GOTOOLCHAIN=local", "GOPROXY=off", "GOFLAGS=")
+	return append(env, mainHelperEnv+"=1", "GOWORK=off", "GOTOOLCHAIN=local", "GOPROXY=off", "GOFLAGS=",
+		"GOCACHE="+testBuildCache)
 }
 
 // runMain runs main with args in dir and returns its exit code and output.
@@ -317,19 +330,27 @@ func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
 		wantRuns   int
 		wantCode   int
 		fail       bool
+		setCache   bool
 	}{
 		{
-			name:       "coverage and mutant runs share the cache",
+			name:       "without GOCACHE, coverage and mutant runs share a temporary cache",
 			wantRuns:   2,
 			wantCode:   0,
 			wantOutput: oneLivedOutput,
 		},
 		{
-			name:       "failed coverage run",
+			name:       "without GOCACHE, a failed coverage run removes the cache",
 			fail:       true,
 			wantRuns:   1,
 			wantCode:   1,
 			wantOutput: "probe failure",
+		},
+		{
+			name:       "with GOCACHE, the runs use it",
+			setCache:   true,
+			wantRuns:   2,
+			wantCode:   0,
+			wantOutput: oneLivedOutput,
 		},
 	}
 	for _, tc := range testCases {
@@ -340,15 +361,17 @@ func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
 				probeSrcFile:  probeAddSrc,
 				probeTestFile: cacheProbeTest(tc.fail),
 			})
-			userCache := t.TempDir()
-			sentinel := filepath.Join(userCache, "sentinel")
-			if err := os.WriteFile(sentinel, nil, 0o600); err != nil {
-				t.Fatalf("write the sentinel: %v", err)
-			}
+			// The default build cache is in the user cache directory, which
+			// these variables select on Linux, macOS, and Windows.
+			home := t.TempDir()
 			recordDir := t.TempDir()
 			cmd, output := mainCommand(t, module, unleashCmd)
 			// exec.Cmd uses the last value of a duplicate variable.
-			cmd.Env = append(cmd.Env, "GOCACHE="+userCache, "PROBE_RECORD="+filepath.Join(recordDir, probeRecordFile))
+			cmd.Env = append(cmd.Env, "XDG_CACHE_HOME="+home, "HOME="+home, "LocalAppData="+home,
+				"PROBE_RECORD="+filepath.Join(recordDir, probeRecordFile), "GOCACHE=")
+			if tc.setCache {
+				cmd.Env = append(cmd.Env, "GOCACHE="+testBuildCache)
+			}
 
 			code := exitCode(t, cmd.Run())
 
@@ -358,8 +381,16 @@ func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
 			if !strings.Contains(output.String(), tc.wantOutput) {
 				t.Errorf("output does not contain %q; output:\n%s", tc.wantOutput, output)
 			}
-			assertRunCache(t, recordDir, tc.wantRuns)
-			assertDirHolds(t, userCache, "sentinel")
+			caches := recordedCaches(t, recordDir, tc.wantRuns)
+			if tc.setCache {
+				if caches[0] != testBuildCache {
+					t.Errorf("GOCACHE = %q, want the set value %q", caches[0], testBuildCache)
+				}
+
+				return
+			}
+			assertTemporaryCache(t, caches[0])
+			assertNoGoBuild(t, home)
 		})
 	}
 }
@@ -367,10 +398,9 @@ func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
 // probeRecordFile is the file in which the cache probe test records GOCACHE.
 const probeRecordFile = "record"
 
-// assertRunCache checks that the probe record in recordDir holds the same
-// build cache wantRuns times, that the cache was in the work directory of
-// the run, and that the run removed it.
-func assertRunCache(t *testing.T, recordDir string, wantRuns int) {
+// recordedCaches returns the build caches that the probe record in
+// recordDir holds. It checks that the record holds one cache wantRuns times.
+func recordedCaches(t *testing.T, recordDir string, wantRuns int) []string {
 	t.Helper()
 	data, err := fs.ReadFile(os.DirFS(recordDir), probeRecordFile)
 	if err != nil {
@@ -385,7 +415,14 @@ func assertRunCache(t *testing.T, recordDir string, wantRuns int) {
 			t.Errorf("test runs used caches %q, want one cache", caches)
 		}
 	}
-	cache := caches[0]
+
+	return caches
+}
+
+// assertTemporaryCache checks that cache was in the work directory of the
+// run, and that the run removed it.
+func assertTemporaryCache(t *testing.T, cache string) {
+	t.Helper()
 	if !filepath.IsAbs(cache) || filepath.Base(cache) != "gocache" ||
 		!strings.HasPrefix(filepath.Base(filepath.Dir(cache)), "gremlins-") {
 		t.Errorf("GOCACHE = %q, want an absolute gocache directory in a gremlins- work directory", cache)
@@ -395,19 +432,22 @@ func assertRunCache(t *testing.T, recordDir string, wantRuns int) {
 	}
 }
 
-// assertDirHolds checks that dir holds only the entry name.
-func assertDirHolds(t *testing.T, dir, name string) {
+// assertNoGoBuild checks that dir holds no go-build directory, the name of
+// the default build cache.
+func assertNoGoBuild(t *testing.T, dir string) {
 	t.Helper()
-	entries, err := fs.ReadDir(os.DirFS(dir), ".")
+	err := fs.WalkDir(os.DirFS(dir), ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() && d.Name() == "go-build" {
+			t.Errorf("default build cache %s exists, want none", path)
+		}
+
+		return nil
+	})
 	if err != nil {
-		t.Fatalf("read %s: %v", dir, err)
-	}
-	var names []string
-	for _, e := range entries {
-		names = append(names, e.Name())
-	}
-	if len(names) != 1 || names[0] != name {
-		t.Errorf("%s holds %q, want only %q", dir, names, name)
+		t.Errorf("walk %s: %v", dir, err)
 	}
 }
 

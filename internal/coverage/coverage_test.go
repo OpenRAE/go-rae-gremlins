@@ -197,19 +197,26 @@ func TestCoverageRunFails(t *testing.T) {
 		}
 	})
 
-	t.Run("failure of: go list", func(t *testing.T) {
-		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 1), "workdir", testBuildCache, mod)
-		if _, err := cov.Run(t.Context()); err == nil {
-			t.Error("Run() error = nil, want an error")
-		}
-	})
-
 	t.Run("failure of: go test", func(t *testing.T) {
 		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 2), "workdir", testBuildCache, mod)
 		if _, err := cov.Run(t.Context()); err == nil {
 			t.Error("Run() error = nil, want an error")
 		}
 	})
+}
+
+func TestFeatureCoverageRunFailsWhenCachePreparationFails(t *testing.T) {
+	mod := gomodule.GoModule{
+		Name:       exampleModule,
+		CallingDir: allPackages,
+	}
+	cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 1), "workdir", testBuildCache, mod)
+
+	_, err := cov.Run(t.Context())
+
+	if err == nil || !strings.Contains(err.Error(), "impossible to build the packages") {
+		t.Errorf("Run() error = %v, want a build-the-packages error", err)
+	}
 }
 
 func TestFeatureCoverageRunStopsOnCancel(t *testing.T) {

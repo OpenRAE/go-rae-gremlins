@@ -201,6 +201,18 @@ func checkWorkDir(workDir, root string) error {
 	return nil
 }
 
+// runBuildCache returns the Go build cache of a run with the work directory
+// workDir. A GOCACHE environment variable keeps its value. Without it, the
+// run uses a new cache in workDir, so the run does not add to the default
+// build cache, and the removal of workDir removes the cache.
+func runBuildCache(workDir string) string {
+	if cache := os.Getenv("GOCACHE"); cache != "" {
+		return cache
+	}
+
+	return filepath.Join(workDir, buildCacheDir)
+}
+
 func cleanUp(wd string) {
 	if err := os.RemoveAll(wd); err != nil {
 		log.Errorf("impossible to remove temporary folder: %s\n\t%s", err, wd)
@@ -208,16 +220,15 @@ func cleanUp(wd string) {
 }
 
 // run runs the mutation testing of mod in workDir, an absolute path. All go
-// commands of the run use one Go build cache in workDir, so a run does not
-// add to the default build cache of the user. The caller removes workDir and
-// the cache with it.
+// commands of the run use the build cache of runBuildCache. The caller
+// removes workDir.
 func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Results, error) {
 	fDiff, err := diff.New(filepath.Join(mod.Root, mod.CallingDir))
 	if err != nil {
 		return report.Results{}, err
 	}
 
-	buildCache := filepath.Join(workDir, buildCacheDir)
+	buildCache := runBuildCache(workDir)
 	c := coverage.New(workDir, buildCache, mod)
 
 	exclude, err := exclusion.New()

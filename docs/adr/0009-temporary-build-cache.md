@@ -18,9 +18,10 @@ That compilation increases the elapsed time and the peak memory of the coverage 
 
 ## Decision
 
-- Each `unleash` run makes the `gocache` directory in its temporary work directory.
-- The CLI resolves the absolute path and gives it to the coverage step and to the executor dealer.
-- Each `go` command of the run gets this path in `GOCACHE`. It replaces a `GOCACHE` value of the environment.
+- When the `GOCACHE` environment variable is not set or is empty, the run uses the `gocache` directory in its temporary work directory.
+- When `GOCACHE` has a value, the run uses that cache.
+- The CLI gives the cache path to the coverage step and to the executor dealer.
+- Each `go` command of the run gets this path in `GOCACHE`.
 - Before the timed coverage run, `go list -export -deps -test` compiles the packages and their dependencies into the cache.
 - The existing cleanup of the work directory removes the cache.
 - The CLI makes the work directory path absolute. A relative path would point to a different directory for a `go` command in a module copy.
@@ -29,8 +30,9 @@ That compilation increases the elapsed time and the peak memory of the coverage 
 
 ## Consequences
 
-- A run does not add entries to the default build cache.
-- Each run compiles the standard library and the dependencies again. A run takes more time than a run with a full default cache.
+- A run without `GOCACHE` does not add entries to the default build cache.
+- A run without `GOCACHE` compiles the standard library and the dependencies again. On one small package, a run took 12.2 s instead of 1.0 s.
+- A run with `GOCACHE` keeps a full cache. That cache grows as before.
 - The cache uses disk space in the temporary directory during the run. When that directory is a `tmpfs`, the cache uses memory.
 - The compilation before the timed coverage run keeps the fallback timeout and the memory limit near their values with a full cache.
 - A crash or `SIGKILL` can leave the cache in the temporary directory, as it can leave the module copies.

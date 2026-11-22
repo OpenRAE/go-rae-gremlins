@@ -20,7 +20,10 @@ The existing outer `cleanUp` removes the owning root after coverage, workers, pr
 Its existing error logging remains the cleanup-failure policy; this issue adds no exit code or changed threshold behavior.
 
 Set `GOCACHE` for every Go child: module download, cache preparation, baseline coverage, and every mutant test command.
-Override an inherited `GOCACHE`, including an explicitly selected persistent cache, for these children only.
+When the `GOCACHE` environment variable has a value, the run uses that cache, and Gremlins makes no run cache.
+The maintainer chose this rule after measurement. An empty cache added about 11 s to each run.
+It also made the CLI test packages exceed the 60 s limit of the CI regression proof.
+
 Preserve the caller's environment and Go configuration outside those children.
 Do not write `go env -w` or temporarily change the process environment with `os.Setenv`.
 
@@ -160,10 +163,10 @@ Use the existing [test standard](test-standard.md), table-driven cases, command 
 Do not add tests or run mutation testing for this documentation-only preflight.
 Implementation evidence must establish these observable properties:
 
-- Every Go command receives the same absolute, existing run-owned cache, despite a conflicting inherited `GOCACHE`.
+- Without a `GOCACHE` value, every Go command receives the same absolute run-owned cache. With a value, every Go command receives that value.
   Check the effective last value, not the first matching entry in `Cmd.Env`.
   Preserve explicit helper environments, unrelated Go settings, and `GOTMPDIR`.
-- A real, dependency-free probe populates that cache and leaves a sentinel in the inherited cache untouched.
+- A real, dependency-free probe populates that cache, and the default cache directory stays empty.
   Verify that no build artifacts appear there; a command-holder assertion alone cannot establish actual Go behavior.
   Keep probe configuration explicit and network disabled, using temporary synthetic data.
 - The owned cache disappears after success, failed coverage, cancellation, report failure, and threshold returns.
