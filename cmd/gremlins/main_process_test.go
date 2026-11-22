@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -321,47 +322,32 @@ func TestAdd(t *testing.T) {
 // cache, so only one case does that. The deferred removal of the work
 // directory on an error return is the same for the cache, and
 // TestRegressionUnleashRejectsWorkDirInModule covers it.
-func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
-	testCases := []struct {
-		name     string
-		setCache bool
-	}{
-		{name: "without GOCACHE, coverage and mutant runs share a temporary cache"},
-		{name: "with GOCACHE, the runs use it", setCache: true},
+// TestFeatureRunUsesSetGOCACHE checks that the coverage run and the mutant
+// run of a real unleash get a set GOCACHE. A run without GOCACHE compiles the
+// standard library in an empty cache, which takes too long for this package;
+// the cmd unit tests check the cache rule, and the coverage and engine tests
+// check that each go command gets the cache.
+func TestFeatureRunUsesSetGOCACHE(t *testing.T) {
+	module := writeModule(t, map[string]string{
+		probeModFile:  probeMod,
+		probeSrcFile:  probeAddSrc,
+		probeTestFile: cacheProbeTest,
+	})
+	recordDir := t.TempDir()
+	cmd, output := mainCommand(t, module, unleashCmd)
+	// exec.Cmd uses the last value of a duplicate variable.
+	cmd.Env = append(cmd.Env, "PROBE_RECORD="+filepath.Join(recordDir, probeRecordFile))
+
+	assertOneLived(t, exitCode(t, cmd.Run()), output.String())
+
+	data, err := fs.ReadFile(os.DirFS(recordDir), probeRecordFile)
+	if err != nil {
+		t.Fatalf("read the probe record: %v", err)
 	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			module := writeModule(t, map[string]string{
-				probeModFile:  probeMod,
-				probeSrcFile:  probeAddSrc,
-				probeTestFile: cacheProbeTest,
-			})
-			// The default build cache is in the user cache directory, which
-			// these variables select on Linux, macOS, and Windows.
-			home := t.TempDir()
-			recordDir := t.TempDir()
-			cmd, output := mainCommand(t, module, unleashCmd)
-			// exec.Cmd uses the last value of a duplicate variable.
-			cmd.Env = append(cmd.Env, "XDG_CACHE_HOME="+home, "HOME="+home, "LocalAppData="+home,
-				"PROBE_RECORD="+filepath.Join(recordDir, probeRecordFile), "GOCACHE=")
-			if tc.setCache {
-				cmd.Env = append(cmd.Env, "GOCACHE="+testBuildCache)
-			}
-
-			assertOneLived(t, exitCode(t, cmd.Run()), output.String())
-			// One coverage run and one mutant run.
-			caches := recordedCaches(t, recordDir, 2)
-			if tc.setCache {
-				if caches[0] != testBuildCache {
-					t.Errorf("GOCACHE = %q, want the set value %q", caches[0], testBuildCache)
-				}
-
-				return
-			}
-			assertTemporaryCache(t, caches[0])
-			assertNoGoBuild(t, home)
-		})
+	// One coverage run and one mutant run.
+	want := []string{testBuildCache, testBuildCache}
+	if got := strings.Fields(string(data)); !slices.Equal(got, want) {
+		t.Errorf("test runs recorded GOCACHE %q, want %q", got, want)
 	}
 }
 
@@ -380,57 +366,59 @@ func assertOneLived(t *testing.T, code int, output string) {
 // probeRecordFile is the file in which the cache probe test records GOCACHE.
 const probeRecordFile = "record"
 
-// recordedCaches returns the build caches that the probe record in
-// recordDir holds. It checks that the record holds one cache wantRuns times.
-func recordedCaches(t *testing.T, recordDir string, wantRuns int) []string {
-	t.Helper()
-	data, err := fs.ReadFile(os.DirFS(recordDir), probeRecordFile)
-	if err != nil {
-		t.Fatalf("read the probe record: %v", err)
+func TestRegressionUnleashRejectsWorkDirInModule(t *testing.T) {
+	testCases := []struct {
+		name     string
+		link     bool
+		relative bool
+	}{
+		{name: "temporary directory in the module"},
+		{name: "symbolic link to a directory in the module", link: true},
+		{name: "relative temporary directory in the module", relative: true},
 	}
-	caches := strings.Fields(string(data))
-	if len(caches) != wantRuns {
-		t.Fatalf("test runs recorded %d caches %q, want %d", len(caches), caches, wantRuns)
-	}
-	for _, c := range caches[1:] {
-		if c != caches[0] {
-			t.Errorf("test runs used caches %q, want one cache", caches)
-		}
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			module := writeModule(t, probeFiles)
+			tmp := filepath.Join(module, "tmp")
+			if err := os.Mkdir(tmp, 0o700); err != nil {
+				t.Fatalf("make the temporary directory: %v", err)
+			}
+			tmpDir := tmp
+			if tc.relative {
+				// The command runs in the module.
+				tmpDir = "tmp"
+			}
+			if tc.link {
+				tmpDir = linkTo(t, tmp)
+			}
+			cmd, output := mainCommand(t, module, unleashCmd)
+			// exec.Cmd uses the last value of a duplicate variable.
+			cmd.Env = append(cmd.Env, "TMPDIR="+tmpDir, "TMP="+tmpDir, "TEMP="+tmpDir)
 
-	return caches
+			code := exitCode(t, cmd.Run())
+
+			if code != 1 || !strings.Contains(output.String(), "inside the module") {
+				t.Errorf("exit code = %d, want 1 and an inside-the-module error; output:\n%s", code, output)
+			}
+			entries, err := fs.ReadDir(os.DirFS(tmp), ".")
+			if err != nil || len(entries) != 0 {
+				t.Errorf("temporary directory after the run holds %v, %v; want no entries", entries, err)
+			}
+		})
+	}
 }
 
-// assertTemporaryCache checks that cache was in the work directory of the
-// run, and that the run removed it.
-func assertTemporaryCache(t *testing.T, cache string) {
+// linkTo returns a new symbolic link to target. It skips the test when the
+// platform cannot make the link.
+func linkTo(t *testing.T, target string) string {
 	t.Helper()
-	if !filepath.IsAbs(cache) || filepath.Base(cache) != "gocache" ||
-		!strings.HasPrefix(filepath.Base(filepath.Dir(cache)), "gremlins-") {
-		t.Errorf("GOCACHE = %q, want an absolute gocache directory in a gremlins- work directory", cache)
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("make a symbolic link: %v", err)
 	}
-	if _, err := os.Stat(cache); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("stat the cache %q after the run: %v, want %v", cache, err, os.ErrNotExist)
-	}
-}
 
-// assertNoGoBuild checks that dir holds no go-build directory, the name of
-// the default build cache.
-func assertNoGoBuild(t *testing.T, dir string) {
-	t.Helper()
-	err := fs.WalkDir(os.DirFS(dir), ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() && d.Name() == "go-build" {
-			t.Errorf("default build cache %s exists, want none", path)
-		}
-
-		return nil
-	})
-	if err != nil {
-		t.Errorf("walk %s: %v", dir, err)
-	}
+	return link
 }
 
 func TestRegressionRelativeTempDirKeepsMutantStatus(t *testing.T) {

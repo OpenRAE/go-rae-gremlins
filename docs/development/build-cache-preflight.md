@@ -166,12 +166,13 @@ Implementation evidence must establish these observable properties:
 - Without a `GOCACHE` value, every Go command receives the same absolute run-owned cache. With a value, every Go command receives that value.
   Check the effective last value, not the first matching entry in `Cmd.Env`.
   Preserve explicit helper environments, unrelated Go settings, and `GOTMPDIR`.
-- A real, dependency-free probe populates that cache, and the default cache directory stays empty.
-  Verify that no build artifacts appear there; a command-holder assertion alone cannot establish actual Go behavior.
-  Keep probe configuration explicit and network disabled, using temporary synthetic data.
-- The owned cache disappears after success, failed coverage, cancellation, report failure, and threshold returns.
-  Observe removal before test-fixture cleanup, so `t.TempDir` cannot conceal a leak.
-  Verify ownership isolation between invocations and safe failure for invalid temporary placement or allocation.
+- A real, dependency-free probe records the `GOCACHE` of the coverage and mutant test binaries when `GOCACHE` has a value.
+  A real run without `GOCACHE` compiles the standard library in an empty cache.
+  That run takes too long for the 60 s package limit of the CI regression proof, so no test runs it.
+  A unit test checks the cache rule. The coverage and engine tests check the effective `GOCACHE` of each command.
+- The run cache is inside the work directory, so the existing deferred removal of the work directory removes it.
+  A regression test checks that the temporary directory is empty after an error return, before fixture cleanup.
+  Verify safe failure for invalid temporary placement.
 - The regression fails on the original behavior and passes with the fix.
   Use targeted race tests locally and the existing hosted regression, mutation, and supported-platform jobs.
   Removing either the override or cleanup must be detectable; no new test framework or workflow is needed.

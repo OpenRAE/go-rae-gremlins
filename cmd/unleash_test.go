@@ -250,76 +250,36 @@ func TestFeatureUnleashRequiresGoModule(t *testing.T) {
 	}
 }
 
-func TestRegressionUnleashRejectsWorkDirInModule(t *testing.T) {
+func TestFeatureRunBuildCache(t *testing.T) {
+	workDir := filepath.Join(t.TempDir(), "gremlins-1")
 	testCases := []struct {
-		name     string
-		link     bool
-		relative bool
+		name  string
+		cache string
+		want  string
 	}{
-		{name: "temporary directory in the module"},
-		{name: "symbolic link to a directory in the module", link: true},
-		{name: "relative temporary directory in the module", relative: true},
+		{name: "a set GOCACHE keeps its value", cache: "/user/cache", want: "/user/cache"},
+		{name: "an empty GOCACHE selects the work directory cache", want: filepath.Join(workDir, "gocache")},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dir, tmp := writeModuleWithTempDir(t)
-			tmpDir := tmp
-			if tc.relative {
-				t.Chdir(dir)
-				tmpDir = "tmp"
-			}
-			if tc.link {
-				tmpDir = linkTo(t, tmp)
-			}
-			for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
-				t.Setenv(key, tmpDir)
-			}
+			t.Setenv("GOCACHE", tc.cache)
 
-			err := runUnleash(context.Background())(nil, []string{dir})
-
-			if err == nil || !strings.Contains(err.Error(), "inside the module") {
-				t.Errorf("runUnleash(%q) error = %v, want an inside-the-module error", dir, err)
-			}
-			entries, readErr := os.ReadDir(tmp)
-			if readErr != nil || len(entries) != 0 {
-				t.Errorf("temporary directory after runUnleash holds %v, %v; want no entries", entries, readErr)
+			if got := runBuildCache(workDir); got != tc.want {
+				t.Errorf("runBuildCache(%q) = %q, want %q", workDir, got, tc.want)
 			}
 		})
 	}
-}
+	t.Run("an unset GOCACHE selects the work directory cache", func(t *testing.T) {
+		t.Setenv("GOCACHE", "")
+		if err := os.Unsetenv("GOCACHE"); err != nil {
+			t.Fatal(err)
+		}
+		want := filepath.Join(workDir, "gocache")
 
-// writeModuleWithTempDir initializes the configuration and writes a module
-// with the empty directory tmp. It returns the module and tmp directories.
-func writeModuleWithTempDir(t *testing.T) (dir, tmp string) {
-	t.Helper()
-	configuration.Reset()
-	t.Cleanup(configuration.Reset)
-	if err := configuration.Init([]string{t.TempDir()}); err != nil {
-		t.Fatalf("configuration.Init error = %v, want nil", err)
-	}
-	dir = t.TempDir()
-	goMod := []byte("module example.com/tmpdir\n\ngo 1.25\n")
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), goMod, 0o600); err != nil {
-		t.Fatalf("write go.mod: %v", err)
-	}
-	tmp = filepath.Join(dir, "tmp")
-	if err := os.Mkdir(tmp, 0o700); err != nil {
-		t.Fatalf("make the temporary directory: %v", err)
-	}
-
-	return dir, tmp
-}
-
-// linkTo returns a new symbolic link to target. It skips the test when the
-// platform cannot make the link.
-func linkTo(t *testing.T, target string) string {
-	t.Helper()
-	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(target, link); err != nil {
-		t.Skipf("make a symbolic link: %v", err)
-	}
-
-	return link
+		if got := runBuildCache(workDir); got != want {
+			t.Errorf("runBuildCache(%q) = %q, want %q", workDir, got, want)
+		}
+	})
 }
 
 func TestFeatureUnleashReportsCancellation(t *testing.T) {
