@@ -37,22 +37,23 @@ import (
 
 // This is the list of the keys available in config files and as flags.
 const (
-	GremlinsSilentKey            = "silent"
-	UnleashDryRunKey             = "unleash.dry-run"
-	UnleashOutputStatusesKey     = "unleash.output-statuses"
-	UnleashOutputKey             = "unleash.output"
-	UnleashTagsKey               = "unleash.tags"
-	UnleashCoverPkgKey           = "unleash.coverpkg"
-	UnleashWorkersKey            = "unleash.workers"
-	UnleashTestCPUKey            = "unleash.test-cpu"
-	UnleashTimeoutCoefficientKey = "unleash.timeout-coefficient"
-	UnleashMemoryBudgetKey       = "unleash.memory-budget"
-	UnleashIntegrationMode       = "unleash.integration"
-	UnleashExcludeFiles          = "unleash.exclude-files"
-	UnleashDiffRef               = "unleash.diff"
-	UnleashThresholdEfficacyKey  = "unleash.threshold.efficacy"
-	UnleashThresholdMCoverageKey = "unleash.threshold.mutant-coverage"
-	UnleashOutputDiffStatusesKey = "unleash.output-diff-statuses"
+	GremlinsSilentKey             = "silent"
+	UnleashDryRunKey              = "unleash.dry-run"
+	UnleashOutputStatusesKey      = "unleash.output-statuses"
+	UnleashOutputKey              = "unleash.output"
+	UnleashTagsKey                = "unleash.tags"
+	UnleashCoverPkgKey            = "unleash.coverpkg"
+	UnleashWorkersKey             = "unleash.workers"
+	UnleashTestCPUKey             = "unleash.test-cpu"
+	UnleashTimeoutCoefficientKey  = "unleash.timeout-coefficient"
+	UnleashTimeoutSafetyMarginKey = "unleash.timeout-safety-margin"
+	UnleashMemoryBudgetKey        = "unleash.memory-budget"
+	UnleashIntegrationMode        = "unleash.integration"
+	UnleashExcludeFiles           = "unleash.exclude-files"
+	UnleashDiffRef                = "unleash.diff"
+	UnleashThresholdEfficacyKey   = "unleash.threshold.efficacy"
+	UnleashThresholdMCoverageKey  = "unleash.threshold.mutant-coverage"
+	UnleashOutputDiffStatusesKey  = "unleash.output-diff-statuses"
 )
 
 const (
@@ -258,22 +259,23 @@ func Validate() error {
 // fixed value type.
 func typedKeys() map[string]func(any) error {
 	checks := map[string]func(any) error{
-		GremlinsSilentKey:            checkBool,
-		UnleashDryRunKey:             checkBool,
-		UnleashOutputStatusesKey:     checkString,
-		UnleashOutputKey:             checkString,
-		UnleashTagsKey:               checkString,
-		UnleashCoverPkgKey:           checkString,
-		UnleashWorkersKey:            checkInt,
-		UnleashTestCPUKey:            checkInt,
-		UnleashTimeoutCoefficientKey: checkInt,
-		UnleashMemoryBudgetKey:       checkSize,
-		UnleashIntegrationMode:       checkBool,
-		UnleashExcludeFiles:          checkStringSlice,
-		UnleashDiffRef:               checkString,
-		UnleashThresholdEfficacyKey:  checkFloat,
-		UnleashThresholdMCoverageKey: checkFloat,
-		UnleashOutputDiffStatusesKey: checkString,
+		GremlinsSilentKey:             checkBool,
+		UnleashDryRunKey:              checkBool,
+		UnleashOutputStatusesKey:      checkString,
+		UnleashOutputKey:              checkString,
+		UnleashTagsKey:                checkString,
+		UnleashCoverPkgKey:            checkString,
+		UnleashWorkersKey:             checkInt,
+		UnleashTestCPUKey:             checkInt,
+		UnleashTimeoutCoefficientKey:  checkInt,
+		UnleashTimeoutSafetyMarginKey: checkInt,
+		UnleashMemoryBudgetKey:        checkSize,
+		UnleashIntegrationMode:        checkBool,
+		UnleashExcludeFiles:           checkStringSlice,
+		UnleashDiffRef:                checkString,
+		UnleashThresholdEfficacyKey:   checkFloat,
+		UnleashThresholdMCoverageKey:  checkFloat,
+		UnleashOutputDiffStatusesKey:  checkString,
 	}
 	for _, mt := range mutator.Types {
 		checks[MutantTypeEnabledKey(mt)] = checkBool
@@ -286,11 +288,12 @@ func typedKeys() map[string]func(any) error {
 // Validate runs a range check only on a value that passes its type check.
 func boundedKeys() map[string]func(string) error {
 	return map[string]func(string) error{
-		UnleashWorkersKey:            checkNotNegative,
-		UnleashTestCPUKey:            checkNotNegative,
-		UnleashTimeoutCoefficientKey: checkNotNegative,
-		UnleashThresholdEfficacyKey:  checkPercentage,
-		UnleashThresholdMCoverageKey: checkPercentage,
+		UnleashWorkersKey:             checkNotNegative,
+		UnleashTestCPUKey:             checkNotNegative,
+		UnleashTimeoutCoefficientKey:  checkNotNegative,
+		UnleashTimeoutSafetyMarginKey: checkNotNegative,
+		UnleashThresholdEfficacyKey:   checkPercentage,
+		UnleashThresholdMCoverageKey:  checkPercentage,
 	}
 }
 
