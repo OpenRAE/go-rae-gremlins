@@ -457,7 +457,7 @@ func TestMutatorRun(t *testing.T) {
 			pkg:      examplePackage,
 			callDir:  exampleCallDir,
 			tags:     exampleTags,
-			wantPath: examplePackage,
+			wantPath: "-count=1 " + examplePackage,
 		},
 		{
 			name:     "integration mode",
@@ -473,7 +473,7 @@ func TestMutatorRun(t *testing.T) {
 			pkg:                examplePackage,
 			callDir:            exampleCallDir,
 			tags:               exampleTags,
-			wantPath:           examplePackage,
+			wantPath:           "-count=1 " + examplePackage,
 		},
 	}
 	for _, tc := range testCases {
@@ -524,13 +524,166 @@ func TestMutatorRun(t *testing.T) {
 				t.Errorf("\n+ %s\n- %s\n", got, want)
 			}
 
-			timeoutDifference := absTimeDiff(holder.timeout, expectedTimeout*2)
-			diffThreshold := 100 * time.Second
-			if timeoutDifference > diffThreshold {
-				t.Errorf("go test command timeout = %s, want within %s of %s", holder.timeout, diffThreshold, expectedTimeout*2)
+			wantDeadline := wantTimeout - 2*time.Second
+			if absTimeDiff(holder.timeout, wantDeadline) > time.Second {
+				t.Errorf("go test command deadline = %s, want within 1s of %s", holder.timeout, wantDeadline)
 			}
 		})
 	}
+}
+
+// execCall is the arguments and the context deadline of one go test command.
+type execCall struct {
+	args     []string
+	deadline time.Duration
+}
+
+// execRecorder records each go test command of a dealer.
+type execRecorder struct {
+	calls []execCall
+	m     sync.Mutex
+}
+
+// exec returns an execContext that runs first for the first command and a
+// passing test process for each later command.
+func (r *execRecorder) exec(first execContext) execContext {
+	return func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		dl, _ := ctx.Deadline()
+		r.m.Lock()
+		defer r.m.Unlock()
+		r.calls = append(r.calls, execCall{args: args, deadline: time.Until(dl)})
+		if len(r.calls) == 1 {
+			return first(ctx, command, args...)
+		}
+
+		return fakeExecCommandSuccess(ctx, command, args...)
+	}
+}
+
+// testTimeout returns the -timeout value of c and checks that the context
+// deadline is the same timeout without the 2 second grace of go test.
+func (c execCall) testTimeout(t *testing.T) time.Duration {
+	t.Helper()
+	for i, arg := range c.args[:len(c.args)-1] {
+		if arg != "-timeout" {
+			continue
+		}
+		got, err := time.ParseDuration(c.args[i+1])
+		if err != nil {
+			t.Fatalf("parse -timeout %q: %v", c.args[i+1], err)
+		}
+		if absTimeDiff(c.deadline, got-2*time.Second) > time.Second {
+			t.Errorf("context deadline = %s, want within 1s of the -timeout %s less 2s", c.deadline, got)
+		}
+
+		return got
+	}
+	t.Fatalf("go test args = %q, want a -timeout flag", c.args)
+
+	return 0
+}
+
+// TestFeatureExecutorAdaptiveTimeout runs two executors of one dealer, one
+// after the other. Both executors exist before the first run, so the second
+// executor must select its timeout when it runs.
+func TestFeatureExecutorAdaptiveTimeout(t *testing.T) {
+	const (
+		baseline     = time.Hour
+		otherPackage = "example.com/my/other"
+	)
+	fallbackArg := baseline*engine.DefaultTimeoutCoefficient + 2*time.Second
+	testCases := []struct {
+		first        execContext
+		name         string
+		firstPkg     string
+		wantFirst    mutator.Status
+		intMode      bool
+		wantAdaptive bool
+	}{
+		{
+			name:         "a LIVED run sets the timeout of the next run in its package",
+			first:        fakeExecCommandSuccess,
+			firstPkg:     examplePackage,
+			wantFirst:    mutator.Lived,
+			wantAdaptive: true,
+		},
+		{
+			name:      "a LIVED run does not change the timeout of another package",
+			first:     fakeExecCommandSuccess,
+			firstPkg:  otherPackage,
+			wantFirst: mutator.Lived,
+		},
+		{
+			name:      "a KILLED run records no sample",
+			first:     fakeExecCommandTestsFailure,
+			firstPkg:  examplePackage,
+			wantFirst: mutator.Killed,
+		},
+		{
+			name:      "integration mode keeps the fallback timeout",
+			first:     fakeExecCommandSuccess,
+			firstPkg:  examplePackage,
+			wantFirst: mutator.Lived,
+			intMode:   true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			viperSet(map[string]any{configuration.UnleashIntegrationMode: tc.intMode})
+			defer viperReset()
+			first := &mutantStub{status: mutator.Runnable, mutType: mutator.ConditionalsBoundary, pkg: tc.firstPkg}
+			second := &mutantStub{status: mutator.Runnable, mutType: mutator.ConditionalsBoundary, pkg: examplePackage}
+
+			calls := runInSequence(t, baseline, tc.first, first, second)
+
+			if first.status != tc.wantFirst {
+				t.Fatalf("first mutant status = %v, want %v", first.status, tc.wantFirst)
+			}
+			if got := calls[0].testTimeout(t); got != fallbackArg {
+				t.Errorf("first -timeout = %s, want the fallback %s", got, fallbackArg)
+			}
+			// The adaptive -timeout is two times the short first run, plus 2s.
+			low, high := fallbackArg, fallbackArg
+			if tc.wantAdaptive {
+				low, high = 4*time.Second, time.Minute
+			}
+			if got := calls[1].testTimeout(t); got < low || got > high {
+				t.Errorf("second -timeout = %s, want from %s to %s", got, low, high)
+			}
+		})
+	}
+}
+
+// runInSequence creates one executor for each mutant from one dealer, then
+// runs them one after the other. The first go test command runs first; each
+// later command passes. It returns one recorded call for each mutant.
+func runInSequence(
+	t *testing.T, baseline time.Duration, first execContext, mutants ...*mutantStub,
+) []execCall {
+	t.Helper()
+	rec := &execRecorder{}
+	mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+	mjd := newExecutorDealer(t, mod, newWdDealerStub(t), baseline, engine.WithExecContext(rec.exec(first)))
+	outCh := make(chan engine.ExecutorResult)
+	var wg sync.WaitGroup
+	wg.Add(len(mutants))
+	executors := make([]workerpool.Executor, 0, len(mutants))
+	for _, mut := range mutants {
+		executors = append(executors, mjd.NewExecutor(mut, outCh, &wg))
+	}
+	w := &workerpool.Worker{Name: testWorkerName, ID: 1}
+	for _, ex := range executors {
+		go ex.Start(context.Background(), w)
+		if res := recvWithin(t, outCh, "executor result"); res.Err != nil {
+			t.Fatalf("executor result error = %v, want nil", res.Err)
+		}
+	}
+	waitWithin(t, &wg, "executors join")
+	if len(rec.calls) != len(mutants) {
+		t.Fatalf("go test commands = %d, want %d", len(rec.calls), len(mutants))
+	}
+
+	return rec.calls
 }
 
 func TestCPU(t *testing.T) {
@@ -784,7 +937,7 @@ func fakeExecCommandSuccessWithHolder(got *commandHolder) execContext {
 	}
 }
 
-func fakeExecCommandWithHolder(got *commandHolder, fakeCmd func(ctx context.Context, command string, args ...string) *exec.Cmd) execContext {
+func fakeExecCommandWithHolder(got *commandHolder, fakeCmd execContext) execContext {
 	return func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		dl, _ := ctx.Deadline()
 		got.m.Lock()

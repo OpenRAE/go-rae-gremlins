@@ -460,7 +460,7 @@ Default: `0` (uses default value of `5`)
     To understand better the use of these flag, check [workers](workers.md)
 [//]: # (@formatter:on)
 
-Gremlins determines the timeout for each Go test run by multiplying by a
+Gremlins determines the fallback timeout of each Go test run by multiplying by a
 coefficient the time it took to perform the coverage run. The default
 coefficient is `5`, which can be overridden with this flag (`0` means use
 the default). Gremlins rejects a negative value before it starts the tests.
@@ -472,8 +472,45 @@ coefficient. For example:
 - Coverage run takes 500ms → timeout = max(500ms, 1s) × 5 = 5 seconds
 - Coverage run takes 2s → timeout = 2s × 5 = 10 seconds
 
+A package uses the fallback timeout until one of its test runs passes.
+After that, the package uses an adaptive timeout. See [timeout safety margin](#timeout-safety-margin).
+In _integration mode_, every test run uses the fallback timeout.
+
 ```shell
 gremlins unleash --timeout-coefficient=10
+```
+
+### Timeout safety margin
+
+:material-flag: `--timeout-safety-margin` · :material-sign-direction:
+Default: `0` (uses default value of `2`)
+
+When the tests of a mutant pass (`LIVED`), Gremlins records the elapsed time of that test run for the package.
+It keeps the longest recorded time of each package.
+A later test run in that package uses this time, multiplied by the safety margin, as its timeout.
+Gremlins uses a minimum of 1 second before it applies the margin.
+The adaptive timeout is never longer than the fallback timeout.
+For example, with a fallback timeout of 300 seconds and the default margin:
+
+- The longest passing run takes 100ms → timeout = max(100ms, 1s) × 2 = 2 seconds
+- The longest passing run takes 45s → timeout = 45s × 2 = 90 seconds
+
+A `KILLED`, `NOT VIABLE`, `TIMED OUT`, or `MEMORY ERROR` test run records no time.
+A failing test run can stop early, so its time does not show the time of all the tests.
+A package with no passing test run keeps the fallback timeout.
+The recorded times are kept only for the duration of one run.
+
+Outside _integration mode_, Gremlins runs `go test` with `-count=1`, so a cached test result is not used as a time.
+
+A shorter timeout makes a mutant that does not stop end sooner.
+It does not change the time of a test run that completes.
+On a busy machine, a test run can take longer than its recorded time.
+If you see more `TIMED OUT` mutants, increase the margin.
+A very large margin restores the fallback timeout for every test run.
+Gremlins rejects a negative value before it starts the tests.
+
+```shell
+gremlins unleash --timeout-safety-margin=3
 ```
 
 ### Memory budget

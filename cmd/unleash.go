@@ -59,6 +59,7 @@ const (
 	paramTestCPU            = "test-cpu"
 	paramWorkers            = "workers"
 	paramTimeoutCoefficient = "timeout-coefficient"
+	paramTimeoutMargin      = "timeout-safety-margin"
 	paramMemoryBudget       = "memory-budget"
 
 	// Thresholds.
@@ -283,6 +284,10 @@ func unleashFlags() []*flags.Flag {
 		{
 			Name: paramTimeoutCoefficient, CfgKey: configuration.UnleashTimeoutCoefficientKey, DefaultV: 0,
 			Usage: "the coefficient by which the timeout is increased",
+		},
+		{
+			Name: paramTimeoutMargin, CfgKey: configuration.UnleashTimeoutSafetyMarginKey, DefaultV: 0,
+			Usage: "the multiplier of the longest passing test run of a package that gives its timeout (default 2)",
 		},
 		{
 			Name: paramMemoryBudget, CfgKey: configuration.UnleashMemoryBudgetKey, DefaultV: "",
