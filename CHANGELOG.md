@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.0](https://github.com/OpenRAE/go-rae-gremlins/compare/v0.9.0...v0.10.0) (2026-11-22)
+
+
+### Features
+
+* adapt the timeout of each package to its passing test runs ([#219](https://github.com/OpenRAE/go-rae-gremlins/issues/219)) ([e7ace09](https://github.com/OpenRAE/go-rae-gremlins/commit/e7ace09b67f9bb8f8eec460e1fe4d2f55daa343f))
+* add the ! to !! mutation to INVERT_LOGICAL ([#213](https://github.com/OpenRAE/go-rae-gremlins/issues/213)) ([7b9e651](https://github.com/OpenRAE/go-rae-gremlins/commit/7b9e65133e441028fd9a33a0d4a00d14d4aaaec0))
+* add the //gremlins:ignore directive to ignore mutants of a line, block, or file ([#220](https://github.com/OpenRAE/go-rae-gremlins/issues/220)) ([54c4d3c](https://github.com/OpenRAE/go-rae-gremlins/commit/54c4d3cba8e7796da3f4bce321839b09dc06b676))
+
+
+### Bug Fixes
+
+* build the Windows process check on 32-bit targets ([#215](https://github.com/OpenRAE/go-rae-gremlins/issues/215)) ([f5a9bff](https://github.com/OpenRAE/go-rae-gremlins/commit/f5a9bff06ffc73fa0f156347112b49eec9578cc4)), closes [#214](https://github.com/OpenRAE/go-rae-gremlins/issues/214)
+* do not mutate the operators of type constraints ([#212](https://github.com/OpenRAE/go-rae-gremlins/issues/212)) ([038c9bf](https://github.com/OpenRAE/go-rae-gremlins/commit/038c9bf125fab19e763b65a46a6d0ddd1aaac78f))
+* match diff paths to mutants in a nested Go module ([#218](https://github.com/OpenRAE/go-rae-gremlins/issues/218)) ([856e1d3](https://github.com/OpenRAE/go-rae-gremlins/commit/856e1d3d1394f21cadd7a6675ace65e2b2cf0ff1))
+
 ## [0.9.0](https://github.com/OpenRAE/go-rae-gremlins/compare/v0.8.0...v0.9.0) (2026-11-19)
 
 
