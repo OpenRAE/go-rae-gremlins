@@ -293,14 +293,8 @@ func TestFeatureGOFLAGSReachesEveryTestRun(t *testing.T) {
 
 // cacheProbeTest is a test that appends the GOCACHE of its test binary to
 // the file in PROBE_RECORD. It does not check the result of Add, so its one
-// covered mutant lives. With fail set, it fails after it records GOCACHE.
-func cacheProbeTest(fail bool) string {
-	end := "_ = Add(1, 2)"
-	if fail {
-		end = `t.Fatal("probe failure")`
-	}
-
-	return `package probe
+// covered mutant lives.
+const cacheProbeTest = `package probe
 
 import (
 	"os"
@@ -318,40 +312,22 @@ func TestAdd(t *testing.T) {
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	` + end + `
+	_ = Add(1, 2)
 }
 `
-}
 
+// TestFeatureRunUsesTemporaryBuildCache runs a real unleash with and without
+// GOCACHE. A run without GOCACHE compiles the standard library in an empty
+// cache, so only one case does that. The deferred removal of the work
+// directory on an error return is the same for the cache, and
+// TestRegressionUnleashRejectsWorkDirInModule covers it.
 func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
 	testCases := []struct {
-		name       string
-		wantOutput string
-		wantRuns   int
-		wantCode   int
-		fail       bool
-		setCache   bool
+		name     string
+		setCache bool
 	}{
-		{
-			name:       "without GOCACHE, coverage and mutant runs share a temporary cache",
-			wantRuns:   2,
-			wantCode:   0,
-			wantOutput: oneLivedOutput,
-		},
-		{
-			name:       "without GOCACHE, a failed coverage run removes the cache",
-			fail:       true,
-			wantRuns:   1,
-			wantCode:   1,
-			wantOutput: "probe failure",
-		},
-		{
-			name:       "with GOCACHE, the runs use it",
-			setCache:   true,
-			wantRuns:   2,
-			wantCode:   0,
-			wantOutput: oneLivedOutput,
-		},
+		{name: "without GOCACHE, coverage and mutant runs share a temporary cache"},
+		{name: "with GOCACHE, the runs use it", setCache: true},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -359,7 +335,7 @@ func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
 			module := writeModule(t, map[string]string{
 				probeModFile:  probeMod,
 				probeSrcFile:  probeAddSrc,
-				probeTestFile: cacheProbeTest(tc.fail),
+				probeTestFile: cacheProbeTest,
 			})
 			// The default build cache is in the user cache directory, which
 			// these variables select on Linux, macOS, and Windows.
@@ -375,13 +351,14 @@ func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
 
 			code := exitCode(t, cmd.Run())
 
-			if code != tc.wantCode {
-				t.Errorf("exit code = %d, want %d; output:\n%s", code, tc.wantCode, output)
+			if code != 0 {
+				t.Errorf("exit code = %d, want 0; output:\n%s", code, output)
 			}
-			if !strings.Contains(output.String(), tc.wantOutput) {
-				t.Errorf("output does not contain %q; output:\n%s", tc.wantOutput, output)
+			if !strings.Contains(output.String(), oneLivedOutput) {
+				t.Errorf("output does not contain %q; output:\n%s", oneLivedOutput, output)
 			}
-			caches := recordedCaches(t, recordDir, tc.wantRuns)
+			// One coverage run and one mutant run.
+			caches := recordedCaches(t, recordDir, 2)
 			if tc.setCache {
 				if caches[0] != testBuildCache {
 					t.Errorf("GOCACHE = %q, want the set value %q", caches[0], testBuildCache)
