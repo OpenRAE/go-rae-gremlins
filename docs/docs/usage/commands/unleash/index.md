@@ -109,6 +109,9 @@ gremlins unleash -E "_(gen|wrap).go$" -E "^(generate|wrap)/" -E "internal/super_
 
 Run tests only for mutants inside code changes between current state and git reference (branch or commit).
 The default is each mutant covered by tests.
+Gremlins reads only the changes in the directory that it scans.
+The module can be in a subdirectory of the Git repository.
+A change outside the scanned directory selects no mutant.
 
 #### Branch merge base
 

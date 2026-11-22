@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "issue": 217,
+  "summary": "Diff selection compares git diff paths with mutant file names. Mutant file names are relative to the scanned directory, which is the module root joined with the calling directory. git diff wrote paths relative to the repository root and ran in the process directory. internal/diff now runs git -C <scanned directory> diff --relative --merge-base. Git then writes paths relative to the scanned directory and omits changes outside it. diff.New takes the scanned directory, and cmd/unleash.go passes it. Fixed color, external diff, textconv, and prefix options keep user Git configuration from changing the parsed patch. --end-of-options and a final -- make Git read the diff reference only as a revision. No import, dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "cmd",
+      "imports": [
+        "internal/configuration",
+        "internal/diff",
+        "internal/gomodule",
+        "internal/log"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/gomodule",
+        "internal/mutator"
+      ]
+    },
+    {
+      "package": "internal/diff",
+      "imports": [
+        "internal/configuration",
+        "internal/log"
+      ],
+      "test_imports": [
+        "internal/configuration"
+      ]
+    }
+  ],
+  "contracts": [
+    "cli"
+  ],
+  "contract_changes": {
+    "cli": "compatible"
+  },
+  "policies": [],
+  "trust_boundaries": "Runtime diff collection remains a local Git read in the operator-selected repository. Pass the selected directory and reference as separate arguments, prevent option-like references from becoming Git options, and request native patch output without external diff or textconv helpers. Git and parser failures stop the run through wrapped Go errors, not an empty successful selection. No remote fetch, new credential handling, upload, or service is introduced. Existing Git configuration remains an operator trust boundary; this change does not claim hostile-repository isolation. The trust_changes entries restate existing development and delivery boundaries, not authorization to execute delivery or transfer source during preflight.",
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  },
+  "conflicts": []
+}
