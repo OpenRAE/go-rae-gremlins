@@ -349,14 +349,7 @@ func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
 				cmd.Env = append(cmd.Env, "GOCACHE="+testBuildCache)
 			}
 
-			code := exitCode(t, cmd.Run())
-
-			if code != 0 {
-				t.Errorf("exit code = %d, want 0; output:\n%s", code, output)
-			}
-			if !strings.Contains(output.String(), oneLivedOutput) {
-				t.Errorf("output does not contain %q; output:\n%s", oneLivedOutput, output)
-			}
+			assertOneLived(t, exitCode(t, cmd.Run()), output.String())
 			// One coverage run and one mutant run.
 			caches := recordedCaches(t, recordDir, 2)
 			if tc.setCache {
@@ -369,6 +362,18 @@ func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
 			assertTemporaryCache(t, caches[0])
 			assertNoGoBuild(t, home)
 		})
+	}
+}
+
+// assertOneLived checks that a run exited with code 0 and reported one
+// LIVED mutant.
+func assertOneLived(t *testing.T, code int, output string) {
+	t.Helper()
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0; output:\n%s", code, output)
+	}
+	if !strings.Contains(output, oneLivedOutput) {
+		t.Errorf("output does not contain %q; output:\n%s", oneLivedOutput, output)
 	}
 }
 

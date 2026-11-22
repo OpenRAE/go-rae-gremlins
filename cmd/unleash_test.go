@@ -262,30 +262,14 @@ func TestRegressionUnleashRejectsWorkDirInModule(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			configuration.Reset()
-			t.Cleanup(configuration.Reset)
-			if err := configuration.Init([]string{t.TempDir()}); err != nil {
-				t.Fatalf("configuration.Init error = %v, want nil", err)
-			}
-			dir := t.TempDir()
-			goMod := []byte("module example.com/tmpdir\n\ngo 1.25\n")
-			if err := os.WriteFile(filepath.Join(dir, "go.mod"), goMod, 0o600); err != nil {
-				t.Fatalf("write go.mod: %v", err)
-			}
-			tmp := filepath.Join(dir, "tmp")
-			if err := os.Mkdir(tmp, 0o700); err != nil {
-				t.Fatalf("make the temporary directory: %v", err)
-			}
+			dir, tmp := writeModuleWithTempDir(t)
 			tmpDir := tmp
 			if tc.relative {
 				t.Chdir(dir)
 				tmpDir = "tmp"
 			}
 			if tc.link {
-				tmpDir = filepath.Join(t.TempDir(), "link")
-				if err := os.Symlink(tmp, tmpDir); err != nil {
-					t.Skipf("make a symbolic link: %v", err)
-				}
+				tmpDir = linkTo(t, tmp)
 			}
 			for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
 				t.Setenv(key, tmpDir)
@@ -302,6 +286,40 @@ func TestRegressionUnleashRejectsWorkDirInModule(t *testing.T) {
 			}
 		})
 	}
+}
+
+// writeModuleWithTempDir initializes the configuration and writes a module
+// with the empty directory tmp. It returns the module and tmp directories.
+func writeModuleWithTempDir(t *testing.T) (dir, tmp string) {
+	t.Helper()
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	dir = t.TempDir()
+	goMod := []byte("module example.com/tmpdir\n\ngo 1.25\n")
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), goMod, 0o600); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	tmp = filepath.Join(dir, "tmp")
+	if err := os.Mkdir(tmp, 0o700); err != nil {
+		t.Fatalf("make the temporary directory: %v", err)
+	}
+
+	return dir, tmp
+}
+
+// linkTo returns a new symbolic link to target. It skips the test when the
+// platform cannot make the link.
+func linkTo(t *testing.T, target string) string {
+	t.Helper()
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("make a symbolic link: %v", err)
+	}
+
+	return link
 }
 
 func TestFeatureUnleashReportsCancellation(t *testing.T) {
