@@ -250,6 +250,60 @@ func TestFeatureUnleashRequiresGoModule(t *testing.T) {
 	}
 }
 
+func TestRegressionUnleashRejectsWorkDirInModule(t *testing.T) {
+	testCases := []struct {
+		name     string
+		link     bool
+		relative bool
+	}{
+		{name: "temporary directory in the module"},
+		{name: "symbolic link to a directory in the module", link: true},
+		{name: "relative temporary directory in the module", relative: true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			configuration.Reset()
+			t.Cleanup(configuration.Reset)
+			if err := configuration.Init([]string{t.TempDir()}); err != nil {
+				t.Fatalf("configuration.Init error = %v, want nil", err)
+			}
+			dir := t.TempDir()
+			goMod := []byte("module example.com/tmpdir\n\ngo 1.25\n")
+			if err := os.WriteFile(filepath.Join(dir, "go.mod"), goMod, 0o600); err != nil {
+				t.Fatalf("write go.mod: %v", err)
+			}
+			tmp := filepath.Join(dir, "tmp")
+			if err := os.Mkdir(tmp, 0o700); err != nil {
+				t.Fatalf("make the temporary directory: %v", err)
+			}
+			tmpDir := tmp
+			if tc.relative {
+				t.Chdir(dir)
+				tmpDir = "tmp"
+			}
+			if tc.link {
+				tmpDir = filepath.Join(t.TempDir(), "link")
+				if err := os.Symlink(tmp, tmpDir); err != nil {
+					t.Skipf("make a symbolic link: %v", err)
+				}
+			}
+			for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
+				t.Setenv(key, tmpDir)
+			}
+
+			err := runUnleash(context.Background())(nil, []string{dir})
+
+			if err == nil || !strings.Contains(err.Error(), "inside the module") {
+				t.Errorf("runUnleash(%q) error = %v, want an inside-the-module error", dir, err)
+			}
+			entries, readErr := os.ReadDir(tmp)
+			if readErr != nil || len(entries) != 0 {
+				t.Errorf("temporary directory after runUnleash holds %v, %v; want no entries", entries, readErr)
+			}
+		})
+	}
+}
+
 func TestFeatureUnleashReportsCancellation(t *testing.T) {
 	configuration.Reset()
 	t.Cleanup(configuration.Reset)

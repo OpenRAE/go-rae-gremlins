@@ -68,6 +68,7 @@ type MutantExecutorDealer struct {
 	execContext       execContext
 	mod               gomodule.GoModule
 	buildTags         string
+	buildCache        string
 	memory            memoryPlan
 	testExecutionTime time.Duration
 	dryRun            bool
@@ -89,10 +90,12 @@ func WithExecContext(c execContext) ExecutorDealerOption {
 
 // NewExecutorDealer initialises a MutantExecutorDealer. The elapsed time
 // and the peak memory of baseline, the coverage run, give the timeout and
-// the memory limit of each mutant test run. It returns an error when it
-// cannot find the memory budget.
+// the memory limit of each mutant test run. Each mutant test run uses
+// buildCache, an absolute path, as its Go build cache. It returns an error
+// when it cannot find the memory budget.
 func NewExecutorDealer(
-	mod gomodule.GoModule, wdd workdir.Dealer, baseline coverage.Result, opts ...ExecutorDealerOption,
+	mod gomodule.GoModule, wdd workdir.Dealer, buildCache string, baseline coverage.Result,
+	opts ...ExecutorDealerOption,
 ) (*MutantExecutorDealer, error) {
 	buildTags := configuration.Get[string](configuration.UnleashTagsKey)
 	dryRun := configuration.Get[bool](configuration.UnleashDryRunKey)
@@ -123,6 +126,7 @@ func NewExecutorDealer(
 		mod:               mod,
 		wdDealer:          wdd,
 		buildTags:         buildTags,
+		buildCache:        buildCache,
 		dryRun:            dryRun,
 		integrationMode:   integrationMode,
 		testCPU:           testCPU,
@@ -154,6 +158,7 @@ func (m MutantExecutorDealer) NewExecutor(
 		dryRun:            m.dryRun,
 		integrationMode:   m.integrationMode,
 		buildTags:         m.buildTags,
+		buildCache:        m.buildCache,
 		execContext:       m.execContext,
 		testCPU:           m.testCPU,
 		memory:            m.memory,
@@ -173,6 +178,7 @@ type mutantExecutor struct {
 	execContext       execContext
 	module            gomodule.GoModule
 	buildTags         string
+	buildCache        string
 	memory            memoryPlan
 	testExecutionTime time.Duration
 	dryRun            bool
@@ -288,8 +294,10 @@ func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mut
 	if m.integrationMode {
 		cmd.Dir = rootDir
 	}
+	// exec.Cmd uses the last value of a duplicate variable, so GOTMPDIR and
+	// GOCACHE replace the values in the environment of Gremlins.
 	cmd.Env = append(cmd.Env, os.Environ()...)
-	cmd.Env = append(cmd.Env, fmt.Sprintf("GOTMPDIR=%s", m.wdDealer.WorkDir()))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("GOTMPDIR=%s", m.wdDealer.WorkDir()), "GOCACHE="+m.buildCache)
 
 	output := newMarkerWriter(buildFailureMarkers)
 	cmd.Stdout = output

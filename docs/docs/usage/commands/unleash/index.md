@@ -30,6 +30,14 @@ This example uses POSIX shell syntax.
 For the `GOFLAGS` format, see the [Go command documentation](https://pkg.go.dev/cmd/go#hdr-Environment_variables).
 Use the [`--tags`](#tags) flag for build tags. Gremlins does not read build tags from `GOFLAGS` when it finds mutants.
 
+Each run uses a new Go build cache in its temporary directory, so it does not add to your default build cache.
+Gremlins sets `GOCACHE` for each `go` command of the run, and ignores a `GOCACHE` value in its environment.
+It removes the cache at the end of the run, also after an error or a cancellation.
+Each run compiles the standard library and the dependencies again.
+
+The cache can use much disk space during the run. Set the temporary directory (`TMPDIR` on Linux and macOS) to a location with space.
+The temporary directory must be outside the module.
+
 ## Cancellation
 
 An interrupt (`SIGINT`) or a termination signal (`SIGTERM`) stops the run.

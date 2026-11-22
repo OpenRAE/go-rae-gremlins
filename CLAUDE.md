@@ -138,7 +138,8 @@ make clean
 **Mutation Testing Flow:**
 
 1. `cmd/unleash.go` → `run()` initializes components
-2. Coverage analysis determines testable code
+2. Coverage analysis determines testable code. All `go` commands of a run use one
+   temporary build cache in the run work directory
 3. `Engine.Run()` walks file tree, parses Go AST
 4. For each token, check `TokenMutantType` mapping for applicable
    mutations

@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "issue": 8,
+  "summary": "Use one private, absolute Go build-cache directory per unleash invocation: gocache in the existing CLI-owned temporary work directory. cmd resolves the path and passes it as a required constructor argument to coverage and the executor dealer. Every Go child (module download, cache preparation, baseline coverage, and each mutant test command) gets GOCACHE after the inherited environment values. Before the timed coverage run, go list -buildvcs=false -export -deps -test fills the cache, so the baseline timeout and memory limit stay close to their values with a full cache. The CLI makes the work directory path absolute, so GOTMPDIR, GOCACHE, and the coverage profile do not depend on the directory of each go command. The existing outer cleanup removes the work directory and the cache on every handled return. unleash rejects a work directory inside the module, including a symbolic-link alias, because the module copies would copy it into themselves. No new package, dependency, flag, configuration key, report field, exit code, or global environment change. See docs/adr/0009-temporary-build-cache.md and docs/development/build-cache-preflight.md.",
+  "changes": [
+    { "package": "cmd" },
+    { "package": "internal/coverage" },
+    { "package": "internal/engine" },
+    { "package": "cmd/gremlins" }
+  ],
+  "contracts": ["cli"],
+  "contract_changes": { "cli": "compatible" },
+  "policies": [],
+  "trust_boundaries": "The operator still selects local Go code and runs it with the caller's permissions. Only the child GOCACHE location changes, and one added go list command compiles the same packages that go test compiles. The CLI owns creation, absolute-path resolution, placement outside the module, and deletion; coverage and the engine borrow an immutable path. Preserve inherited child environments and helper markers, applying the cache override last without logging environment values. Reuse internal/process for all Go execution and existing worker shutdown before deleting the root. Setup errors use wrapped ordinary errors; cleanup keeps the existing Logger policy and exit-code behavior. GOCACHEPROG is an operator-managed alternate backend, outside the local-directory deletion guarantee. No authentication layer, credential transfer, new persistent store, network destination, or workflow change is introduced.",
+  "trust_changes": {
+    "development_checks": {
+      "destinations": ["local", "existing-ci"],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": ["existing-ci"],
+      "network": false,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": ["existing-ci"],
+      "network": false,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": ["existing-ci"],
+      "network": false,
+      "execute_source": false
+    }
+  },
+  "conflicts": []
+}

@@ -143,9 +143,42 @@ func TestApplyAndRollback(t *testing.T) {
 	})
 }
 
+// goBuildCache returns the build cache of the go command. A test that runs
+// the real toolchain uses it to reuse the build cache of the test
+// environment.
+func goBuildCache(t *testing.T) string {
+	t.Helper()
+	out, err := exec.CommandContext(t.Context(), "go", "env", "GOCACHE").Output()
+	if err != nil {
+		t.Fatalf("go env GOCACHE: %v", err)
+	}
+
+	return strings.TrimSpace(string(out))
+}
+
+// lastEnvValue returns the value of the last entry of key in env, because
+// exec.Cmd uses the last value of a duplicate variable.
+func lastEnvValue(env []string, key string) string {
+	var value string
+	for _, v := range env {
+		if k, val, ok := strings.Cut(v, "="); ok && k == key {
+			value = val
+		}
+	}
+
+	return value
+}
+
 type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
+// testBuildCache is a build cache path that no real go command uses. A test
+// that replaces the go command checks that the command gets this path.
+const testBuildCache = "/gremlins-test/gocache"
+
 func TestMutatorTestExecution(t *testing.T) {
+	// The go test command must use the build cache of the coverage run, not
+	// the cache of the Gremlins environment.
+	t.Setenv("GOCACHE", filepath.Join(t.TempDir(), "user-cache"))
 	testCases := []struct {
 		testResult    execContext
 		name          string
@@ -183,7 +216,7 @@ func TestMutatorTestExecution(t *testing.T) {
 				Root:       ".",
 				CallingDir: ".",
 			}
-			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
+			mjd := newExecutorDealerWithCache(t, mod, wdDealer, testBuildCache, expectedTimeout,
 				engine.WithExecContext(fakeExecCommandWithHolder(holder, tc.testResult)),
 			)
 			mut := &mutantStub{
@@ -207,17 +240,11 @@ func TestMutatorTestExecution(t *testing.T) {
 			}
 
 			if tc.mutantStatus != mutator.NotCovered {
-				goTmpDirEnv := fmt.Sprintf("GOTMPDIR=%s", wdDealer.WorkDir())
-				actualGoTmpDir := ""
-				for _, v := range holder.cmd.Env {
-					if strings.HasPrefix(v, "GOTMPDIR=") {
-						actualGoTmpDir = v
-
-						break
+				want := map[string]string{"GOTMPDIR": wdDealer.WorkDir(), "GOCACHE": testBuildCache}
+				for key, wantValue := range want {
+					if got := lastEnvValue(holder.cmd.Env, key); got != wantValue {
+						t.Errorf("go test command %s = %q, want %q", key, got, wantValue)
 					}
-				}
-				if goTmpDirEnv != actualGoTmpDir {
-					t.Errorf("go test command GOTMPDIR entry = %q, want %q", actualGoTmpDir, goTmpDirEnv)
 				}
 			}
 		})

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,6 +35,8 @@ const (
 	// mainHelperLimit bounds the lifetime of one helper process.
 	mainHelperLimit = 2 * time.Minute
 	unleashCmd      = "unleash"
+	// oneLivedOutput is the report line of a run with one LIVED mutant.
+	oneLivedOutput = "Killed: 0, Lived: 1"
 )
 
 // The file names and contents that the probe modules share.
@@ -240,14 +243,14 @@ func TestFeatureGOFLAGSReachesEveryTestRun(t *testing.T) {
 			goflags:    "-gcflags=all=-l",
 			args:       []string{unleashCmd},
 			wantCode:   0,
-			wantOutput: "Killed: 0, Lived: 1",
+			wantOutput: oneLivedOutput,
 		},
 		{
 			name:       "integration mode",
 			goflags:    "-gcflags=all=-l",
 			args:       []string{unleashCmd, "--integration"},
 			wantCode:   0,
-			wantOutput: "Killed: 0, Lived: 1",
+			wantOutput: oneLivedOutput,
 		},
 		{
 			name:       "coverage run fails without the flags",
@@ -272,5 +275,159 @@ func TestFeatureGOFLAGSReachesEveryTestRun(t *testing.T) {
 				t.Errorf("output does not contain %q; output:\n%s", tc.wantOutput, output)
 			}
 		})
+	}
+}
+
+// cacheProbeTest is a test that appends the GOCACHE of its test binary to
+// the file in PROBE_RECORD. It does not check the result of Add, so its one
+// covered mutant lives. With fail set, it fails after it records GOCACHE.
+func cacheProbeTest(fail bool) string {
+	end := "_ = Add(1, 2)"
+	if fail {
+		end = `t.Fatal("probe failure")`
+	}
+
+	return `package probe
+
+import (
+	"os"
+	"testing"
+)
+
+func TestAdd(t *testing.T) {
+	f, err := os.OpenFile(os.Getenv("PROBE_RECORD"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(os.Getenv("GOCACHE") + "\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	` + end + `
+}
+`
+}
+
+func TestFeatureRunUsesTemporaryBuildCache(t *testing.T) {
+	testCases := []struct {
+		name       string
+		wantOutput string
+		wantRuns   int
+		wantCode   int
+		fail       bool
+	}{
+		{
+			name:       "coverage and mutant runs share the cache",
+			wantRuns:   2,
+			wantCode:   0,
+			wantOutput: oneLivedOutput,
+		},
+		{
+			name:       "failed coverage run",
+			fail:       true,
+			wantRuns:   1,
+			wantCode:   1,
+			wantOutput: "probe failure",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			module := writeModule(t, map[string]string{
+				probeModFile:  probeMod,
+				probeSrcFile:  probeAddSrc,
+				probeTestFile: cacheProbeTest(tc.fail),
+			})
+			userCache := t.TempDir()
+			sentinel := filepath.Join(userCache, "sentinel")
+			if err := os.WriteFile(sentinel, nil, 0o600); err != nil {
+				t.Fatalf("write the sentinel: %v", err)
+			}
+			recordDir := t.TempDir()
+			cmd, output := mainCommand(t, module, unleashCmd)
+			// exec.Cmd uses the last value of a duplicate variable.
+			cmd.Env = append(cmd.Env, "GOCACHE="+userCache, "PROBE_RECORD="+filepath.Join(recordDir, probeRecordFile))
+
+			code := exitCode(t, cmd.Run())
+
+			if code != tc.wantCode {
+				t.Errorf("exit code = %d, want %d; output:\n%s", code, tc.wantCode, output)
+			}
+			if !strings.Contains(output.String(), tc.wantOutput) {
+				t.Errorf("output does not contain %q; output:\n%s", tc.wantOutput, output)
+			}
+			assertRunCache(t, recordDir, tc.wantRuns)
+			assertDirHolds(t, userCache, "sentinel")
+		})
+	}
+}
+
+// probeRecordFile is the file in which the cache probe test records GOCACHE.
+const probeRecordFile = "record"
+
+// assertRunCache checks that the probe record in recordDir holds the same
+// build cache wantRuns times, that the cache was in the work directory of
+// the run, and that the run removed it.
+func assertRunCache(t *testing.T, recordDir string, wantRuns int) {
+	t.Helper()
+	data, err := fs.ReadFile(os.DirFS(recordDir), probeRecordFile)
+	if err != nil {
+		t.Fatalf("read the probe record: %v", err)
+	}
+	caches := strings.Fields(string(data))
+	if len(caches) != wantRuns {
+		t.Fatalf("test runs recorded %d caches %q, want %d", len(caches), caches, wantRuns)
+	}
+	for _, c := range caches[1:] {
+		if c != caches[0] {
+			t.Errorf("test runs used caches %q, want one cache", caches)
+		}
+	}
+	cache := caches[0]
+	if !filepath.IsAbs(cache) || filepath.Base(cache) != "gocache" ||
+		!strings.HasPrefix(filepath.Base(filepath.Dir(cache)), "gremlins-") {
+		t.Errorf("GOCACHE = %q, want an absolute gocache directory in a gremlins- work directory", cache)
+	}
+	if _, err := os.Stat(cache); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("stat the cache %q after the run: %v, want %v", cache, err, os.ErrNotExist)
+	}
+}
+
+// assertDirHolds checks that dir holds only the entry name.
+func assertDirHolds(t *testing.T, dir, name string) {
+	t.Helper()
+	entries, err := fs.ReadDir(os.DirFS(dir), ".")
+	if err != nil {
+		t.Fatalf("read %s: %v", dir, err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if len(names) != 1 || names[0] != name {
+		t.Errorf("%s holds %q, want only %q", dir, names, name)
+	}
+}
+
+func TestRegressionRelativeTempDirKeepsMutantStatus(t *testing.T) {
+	module := writeModule(t, gcflagsProbeFiles)
+	if err := os.Mkdir(filepath.Join(filepath.Dir(module), "reltmp"), 0o700); err != nil {
+		t.Fatalf("make the temporary directory: %v", err)
+	}
+	cmd, output := mainCommand(t, module, unleashCmd)
+	// The command runs in the module, so the relative temporary directory is
+	// outside the module. exec.Cmd uses the last value of a duplicate variable.
+	tmpDir := filepath.Join("..", "reltmp")
+	cmd.Env = append(cmd.Env, "GOFLAGS=-gcflags=all=-l", "TMPDIR="+tmpDir, "TMP="+tmpDir, "TEMP="+tmpDir)
+
+	code := exitCode(t, cmd.Run())
+
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0; output:\n%s", code, output)
+	}
+	if !strings.Contains(output.String(), oneLivedOutput) {
+		t.Errorf("output does not contain %q; output:\n%s", oneLivedOutput, output)
 	}
 }
