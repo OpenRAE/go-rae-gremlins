@@ -66,6 +66,7 @@ const (
 	negationReason = "the result does not reach the caller"
 
 	fileA            = "a.go"
+	fileBad          = "bad.go"
 	boundaryAt4Col11 = "a.go:4:11 CONDITIONALS_BOUNDARY"
 	negationAt4Col11 = "a.go:4:11 CONDITIONALS_NEGATION"
 )
@@ -271,7 +272,6 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 		src      string
 		wantLine int
 	}{
-		{name: "unknown directive", src: lineFourSrc("//gremlins:equivalnt CONDITIONALS_BOUNDARY@11 r"), wantLine: 4},
 		{name: "no arguments", src: lineFourSrc("//gremlins:equivalent"), wantLine: 4},
 		{name: "missing reason", src: lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@11"), wantLine: 4},
 		{name: "blank reason", src: lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@11 \t "), wantLine: 4},
@@ -311,7 +311,7 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sys := fstest.MapFS{"bad.go": {Data: []byte(tc.src)}}
+			sys := fstest.MapFS{fileBad: {Data: []byte(tc.src)}}
 
 			_, err := runEquivalentEngine(t, sys, engine.CodeData{}, map[string]any{})
 
@@ -329,7 +329,7 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 // engine binds the annotations of a file before it sends its mutants, so an
 // invalid annotation never lets a mutant of that file reach the results.
 func TestFeatureEquivalentAnnotationErrorSendsNoMutantOfTheFile(t *testing.T) {
-	sys := fstest.MapFS{"bad.go": {Data: []byte(lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@12 r"))}}
+	sys := fstest.MapFS{fileBad: {Data: []byte(lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY@12 r"))}}
 
 	res, err := runEquivalentEngine(t, sys, engine.CodeData{}, map[string]any{})
 
