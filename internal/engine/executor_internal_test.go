@@ -54,7 +54,9 @@ func TestGetTestArgs(t *testing.T) {
 			buildTags: "tag1,tag2",
 			timeout:   10 * time.Second,
 			pkg:       examplePackage,
-			want:      []string{goTestArg, "-tags", "tag1,tag2", timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage},
+			want: []string{
+				goTestArg, "-tags", "tag1,tag2", timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage,
+			},
 		},
 		"should_compute_timeout_as_two_seconds_plus_execution_time": {
 			timeout: 30 * time.Second,

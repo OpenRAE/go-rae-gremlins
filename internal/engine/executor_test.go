@@ -525,7 +525,7 @@ func TestMutatorRun(t *testing.T) {
 			}
 
 			wantDeadline := wantTimeout - 2*time.Second
-			if diff := absTimeDiff(holder.timeout, wantDeadline); diff > time.Second {
+			if absTimeDiff(holder.timeout, wantDeadline) > time.Second {
 				t.Errorf("go test command deadline = %s, want within 1s of %s", holder.timeout, wantDeadline)
 			}
 		})
@@ -572,7 +572,7 @@ func (c execCall) testTimeout(t *testing.T) time.Duration {
 		if err != nil {
 			t.Fatalf("parse -timeout %q: %v", c.args[i+1], err)
 		}
-		if diff := absTimeDiff(c.deadline, got-2*time.Second); diff > time.Second {
+		if absTimeDiff(c.deadline, got-2*time.Second) > time.Second {
 			t.Errorf("context deadline = %s, want within 1s of the -timeout %s less 2s", c.deadline, got)
 		}
 
@@ -631,46 +631,58 @@ func TestFeatureExecutorAdaptiveTimeout(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			viperSet(map[string]any{configuration.UnleashIntegrationMode: tc.intMode})
 			defer viperReset()
-			rec := &execRecorder{}
-			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
-			mjd := newExecutorDealer(t, mod, newWdDealerStub(t), baseline, engine.WithExecContext(rec.exec(tc.first)))
 			first := &mutantStub{status: mutator.Runnable, mutType: mutator.ConditionalsBoundary, pkg: tc.firstPkg}
 			second := &mutantStub{status: mutator.Runnable, mutType: mutator.ConditionalsBoundary, pkg: examplePackage}
-			outCh := make(chan engine.ExecutorResult)
-			var wg sync.WaitGroup
-			wg.Add(2)
-			executors := []workerpool.Executor{mjd.NewExecutor(first, outCh, &wg), mjd.NewExecutor(second, outCh, &wg)}
-			w := &workerpool.Worker{Name: testWorkerName, ID: 1}
-			for _, ex := range executors {
-				go ex.Start(context.Background(), w)
-				if res := recvWithin(t, outCh, "executor result"); res.Err != nil {
-					t.Fatalf("executor result error = %v, want nil", res.Err)
-				}
-			}
-			waitWithin(t, &wg, "executors join")
+
+			calls := runInSequence(t, baseline, tc.first, first, second)
 
 			if first.status != tc.wantFirst {
 				t.Fatalf("first mutant status = %v, want %v", first.status, tc.wantFirst)
 			}
-			if len(rec.calls) != 2 {
-				t.Fatalf("go test commands = %d, want 2", len(rec.calls))
-			}
-			if got := rec.calls[0].testTimeout(t); got != fallbackArg {
+			if got := calls[0].testTimeout(t); got != fallbackArg {
 				t.Errorf("first -timeout = %s, want the fallback %s", got, fallbackArg)
 			}
-			got := rec.calls[1].testTimeout(t)
-			if !tc.wantAdaptive {
-				if got != fallbackArg {
-					t.Errorf("second -timeout = %s, want the fallback %s", got, fallbackArg)
-				}
-
-				return
-			}
-			if got < 4*time.Second || got > time.Minute {
+			got := calls[1].testTimeout(t)
+			switch {
+			case !tc.wantAdaptive && got != fallbackArg:
+				t.Errorf("second -timeout = %s, want the fallback %s", got, fallbackArg)
+			case tc.wantAdaptive && (got < 4*time.Second || got > time.Minute):
 				t.Errorf("second -timeout = %s, want from 4s to 1m: two times the short first run, plus 2s", got)
 			}
 		})
 	}
+}
+
+// runInSequence creates one executor for each mutant from one dealer, then
+// runs them one after the other. The first go test command runs first; each
+// later command passes. It returns one recorded call for each mutant.
+func runInSequence(
+	t *testing.T, baseline time.Duration, first execContext, mutants ...*mutantStub,
+) []execCall {
+	t.Helper()
+	rec := &execRecorder{}
+	mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: "."}
+	mjd := newExecutorDealer(t, mod, newWdDealerStub(t), baseline, engine.WithExecContext(rec.exec(first)))
+	outCh := make(chan engine.ExecutorResult)
+	var wg sync.WaitGroup
+	wg.Add(len(mutants))
+	executors := make([]workerpool.Executor, 0, len(mutants))
+	for _, mut := range mutants {
+		executors = append(executors, mjd.NewExecutor(mut, outCh, &wg))
+	}
+	w := &workerpool.Worker{Name: testWorkerName, ID: 1}
+	for _, ex := range executors {
+		go ex.Start(context.Background(), w)
+		if res := recvWithin(t, outCh, "executor result"); res.Err != nil {
+			t.Fatalf("executor result error = %v, want nil", res.Err)
+		}
+	}
+	waitWithin(t, &wg, "executors join")
+	if len(rec.calls) != len(mutants) {
+		t.Fatalf("go test commands = %d, want %d", len(rec.calls), len(mutants))
+	}
+
+	return rec.calls
 }
 
 func TestCPU(t *testing.T) {
@@ -924,7 +936,7 @@ func fakeExecCommandSuccessWithHolder(got *commandHolder) execContext {
 	}
 }
 
-func fakeExecCommandWithHolder(got *commandHolder, fakeCmd func(ctx context.Context, command string, args ...string) *exec.Cmd) execContext {
+func fakeExecCommandWithHolder(got *commandHolder, fakeCmd execContext) execContext {
 	return func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		dl, _ := ctx.Deadline()
 		got.m.Lock()
