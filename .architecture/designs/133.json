@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "issue": 133,
+  "summary": "Architecture preflight for the Diataxis adoption design. Record documentation ownership, existing doc-tools and shared skill reuse, coverage of repository-only documentation, code-verification obligations, preservation of contracts and historical records, and GitHub milestone/dependency boundaries. The issue implementation must design the adoption and prepare its implementation issues; this preflight does neither backlog mutation nor section rewrites. No Go package, dependency, modeled policy, CLI flag, configuration key, schema, JSON report, or exit-code change is proposed by this preflight. Later policy edits require an updated per-issue design declaration.",
+  "changes": [],
+  "contracts": [],
+  "policies": [],
+  "contract_changes": {},
+  "trust_boundaries": "Preflight reads repository sources and public framework references. Guidance remains in this checkout. Existing documentation checks read explicit local Markdown paths and report locally or in existing CI; no source, prose, or artifacts are uploaded to a new destination. Tool provisioning retains existing pinned, checksum-verified release downloads. The later issue may use the established GitHub API for milestone, issue, and blocking metadata, with existing authorization. No new provider, credential path, service, site publication, source execution, or modeled trust change is authorized. Unchanged modeled boundaries are restated for the existing checker; they do not authorize this preflight to invoke delivery or transport workflows.",
+  "conflicts": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": ["local", "existing-ci"],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": ["existing-ci", "github-api", "ground-control-release", "npm-registry"],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": ["existing-ci", "github-api"],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": ["existing-ci", "ground-control-release", "npm-registry"],
+      "network": true,
+      "execute_source": true
+    }
+  }
+}
