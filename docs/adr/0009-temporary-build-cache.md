@@ -12,7 +12,7 @@ Before #8, these entries went to the default build cache of the user.
 A mutation run with many mutants thus made the default cache grow without a limit.
 Issue #8 asks for a separate temporary build cache that Gremlins removes after each run.
 
-The coverage run sets the timeout and the memory limit of each mutant test run.
+The coverage run sets the memory limit and the fallback timeout of each mutant test run. The fallback timeout also caps the timeout of each package.
 An empty cache makes the coverage run also compile the standard library and the dependencies.
 That compilation increases the elapsed time and the peak memory of the coverage run.
 
@@ -32,6 +32,6 @@ That compilation increases the elapsed time and the peak memory of the coverage 
 - A run does not add entries to the default build cache.
 - Each run compiles the standard library and the dependencies again. A run takes more time than a run with a full default cache.
 - The cache uses disk space in the temporary directory during the run. When that directory is a `tmpfs`, the cache uses memory.
-- The compilation before the timed coverage run keeps the timeouts and memory limits near their values with a full cache.
+- The compilation before the timed coverage run keeps the fallback timeout and the memory limit near their values with a full cache.
 - A crash or `SIGKILL` can leave the cache in the temporary directory, as it can leave the module copies.
 - `GOCACHEPROG` selects an external cache program. Gremlins does not remove the storage of that program.

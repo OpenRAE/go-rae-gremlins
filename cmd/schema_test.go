@@ -69,6 +69,7 @@ func TestFeatureConfigurationSchemaDeclaresValidateBounds(t *testing.T) {
 		{key: configuration.UnleashWorkersKey, minimum: &zero},
 		{key: configuration.UnleashTestCPUKey, minimum: &zero},
 		{key: configuration.UnleashTimeoutCoefficientKey, minimum: &zero},
+		{key: configuration.UnleashTimeoutSafetyMarginKey, minimum: &zero},
 		{key: configuration.UnleashThresholdEfficacyKey, minimum: &zero, maximum: &hundred},
 		{key: configuration.UnleashThresholdMCoverageKey, minimum: &zero, maximum: &hundred},
 	}

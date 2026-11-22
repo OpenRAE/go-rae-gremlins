@@ -29,6 +29,7 @@ const (
 	failFastArg     = "-failfast"
 	allPackagesArg  = "./..."
 	timeoutArg      = "-timeout"
+	countArg        = "-count=1"
 	expectedTimeout = "12s"
 	examplePackage  = "example.com/my/package"
 )
@@ -37,59 +38,61 @@ func TestGetTestArgs(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		buildTags         string
-		testExecutionTime time.Duration
-		testCPU           int
-		integrationMode   bool
-		pkg               string
-		want              []string
+		buildTags       string
+		timeout         time.Duration
+		testCPU         int
+		integrationMode bool
+		pkg             string
+		want            []string
 	}{
 		"should_not_include_tags_flag_when_build_tags_are_empty": {
-			testExecutionTime: 10 * time.Second,
-			pkg:               examplePackage,
-			want:              []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, examplePackage},
+			timeout: 10 * time.Second,
+			pkg:     examplePackage,
+			want:    []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage},
 		},
 		"should_include_tags_flag_when_build_tags_are_set": {
-			buildTags:         "tag1,tag2",
-			testExecutionTime: 10 * time.Second,
-			pkg:               examplePackage,
-			want:              []string{goTestArg, "-tags", "tag1,tag2", timeoutArg, expectedTimeout, failFastArg, examplePackage},
+			buildTags: "tag1,tag2",
+			timeout:   10 * time.Second,
+			pkg:       examplePackage,
+			want: []string{
+				goTestArg, "-tags", "tag1,tag2", timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage,
+			},
 		},
 		"should_compute_timeout_as_two_seconds_plus_execution_time": {
-			testExecutionTime: 30 * time.Second,
-			pkg:               examplePackage,
-			want:              []string{goTestArg, timeoutArg, "32s", failFastArg, examplePackage},
+			timeout: 30 * time.Second,
+			pkg:     examplePackage,
+			want:    []string{goTestArg, timeoutArg, "32s", failFastArg, countArg, examplePackage},
 		},
 		"should_not_include_cpu_flag_when_test_cpu_is_zero": {
-			testExecutionTime: 10 * time.Second,
-			testCPU:           0,
-			pkg:               examplePackage,
-			want:              []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, examplePackage},
+			timeout: 10 * time.Second,
+			testCPU: 0,
+			pkg:     examplePackage,
+			want:    []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage},
 		},
 		"should_include_cpu_flag_when_test_cpu_is_nonzero": {
-			testExecutionTime: 10 * time.Second,
-			testCPU:           4,
-			pkg:               examplePackage,
-			want:              []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, "-cpu", "4", examplePackage},
+			timeout: 10 * time.Second,
+			testCPU: 4,
+			pkg:     examplePackage,
+			want:    []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, "-cpu", "4", countArg, examplePackage},
 		},
 		"should_use_package_path_when_integration_mode_is_disabled": {
-			testExecutionTime: 10 * time.Second,
-			integrationMode:   false,
-			pkg:               examplePackage,
-			want:              []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, examplePackage},
+			timeout:         10 * time.Second,
+			integrationMode: false,
+			pkg:             examplePackage,
+			want:            []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage},
 		},
 		"should_use_dot_dot_dot_path_when_integration_mode_is_enabled": {
-			testExecutionTime: 10 * time.Second,
-			integrationMode:   true,
-			pkg:               examplePackage,
-			want:              []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, "-p", "1", allPackagesArg},
+			timeout:         10 * time.Second,
+			integrationMode: true,
+			pkg:             examplePackage,
+			want:            []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, "-p", "1", allPackagesArg},
 		},
 		"should_include_all_flags_when_all_options_are_configured": {
-			buildTags:         "integration",
-			testExecutionTime: 10 * time.Second,
-			testCPU:           2,
-			integrationMode:   true,
-			pkg:               examplePackage,
+			buildTags:       "integration",
+			timeout:         10 * time.Second,
+			testCPU:         2,
+			integrationMode: true,
+			pkg:             examplePackage,
 			want: []string{
 				goTestArg, "-tags", "integration", timeoutArg, expectedTimeout, failFastArg,
 				"-cpu", "2", "-p", "1", allPackagesArg,
@@ -102,13 +105,12 @@ func TestGetTestArgs(t *testing.T) {
 			t.Parallel()
 
 			sut := &mutantExecutor{
-				buildTags:         tc.buildTags,
-				testExecutionTime: tc.testExecutionTime,
-				testCPU:           tc.testCPU,
-				integrationMode:   tc.integrationMode,
+				buildTags:       tc.buildTags,
+				testCPU:         tc.testCPU,
+				integrationMode: tc.integrationMode,
 			}
 
-			if diff := cmp.Diff(tc.want, sut.getTestArgs(tc.pkg)); diff != "" {
+			if diff := cmp.Diff(tc.want, sut.getTestArgs(tc.pkg, tc.timeout)); diff != "" {
 				t.Errorf("getTestArgs() mismatch (-want +got):\n%s", diff)
 			}
 		})

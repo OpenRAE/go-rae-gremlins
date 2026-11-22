@@ -58,7 +58,7 @@ These directives stop the run with exit code 1:
 
 | Directive | Error |
 | --- | --- |
-| `//gremlins:` followed by a name other than `equivalent` | Unknown directive. |
+| `//gremlins:` followed by a name other than `equivalent` or [`ignore`](ignore-mutants.md) | Unknown directive. |
 | No type, or no reason | Missing mutation type, or missing reason. |
 | A type that Gremlins does not know | Unknown mutation type. |
 | A column that is not a positive integer | Column is not a positive integer. |

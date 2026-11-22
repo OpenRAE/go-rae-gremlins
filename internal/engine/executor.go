@@ -36,10 +36,6 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/process"
 )
 
-// DefaultTimeoutCoefficient is the default multiplier for the timeout length
-// of each test run.
-const DefaultTimeoutCoefficient = 5
-
 // ExecutorDealer is the initializer for new workerpool.Executor.
 type ExecutorDealer interface {
 	// NewExecutor returns the workerpool.Executor of mut. The executor sends
@@ -64,16 +60,16 @@ type ExecutorResult struct {
 // rollback. These can be overridden with nop functions in tests. Not an
 // ideal setup. In the future we can think of a better way to handle this.
 type MutantExecutorDealer struct {
-	wdDealer          workdir.Dealer
-	execContext       execContext
-	mod               gomodule.GoModule
-	buildTags         string
-	buildCache        string
-	memory            memoryPlan
-	testExecutionTime time.Duration
-	dryRun            bool
-	integrationMode   bool
-	testCPU           int
+	wdDealer        workdir.Dealer
+	execContext     execContext
+	timeouts        *timeoutPlan
+	mod             gomodule.GoModule
+	buildTags       string
+	buildCache      string
+	memory          memoryPlan
+	dryRun          bool
+	integrationMode bool
+	testCPU         int
 }
 
 // ExecutorDealerOption is the defining option for the initialisation of a ExecutorDealer.
@@ -89,10 +85,11 @@ func WithExecContext(c execContext) ExecutorDealerOption {
 }
 
 // NewExecutorDealer initialises a MutantExecutorDealer. The elapsed time
-// and the peak memory of baseline, the coverage run, give the timeout and
-// the memory limit of each mutant test run. Each mutant test run uses
-// buildCache, an absolute path, as its Go build cache. It returns an error
-// when it cannot find the memory budget.
+// and the peak memory of baseline, the coverage run, give the fallback
+// timeout and the memory limit of each mutant test run. Outside integration
+// mode, the timeout of a package adapts to its passing test runs. Each mutant
+// test run uses buildCache, an absolute path, as its Go build cache. It
+// returns an error when it cannot find the memory budget.
 func NewExecutorDealer(
 	mod gomodule.GoModule, wdd workdir.Dealer, buildCache string, baseline coverage.Result,
 	opts ...ExecutorDealerOption,
@@ -101,38 +98,35 @@ func NewExecutorDealer(
 	dryRun := configuration.Get[bool](configuration.UnleashDryRunKey)
 	integrationMode := configuration.Get[bool](configuration.UnleashIntegrationMode)
 	testCPU := configuration.Get[int](configuration.UnleashTestCPUKey)
-	tCoefficient := configuration.Get[int](configuration.UnleashTimeoutCoefficientKey)
-
-	coefficient := DefaultTimeoutCoefficient
-	if tCoefficient != 0 {
-		coefficient = tCoefficient
-	}
+	timeouts := newTimeoutPlan(
+		baseline.Elapsed,
+		configuration.Get[int](configuration.UnleashTimeoutCoefficientKey),
+		configuration.Get[int](configuration.UnleashTimeoutSafetyMarginKey),
+		!integrationMode,
+	)
 
 	if testCPU != 0 && integrationMode {
 		testCPU /= testCPU
 	}
-
-	// Use a minimum of 1 second for timeout calculation to prevent
-	// unreasonably short timeouts when coverage runs very quickly
-	baseTime := max(baseline.Elapsed, time.Second)
 
 	memory, err := newMemoryPlan(baseline.Peak, process.AvailableMemory)
 	if err != nil {
 		return nil, err
 	}
 	log.Infof("Memory limit of each test run: %d MiB, for %d test runs at a time\n", memory.limit>>20, cap(memory.slots))
+	log.Infof("%s\n", timeouts)
 
 	jd := MutantExecutorDealer{
-		mod:               mod,
-		wdDealer:          wdd,
-		buildTags:         buildTags,
-		buildCache:        buildCache,
-		dryRun:            dryRun,
-		integrationMode:   integrationMode,
-		testCPU:           testCPU,
-		memory:            memory,
-		testExecutionTime: baseTime * time.Duration(coefficient),
-		execContext:       exec.CommandContext,
+		mod:             mod,
+		wdDealer:        wdd,
+		buildTags:       buildTags,
+		buildCache:      buildCache,
+		dryRun:          dryRun,
+		integrationMode: integrationMode,
+		testCPU:         testCPU,
+		memory:          memory,
+		timeouts:        timeouts,
+		execContext:     exec.CommandContext,
 	}
 
 	for _, opt := range opts {
@@ -150,19 +144,19 @@ func (m MutantExecutorDealer) NewExecutor(
 	mut mutator.Mutator, outCh chan<- ExecutorResult, wg *sync.WaitGroup,
 ) workerpool.Executor {
 	mj := mutantExecutor{
-		mutant:            mut,
-		outCh:             outCh,
-		wg:                wg,
-		wdDealer:          m.wdDealer,
-		module:            m.mod,
-		dryRun:            m.dryRun,
-		integrationMode:   m.integrationMode,
-		buildTags:         m.buildTags,
-		buildCache:        m.buildCache,
-		execContext:       m.execContext,
-		testCPU:           m.testCPU,
-		memory:            m.memory,
-		testExecutionTime: m.testExecutionTime,
+		mutant:          mut,
+		outCh:           outCh,
+		wg:              wg,
+		wdDealer:        m.wdDealer,
+		module:          m.mod,
+		dryRun:          m.dryRun,
+		integrationMode: m.integrationMode,
+		buildTags:       m.buildTags,
+		buildCache:      m.buildCache,
+		execContext:     m.execContext,
+		testCPU:         m.testCPU,
+		memory:          m.memory,
+		timeouts:        m.timeouts,
 	}
 
 	return &mj
@@ -171,19 +165,19 @@ func (m MutantExecutorDealer) NewExecutor(
 type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 type mutantExecutor struct {
-	mutant            mutator.Mutator
-	wdDealer          workdir.Dealer
-	outCh             chan<- ExecutorResult
-	wg                *sync.WaitGroup
-	execContext       execContext
-	module            gomodule.GoModule
-	buildTags         string
-	buildCache        string
-	memory            memoryPlan
-	testExecutionTime time.Duration
-	dryRun            bool
-	integrationMode   bool
-	testCPU           int
+	mutant          mutator.Mutator
+	wdDealer        workdir.Dealer
+	outCh           chan<- ExecutorResult
+	wg              *sync.WaitGroup
+	execContext     execContext
+	timeouts        *timeoutPlan
+	module          gomodule.GoModule
+	buildTags       string
+	buildCache      string
+	memory          memoryPlan
+	dryRun          bool
+	integrationMode bool
+	testCPU         int
 }
 
 // Start is the implementation of the workerpool.Executor definition and is the
@@ -268,9 +262,10 @@ func (m *mutantExecutor) discard(workerName string, cause error) error {
 }
 
 // runTests waits for a free slot of the memory budget, runs the tests for
-// pkg, and classifies the mutant status from the result. The timeout starts
-// when the slot is free. A test run that passes its memory limit is MEMORY
-// ERROR. A mutant whose package does not compile must be NOT
+// pkg, and classifies the mutant status from the result. The timeout of pkg
+// is selected and starts when the slot is free. The elapsed time of a LIVED
+// test run is a timeout sample of pkg. A test run that passes its memory
+// limit is MEMORY ERROR. A mutant whose package does not compile must be NOT
 // VIABLE, not KILLED: the test suite never ran, so it has no opinion on the
 // mutation. go test exits 1 for both a build failure and a genuine assertion
 // failure, so the exit code alone cannot distinguish them; the
@@ -286,10 +281,11 @@ func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mut
 	}
 	defer release()
 
-	ctx, cancel := context.WithTimeout(ctx, m.testExecutionTime)
+	timeout := m.timeouts.timeout(pkg)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := m.execContext(ctx, "go", m.getTestArgs(pkg)...)
+	cmd := m.execContext(ctx, "go", m.getTestArgs(pkg, timeout)...)
 	cmd.Dir = m.mutant.Workdir()
 	if m.integrationMode {
 		cmd.Dir = rootDir
@@ -303,7 +299,9 @@ func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mut
 	cmd.Stdout = output
 	cmd.Stderr = output
 
+	start := time.Now()
 	usage, err := process.RunBounded(cmd, m.memory.limit)
+	elapsed := time.Since(start)
 
 	if usage.OverLimit {
 		return mutator.MemoryError, nil
@@ -320,11 +318,15 @@ func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mut
 	if err != nil {
 		return 0, fmt.Errorf("failed to run tests for %s: %w", pkg, err)
 	}
+	m.timeouts.record(pkg, elapsed)
 
 	return mutator.Lived, nil
 }
 
-func (m *mutantExecutor) getTestArgs(pkg string) []string {
+// getTestArgs returns the go test arguments for pkg with timeout. Outside
+// integration mode, -count=1 makes go test run the tests and not report a
+// cached result, so the elapsed time is a true timeout sample.
+func (m *mutantExecutor) getTestArgs(pkg string, timeout time.Duration) []string {
 	args := []string{"test"}
 	if m.buildTags != "" {
 		args = append(args, "-tags", m.buildTags)
@@ -332,7 +334,7 @@ func (m *mutantExecutor) getTestArgs(pkg string) []string {
 	// Here we add some seconds to the timeout to be sure it's gremlins that catches the test
 	// timeout and not the test itself. The timeout on the test prevents the test.* processes
 	// from hanging forever.
-	args = append(args, "-timeout", (2*time.Second + m.testExecutionTime).String())
+	args = append(args, "-timeout", (testTimeoutGrace + timeout).String())
 	args = append(args, "-failfast")
 
 	if m.testCPU != 0 {
@@ -345,6 +347,8 @@ func (m *mutantExecutor) getTestArgs(pkg string) []string {
 		// every package, within the memory limit of one mutant.
 		args = append(args, "-p", "1")
 		path = "./..."
+	} else {
+		args = append(args, "-count=1")
 	}
 	args = append(args, path)
 

@@ -181,6 +181,7 @@ func bindFlags(t *testing.T, args []string) {
 	fs.Int("workers", 0, "")
 	fs.Int("test-cpu", 0, "")
 	fs.Int("timeout-coefficient", 0, "")
+	fs.Int("timeout-safety-margin", 0, "")
 	fs.Float64("threshold-efficacy", 0, "")
 	fs.Float64("threshold-mcover", 0, "")
 	fs.StringArray("exclude-files", nil, "")
@@ -188,13 +189,14 @@ func bindFlags(t *testing.T, args []string) {
 		t.Fatalf("parse flags %v: %v", args, err)
 	}
 	bindings := map[string]string{
-		UnleashDryRunKey:             "dry-run",
-		UnleashWorkersKey:            "workers",
-		UnleashTestCPUKey:            "test-cpu",
-		UnleashTimeoutCoefficientKey: "timeout-coefficient",
-		UnleashThresholdEfficacyKey:  "threshold-efficacy",
-		UnleashThresholdMCoverageKey: "threshold-mcover",
-		UnleashExcludeFiles:          "exclude-files",
+		UnleashDryRunKey:              "dry-run",
+		UnleashWorkersKey:             "workers",
+		UnleashTestCPUKey:             "test-cpu",
+		UnleashTimeoutCoefficientKey:  "timeout-coefficient",
+		UnleashTimeoutSafetyMarginKey: "timeout-safety-margin",
+		UnleashThresholdEfficacyKey:   "threshold-efficacy",
+		UnleashThresholdMCoverageKey:  "threshold-mcover",
+		UnleashExcludeFiles:           "exclude-files",
 	}
 	for key, name := range bindings {
 		if err := viper.BindPFlag(key, fs.Lookup(name)); err != nil {
@@ -258,6 +260,16 @@ func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
 			name:    "negative timeout coefficient from flag",
 			flags:   []string{"--timeout-coefficient=-1"},
 			wantKey: []string{UnleashTimeoutCoefficientKey},
+		},
+		{
+			name:    "negative timeout safety margin from flag",
+			flags:   []string{"--timeout-safety-margin=-1"},
+			wantKey: []string{UnleashTimeoutSafetyMarginKey},
+		},
+		{
+			name:    "timeout safety margin not an int from file",
+			config:  "unleash:\n  timeout-safety-margin: double\n",
+			wantKey: []string{UnleashTimeoutSafetyMarginKey},
 		},
 		{
 			name:    "negative workers from flag over valid file",

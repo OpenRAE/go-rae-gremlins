@@ -118,12 +118,22 @@
         },
         "timeout-coefficient": {
           "title": "Timeout coefficient",
-          "description": "The coefficient that multiplies the coverage run time to give the test timeout. 0 uses the default of 5",
+          "description": "The coefficient that multiplies the coverage run time to give the fallback test timeout. A package with no passing test run uses the fallback timeout. 0 uses the default of 5",
           "type": "integer",
           "default": 0,
           "minimum": 0,
           "examples": [
             10
+          ]
+        },
+        "timeout-safety-margin": {
+          "title": "Timeout safety margin",
+          "description": "The multiplier of the longest passing test run of a package that gives the test timeout of that package. The timeout is never longer than the fallback timeout. 0 uses the default of 2",
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "examples": [
+            3
           ]
         },
         "memory-budget": {

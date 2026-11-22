@@ -63,6 +63,7 @@ const (
 	paramTestCPU            = "test-cpu"
 	paramWorkers            = "workers"
 	paramTimeoutCoefficient = "timeout-coefficient"
+	paramTimeoutMargin      = "timeout-safety-margin"
 	paramMemoryBudget       = "memory-budget"
 
 	// Thresholds.
@@ -211,7 +212,7 @@ func cleanUp(wd string) {
 // add to the default build cache of the user. The caller removes workDir and
 // the cache with it.
 func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Results, error) {
-	fDiff, err := diff.New()
+	fDiff, err := diff.New(filepath.Join(mod.Root, mod.CallingDir))
 	if err != nil {
 		return report.Results{}, err
 	}
@@ -328,6 +329,10 @@ func unleashFlags() []*flags.Flag {
 		{
 			Name: paramTimeoutCoefficient, CfgKey: configuration.UnleashTimeoutCoefficientKey, DefaultV: 0,
 			Usage: "the coefficient by which the timeout is increased",
+		},
+		{
+			Name: paramTimeoutMargin, CfgKey: configuration.UnleashTimeoutSafetyMarginKey, DefaultV: 0,
+			Usage: "the multiplier of the longest passing test run of a package that gives its timeout (default 2)",
 		},
 		{
 			Name: paramMemoryBudget, CfgKey: configuration.UnleashMemoryBudgetKey, DefaultV: "",

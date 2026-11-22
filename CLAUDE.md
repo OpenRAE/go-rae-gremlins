@@ -145,7 +145,9 @@ make clean
    mutations
 5. Create mutators with status (`Runnable`, `NotCovered`, `Skipped`,
    `Equivalent`). A `//gremlins:equivalent` directive selects an
-   `Equivalent` mutant (see `internal/engine/equivalent.go`)
+   `Equivalent` mutant (see `internal/engine/equivalent.go`). A
+   `//gremlins:ignore` directive removes mutants of a line, a block,
+   or a file before they are created (see `internal/engine/ignore.go`)
 6. Worker pool processes runnable mutants:
    - Copy code to temp workdir
    - Apply mutation via `Mutator.Apply()`
