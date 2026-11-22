@@ -642,12 +642,13 @@ func TestFeatureExecutorAdaptiveTimeout(t *testing.T) {
 			if got := calls[0].testTimeout(t); got != fallbackArg {
 				t.Errorf("first -timeout = %s, want the fallback %s", got, fallbackArg)
 			}
-			got := calls[1].testTimeout(t)
-			switch {
-			case !tc.wantAdaptive && got != fallbackArg:
-				t.Errorf("second -timeout = %s, want the fallback %s", got, fallbackArg)
-			case tc.wantAdaptive && (got < 4*time.Second || got > time.Minute):
-				t.Errorf("second -timeout = %s, want from 4s to 1m: two times the short first run, plus 2s", got)
+			// The adaptive -timeout is two times the short first run, plus 2s.
+			low, high := fallbackArg, fallbackArg
+			if tc.wantAdaptive {
+				low, high = 4*time.Second, time.Minute
+			}
+			if got := calls[1].testTimeout(t); got < low || got > high {
+				t.Errorf("second -timeout = %s, want from %s to %s", got, low, high)
 			}
 		})
 	}
