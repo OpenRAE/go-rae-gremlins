@@ -47,6 +47,10 @@ type unleashCmd struct {
 const (
 	commandName = "unleash"
 
+	// buildCacheDir is the name of the Go build cache directory of a run in
+	// its work directory.
+	buildCacheDir = "gocache"
+
 	paramDiff               = "diff"
 	paramBuildTags          = "tags"
 	paramCoverPackages      = "coverpkg"
@@ -119,11 +123,14 @@ func runUnleash(ctx context.Context) func(cmd *cobra.Command, args []string) err
 			return fmt.Errorf("not in a Go module: %w", err)
 		}
 
-		workDir, err := os.MkdirTemp(os.TempDir(), "gremlins-")
+		workDir, err := newWorkDir()
 		if err != nil {
 			return fmt.Errorf("impossible to create the workdir: %w", err)
 		}
 		defer cleanUp(workDir)
+		if err := checkWorkDir(workDir, mod.Root); err != nil {
+			return err
+		}
 
 		stopNotice := context.AfterFunc(ctx, func() {
 			log.Infof("\nShutting down gracefully...\n")
@@ -161,19 +168,68 @@ func modulePath(args []string) (string, error) {
 	return path, nil
 }
 
+// newWorkDir makes the temporary work directory of a run and returns its
+// absolute path. The go commands of the run run in other directories, so a
+// relative path in the work directory would point to a different directory.
+func newWorkDir() (string, error) {
+	tmp, err := filepath.Abs(os.TempDir())
+	if err != nil {
+		return "", err
+	}
+
+	return os.MkdirTemp(tmp, "gremlins-")
+}
+
+// checkWorkDir returns an error when workDir is inside the module root. The
+// copies of the module in workDir would then copy workDir into themselves.
+// Both paths are absolute. It resolves symbolic links, so an alias of a
+// directory in the module also fails.
+func checkWorkDir(workDir, root string) error {
+	realWorkDir, err := filepath.EvalSymlinks(workDir)
+	if err != nil {
+		return fmt.Errorf("impossible to resolve the workdir: %w", err)
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf("impossible to resolve the module root: %w", err)
+	}
+	if rel, err := filepath.Rel(realRoot, realWorkDir); err == nil && filepath.IsLocal(rel) {
+		return fmt.Errorf("the workdir %s is inside the module %s: use a temporary directory outside the module",
+			workDir, root)
+	}
+
+	return nil
+}
+
+// runBuildCache returns the Go build cache of a run with the work directory
+// workDir. A GOCACHE environment variable keeps its value. Without it, the
+// run uses a new cache in workDir, so the run does not add to the default
+// build cache, and the removal of workDir removes the cache.
+func runBuildCache(workDir string) string {
+	if cache := os.Getenv("GOCACHE"); cache != "" {
+		return cache
+	}
+
+	return filepath.Join(workDir, buildCacheDir)
+}
+
 func cleanUp(wd string) {
 	if err := os.RemoveAll(wd); err != nil {
 		log.Errorf("impossible to remove temporary folder: %s\n\t%s", err, wd)
 	}
 }
 
+// run runs the mutation testing of mod in workDir, an absolute path. All go
+// commands of the run use the build cache of runBuildCache. The caller
+// removes workDir.
 func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Results, error) {
 	fDiff, err := diff.New(filepath.Join(mod.Root, mod.CallingDir))
 	if err != nil {
 		return report.Results{}, err
 	}
 
-	c := coverage.New(workDir, mod)
+	buildCache := runBuildCache(workDir)
+	c := coverage.New(workDir, buildCache, mod)
 
 	exclude, err := exclusion.New()
 	if err != nil {
@@ -188,7 +244,7 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 	wdDealer := workdir.NewCachedDealer(workDir, mod.Root)
 	defer wdDealer.Clean()
 
-	jDealer, err := engine.NewExecutorDealer(mod, wdDealer, cProfile)
+	jDealer, err := engine.NewExecutorDealer(mod, wdDealer, buildCache, cProfile)
 	if err != nil {
 		return report.Results{}, err
 	}

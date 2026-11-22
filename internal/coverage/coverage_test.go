@@ -36,8 +36,9 @@ import (
 )
 
 const (
-	allPackages   = "./..."
-	exampleModule = "example.com"
+	allPackages    = "./..."
+	exampleModule  = "example.com"
+	testBuildCache = "/gremlins-test/gocache"
 )
 
 type commandHolder struct {
@@ -104,7 +105,7 @@ func TestCoverageRun(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, holder), wantWorkdir, mod)
+			cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, holder), wantWorkdir, testBuildCache, mod)
 
 			if _, err := cov.Run(t.Context()); err != nil {
 				t.Fatalf("Run error = %v, want nil", err)
@@ -112,24 +113,61 @@ func TestCoverageRun(t *testing.T) {
 
 			assertCallerDirKept(t, callerDir, holder, mod.Root)
 
-			firstWant := "go mod download"
-			secondWant := fmt.Sprintf("go test -tags tag1 tag2 -coverpkg %s -count=1 -cover -coverprofile %v %s",
-				coverpkg, wantFilePath, tc.wantPath)
-
-			if len(holder.events) != 2 {
-				t.Fatalf("Run() executed %d commands, want 2", len(holder.events))
+			want := []string{
+				"go mod download",
+				"go list -buildvcs=false -export -deps -test -tags tag1 tag2 " + tc.wantPath,
+				fmt.Sprintf("go test -tags tag1 tag2 -coverpkg %s -count=1 -cover -coverprofile %v %s",
+					coverpkg, wantFilePath, tc.wantPath),
 			}
-			firstGot := fmt.Sprintf("go %v", strings.Join(holder.events[0].args, " "))
-			secondGot := fmt.Sprintf("go %v", strings.Join(holder.events[1].args, " "))
-
-			if diff := cmp.Diff(firstWant, firstGot); diff != "" {
-				t.Errorf("Run() first command mismatch (-want +got):\n%s", diff)
+			var got []string
+			for _, e := range holder.events {
+				got = append(got, fmt.Sprintf("go %v", strings.Join(e.args, " ")))
 			}
-			if diff := cmp.Diff(secondWant, secondGot); diff != "" {
-				t.Errorf("Run() second command mismatch (-want +got):\n%s", diff)
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("Run() commands mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
+}
+
+func TestFeatureCoverageRunUsesTemporaryBuildCache(t *testing.T) {
+	t.Setenv("GOCACHE", filepath.Join(t.TempDir(), "user-cache"))
+	workDir := t.TempDir()
+	holder := &commandHolder{}
+	mod := gomodule.GoModule{Name: exampleModule, Root: t.TempDir(), CallingDir: "."}
+	if err := os.WriteFile(filepath.Join(workDir, "coverage"), []byte("mode: set\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, holder), workDir, testBuildCache, mod)
+
+	if _, err := cov.Run(t.Context()); err != nil {
+		t.Fatalf("Run error = %v, want nil", err)
+	}
+
+	if len(holder.events) != 3 {
+		t.Fatalf("Run() executed %d commands, want 3", len(holder.events))
+	}
+	for _, e := range holder.events {
+		if got := lastValue(e.cmd.Env, "GOCACHE"); got != testBuildCache {
+			t.Errorf("%s %v GOCACHE = %q, want %q", e.command, e.args, got, testBuildCache)
+		}
+		if got := lastValue(e.cmd.Env, "GO_TEST_PROCESS"); got != "1" {
+			t.Errorf("%s %v GO_TEST_PROCESS = %q, want the command's own value %q", e.command, e.args, got, "1")
+		}
+	}
+}
+
+// lastValue returns the value of the last entry of key in env, because
+// exec.Cmd uses the last value of a duplicate variable.
+func lastValue(env []string, key string) string {
+	var value string
+	for _, v := range env {
+		if k, val, ok := strings.Cut(v, "="); ok && k == key {
+			value = val
+		}
+	}
+
+	return value
 }
 
 // assertCallerDirKept checks that the working directory is still callerDir
@@ -153,18 +191,32 @@ func TestCoverageRunFails(t *testing.T) {
 	}
 
 	t.Run("failure of: go mod download", func(t *testing.T) {
-		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 0), "workdir", mod)
+		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 0), "workdir", testBuildCache, mod)
 		if _, err := cov.Run(t.Context()); err == nil {
 			t.Error("Run() error = nil, want an error")
 		}
 	})
 
 	t.Run("failure of: go test", func(t *testing.T) {
-		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 1), "workdir", mod)
+		cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 2), "workdir", testBuildCache, mod)
 		if _, err := cov.Run(t.Context()); err == nil {
 			t.Error("Run() error = nil, want an error")
 		}
 	})
+}
+
+func TestFeatureCoverageRunFailsWhenCachePreparationFails(t *testing.T) {
+	mod := gomodule.GoModule{
+		Name:       exampleModule,
+		CallingDir: allPackages,
+	}
+	cov := coverage.NewWithCmd(fakeExecCommandFailure(t, 1), "workdir", testBuildCache, mod)
+
+	_, err := cov.Run(t.Context())
+
+	if err == nil || !strings.Contains(err.Error(), "impossible to build the packages") {
+		t.Errorf("Run() error = %v, want a build-the-packages error", err)
+	}
 }
 
 func TestFeatureCoverageRunStopsOnCancel(t *testing.T) {
@@ -174,7 +226,7 @@ func TestFeatureCoverageRunStopsOnCancel(t *testing.T) {
 		CallingDir: ".",
 	}
 	holder := &commandHolder{}
-	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, holder), "workdir", mod)
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, holder), "workdir", testBuildCache, mod)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -194,7 +246,7 @@ func TestCoverageParsesOutput(t *testing.T) {
 		Name:       module,
 		CallingDir: "path",
 	}
-	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), "testdata/valid", mod)
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), "testdata/valid", testBuildCache, mod)
 	profile := coverage.Profile{
 		"file1.go": {
 			{
@@ -266,7 +318,7 @@ func TestRegressionCoverageMatchesModuleAfterComment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("gomodule.Init(%q) error = %v, want nil", root, err)
 	}
-	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), workdir, mod)
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), workdir, testBuildCache, mod)
 
 	got, err := cov.Run(t.Context())
 	if err != nil {
@@ -284,7 +336,7 @@ func TestParseOutputFail(t *testing.T) {
 		Name:       exampleModule,
 		CallingDir: allPackages,
 	}
-	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), "testdata/invalid", mod)
+	cov := coverage.NewWithCmd(fakeExecCommandSuccess(t, nil), "testdata/invalid", testBuildCache, mod)
 
 	if _, err := cov.Run(t.Context()); err == nil {
 		t.Error("Run() with an invalid coverage profile error = nil, want an error")

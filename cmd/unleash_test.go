@@ -250,6 +250,38 @@ func TestFeatureUnleashRequiresGoModule(t *testing.T) {
 	}
 }
 
+func TestFeatureRunBuildCache(t *testing.T) {
+	workDir := filepath.Join(t.TempDir(), "gremlins-1")
+	testCases := []struct {
+		name  string
+		cache string
+		want  string
+	}{
+		{name: "a set GOCACHE keeps its value", cache: "/user/cache", want: "/user/cache"},
+		{name: "an empty GOCACHE selects the work directory cache", want: filepath.Join(workDir, "gocache")},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GOCACHE", tc.cache)
+
+			if got := runBuildCache(workDir); got != tc.want {
+				t.Errorf("runBuildCache(%q) = %q, want %q", workDir, got, tc.want)
+			}
+		})
+	}
+	t.Run("an unset GOCACHE selects the work directory cache", func(t *testing.T) {
+		t.Setenv("GOCACHE", "")
+		if err := os.Unsetenv("GOCACHE"); err != nil {
+			t.Fatal(err)
+		}
+		want := filepath.Join(workDir, "gocache")
+
+		if got := runBuildCache(workDir); got != want {
+			t.Errorf("runBuildCache(%q) = %q, want %q", workDir, got, want)
+		}
+	})
+}
+
 func TestFeatureUnleashReportsCancellation(t *testing.T) {
 	configuration.Reset()
 	t.Cleanup(configuration.Reset)

@@ -269,12 +269,26 @@ func (j *blockingExecutorStub) Start(ctx context.Context, _ *workerpool.Worker) 
 }
 
 // newExecutorDealer returns the executor dealer of mod for a coverage run
-// that took elapsed, with no measured peak memory.
+// that took elapsed, with no measured peak memory. Its test runs use the
+// build cache of the go command, so a test that runs the real toolchain
+// gets a cache that works.
 func newExecutorDealer(
 	t *testing.T, mod gomodule.GoModule, wdd workdir.Dealer, elapsed time.Duration, opts ...engine.ExecutorDealerOption,
 ) *engine.MutantExecutorDealer {
 	t.Helper()
-	dealer, err := engine.NewExecutorDealer(mod, wdd, coverage.Result{Elapsed: elapsed}, opts...)
+
+	return newExecutorDealerWithCache(t, mod, wdd, goBuildCache(t), elapsed, opts...)
+}
+
+// newExecutorDealerWithCache returns the executor dealer of mod with the
+// build cache buildCache, for a coverage run that took elapsed, with no
+// measured peak memory.
+func newExecutorDealerWithCache(
+	t *testing.T, mod gomodule.GoModule, wdd workdir.Dealer, buildCache string, elapsed time.Duration,
+	opts ...engine.ExecutorDealerOption,
+) *engine.MutantExecutorDealer {
+	t.Helper()
+	dealer, err := engine.NewExecutorDealer(mod, wdd, buildCache, coverage.Result{Elapsed: elapsed}, opts...)
 	if err != nil {
 		t.Fatalf("NewExecutorDealer() = %v, want nil", err)
 	}

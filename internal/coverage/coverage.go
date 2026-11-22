@@ -52,6 +52,7 @@ type Result struct {
 type Coverage struct {
 	cmdContext execContext
 	workDir    string
+	buildCache string
 	path       string
 	fileName   string
 	mod        gomodule.GoModule
@@ -67,13 +68,16 @@ type Option func(c *Coverage) *Coverage
 type execContext = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 // New instantiates a Coverage element using exec.CommandContext as execContext,
-// actually running the command on the OS.
-func New(workdir string, mod gomodule.GoModule, opts ...Option) *Coverage {
-	return NewWithCmd(exec.CommandContext, workdir, mod, opts...)
+// actually running the command on the OS. Each go command uses buildCache,
+// an absolute path, as its Go build cache.
+func New(workdir, buildCache string, mod gomodule.GoModule, opts ...Option) *Coverage {
+	return NewWithCmd(exec.CommandContext, workdir, buildCache, mod, opts...)
 }
 
 // NewWithCmd instantiates a Coverage element given a custom execContext.
-func NewWithCmd(cmdContext execContext, workdir string, mod gomodule.GoModule, opts ...Option) *Coverage {
+func NewWithCmd(
+	cmdContext execContext, workdir, buildCache string, mod gomodule.GoModule, opts ...Option,
+) *Coverage {
 	buildTags := configuration.Get[string](configuration.UnleashTagsKey)
 	coverPkg := configuration.Get[string](configuration.UnleashCoverPkgKey)
 	integrationMode := configuration.Get[bool](configuration.UnleashIntegrationMode)
@@ -81,6 +85,7 @@ func NewWithCmd(cmdContext execContext, workdir string, mod gomodule.GoModule, o
 	c := &Coverage{
 		cmdContext:      cmdContext,
 		workDir:         workdir,
+		buildCache:      buildCache,
 		path:            "./...",
 		fileName:        "coverage",
 		mod:             mod,
@@ -97,9 +102,11 @@ func NewWithCmd(cmdContext execContext, workdir string, mod gomodule.GoModule, o
 
 // Run executes the coverage command and parses the results, returning a *Profile
 // object.
-// Before executing the coverage, it downloads the go modules in a separate step.
-// This is done to avoid that the download phase impacts the execution time which
-// is later used as timeout for the mutant testing execution.
+// Before executing the coverage, it downloads the go modules and builds the
+// packages and their dependencies into the cache in separate steps.
+// This is done to avoid that the download and the build of the dependencies
+// impact the execution time which is later used as timeout for the mutant
+// testing execution.
 // The cancellation of ctx stops the running command.
 func (c *Coverage) Run(ctx context.Context) (Result, error) {
 	log.Infof("Gathering coverage... ")
@@ -111,6 +118,9 @@ func (c *Coverage) Run(ctx context.Context) (Result, error) {
 	}
 	if err := c.downloadModules(ctx); err != nil {
 		return Result{}, fmt.Errorf("impossible to download modules: %w", err)
+	}
+	if err := c.buildDependencies(ctx); err != nil {
+		return Result{}, fmt.Errorf("impossible to build the packages: %w", err)
 	}
 	elapsed, peak, err := c.executeCoverage(ctx, profilePath)
 	if err != nil {
@@ -141,13 +151,50 @@ func (c *Coverage) filePath() string {
 	return fmt.Sprintf("%v/%v", c.workDir, c.fileName)
 }
 
-func (c *Coverage) downloadModules(ctx context.Context) error {
-	cmd := c.cmdContext(ctx, "go", "mod", "download")
+// goCommand returns a go command with args that runs in the module root
+// and uses the Go build cache of c.
+func (c *Coverage) goCommand(ctx context.Context, args ...string) *exec.Cmd {
+	cmd := c.cmdContext(ctx, "go", args...)
 	cmd.Dir = c.mod.Root
+	// exec.Cmd uses the last value of a duplicate variable, so GOCACHE
+	// replaces the value in the environment of Gremlins.
+	cmd.Env = append(cmd.Environ(), "GOCACHE="+c.buildCache)
+
+	return cmd
+}
+
+func (c *Coverage) downloadModules(ctx context.Context) error {
+	cmd := c.goCommand(ctx, "mod", "download")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	return process.Run(cmd)
+}
+
+// buildDependencies compiles the packages of the scan path, their tests, and
+// all their dependencies into the build cache. The go list command compiles
+// the packages for their export data, and it does not link or run a test.
+// The go test command does not stamp VCS information, so go list does not
+// read it either: a VCS error must not fail a module that go test can test.
+func (c *Coverage) buildDependencies(ctx context.Context) error {
+	args := []string{"list", "-buildvcs=false", "-export", "-deps", "-test"}
+	if c.buildTags != "" {
+		args = append(args, "-tags", c.buildTags)
+	}
+	args = append(args, c.scanPath())
+	cmd := c.goCommand(ctx, args...)
+
+	// A nil Stdout drops the package list to the null device.
+	var output bytes.Buffer
+	cmd.Stderr = &output
+
+	if err := process.Run(cmd); err != nil {
+		log.Infof("\n%s\n", output.String())
+
+		return err
+	}
+
+	return nil
 }
 
 func (c *Coverage) executeCoverage(ctx context.Context, profilePath string) (time.Duration, uint64, error) {
@@ -160,8 +207,7 @@ func (c *Coverage) executeCoverage(ctx context.Context, profilePath string) (tim
 	}
 
 	args = append(args, "-count=1", "-cover", "-coverprofile", profilePath, c.scanPath())
-	cmd := c.cmdContext(ctx, "go", args...)
-	cmd.Dir = c.mod.Root
+	cmd := c.goCommand(ctx, args...)
 
 	var output bytes.Buffer
 	cmd.Stdout = &output
