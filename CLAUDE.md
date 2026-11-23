@@ -95,6 +95,12 @@ make clean
 - Coordinates mutant execution via worker pool
 - Entry point: `Engine.Run(ctx)` traverses files, finds mutants,
   executes tests
+- Mutation registry: one spec for each mutation type gives eligibility
+  and a reversible AST edit (`spec.go`, `spec_expression.go`,
+  `specs.go`). The registry validates the specs and the factory binds
+  mutants (`registry.go`). One mutant implementation owns the file
+  lifecycle (`mutant.go`). See
+  [the mutation registry](docs/development/mutation-registry.md)
 
 **Mutator (`internal/mutator/`)**
 
@@ -141,8 +147,8 @@ make clean
 2. Coverage analysis determines testable code. Without `GOCACHE`, all `go`
    commands of a run use one temporary build cache in the run work directory
 3. `Engine.Run()` walks file tree, parses Go AST
-4. For each token, check `TokenMutantType` mapping for applicable
-   mutations
+4. For each operator, the registry gives the eligible mutation types
+   in registration order
 5. Create mutators with status (`Runnable`, `NotCovered`, `Skipped`,
    `Equivalent`). A `//gremlins:equivalent` directive selects an
    `Equivalent` mutant (see `internal/engine/equivalent.go`). A
@@ -162,17 +168,23 @@ make clean
 
 1. Add new constant to `mutator.Type` in `internal/mutator/mutator.go`
 2. Update `Types` slice and `String()` method
-3. Add token mappings in `internal/engine/mappings.go`
-   (`TokenMutantType`)
-4. Implement mutation logic in `internal/engine/tokenmutator.go`
-   (`ApplyMutation`)
-5. Add configuration key in `internal/configuration/`
-6. Update flag registration in `cmd/unleash.go`
+3. Register a spec for the type in `internal/engine/specs.go`. Use a
+   `tokenSpec` table for a token replacement. Put the spec at its
+   candidate position in the registration order
+4. Set the default in `internal/configuration/mutantenabled.go`. The
+   configuration key and the flag come from `mutator.Types`
+5. Add the type to `docs/docs/schema/configuration.json` and add its
+   page to `docs/docs/usage/mutations/`
+
+Registration alone does not make a public type. A new type changes the
+CLI, configuration, and report contracts.
 
 ### Important Patterns
 
-- **Token-based mutations**: Uses Go's AST and token positions to
-  identify and apply mutations
+- **Spec-based mutations**: Each spec edits the shared Go AST at an
+  original operator position and restores the AST before `Apply`
+  returns. Worker writes use the physical file name, not `//line`
+  positions
 - **Workdir isolation**: Each mutation runs in temporary directory
   copy to avoid interference
 - **Worker pool**: Concurrent mutation execution with configurable

@@ -75,20 +75,6 @@ func (n *NodeToken) SetTok(t token.Token) {
 	*n.tok = t
 }
 
-// wrapOperand puts a unary expression of op in front of the operand of a
-// unary expression. It returns a function that puts back the original
-// operand, or false if the node has no operand. The added expression has no
-// position, so the original positions do not change.
-func (n *NodeToken) wrapOperand(op token.Token) (func(), bool) {
-	if n.operand == nil {
-		return nil, false
-	}
-	orig := *n.operand
-	*n.operand = &ast.UnaryExpr{Op: op, X: orig}
-
-	return func() { *n.operand = orig }, true
-}
-
 // inspectTokens calls fn for each node of root that NewTokenNode supports, in
 // depth-first order. It does not go into the type constraints of type
 // parameters and interfaces. An operator in a constraint, for example the |
