@@ -97,7 +97,8 @@ func TestExtractSnippet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			if diff := cmp.Diff(string(tc.want), string(extractSnippet(tc.content, tc.targetLine, tc.contextLines))); diff != "" {
+			got := extractSnippet(tc.content, tc.targetLine, tc.contextLines)
+			if diff := cmp.Diff(string(tc.want), string(got)); diff != "" {
 				t.Errorf("extractSnippet() mismatch (-want +got):\n%s", diff)
 			}
 		})

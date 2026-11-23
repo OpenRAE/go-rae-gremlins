@@ -186,44 +186,43 @@ func TestFeatureSpecRejectsIneligibleOperator(t *testing.T) {
 	}
 }
 
+// TestFeatureRegistryAcceptsTheBuiltinSpecs checks that the built-in specs
+// form a registry with one spec for each type of mutator.Types.
+func TestFeatureRegistryAcceptsTheBuiltinSpecs(t *testing.T) {
+	t.Parallel()
+
+	r, err := newRegistry(builtinSpecs()...)
+
+	if err != nil || r == nil {
+		t.Fatalf("newRegistry(builtinSpecs()) = %v, %v, want a registry, nil", r, err)
+	}
+	for _, mt := range mutator.Types {
+		if s, ok := r.byType[mt]; !ok || s.mutationType() != mt {
+			t.Errorf("newRegistry(builtinSpecs()) spec of %s = %v, want a spec of that type", mt, s)
+		}
+	}
+}
+
 // TestFeatureRegistryRejectsInvalidRegistration checks that newRegistry
 // accepts only one spec for each type of mutator.Types.
 func TestFeatureRegistryRejectsInvalidRegistration(t *testing.T) {
 	t.Parallel()
 
-	valid := builtinSpecs()
-	testCases := map[string]struct {
-		specs   []spec
-		wantErr bool
-	}{
-		"built-in specs": {specs: valid},
-		"nil spec":       {specs: append(builtinSpecs(), nil), wantErr: true},
-		"unknown type": {
-			specs:   append(builtinSpecs(), tokenSpec{mt: mutator.Type(len(mutator.Types))}),
-			wantErr: true,
-		},
-		"second spec of a type": {specs: append(builtinSpecs(), tokenSpec{mt: mutator.InvertLogical}), wantErr: true},
-		"missing type":          {specs: valid[1:], wantErr: true},
-		"no specs":              {wantErr: true},
+	testCases := map[string][]spec{
+		"nil spec":              append(builtinSpecs(), nil),
+		"unknown type":          append(builtinSpecs(), tokenSpec{mt: mutator.Type(len(mutator.Types))}),
+		"second spec of a type": append(builtinSpecs(), tokenSpec{mt: mutator.InvertLogical}),
+		"missing type":          builtinSpecs()[1:],
+		"no specs":              nil,
 	}
-	for name, tc := range testCases {
+	for name, specs := range testCases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			r, err := newRegistry(tc.specs...)
+			r, err := newRegistry(specs...)
 
-			if tc.wantErr {
-				if !errors.Is(err, errInvalidRegistry) || r != nil {
-					t.Errorf("newRegistry() = %v, %v, want nil, %v", r, err, errInvalidRegistry)
-				}
-
-				return
-			}
-			if err != nil || r == nil {
-				t.Fatalf("newRegistry() = %v, %v, want a registry, nil", r, err)
-			}
-			if got := len(r.byType); got != len(mutator.Types) {
-				t.Errorf("newRegistry() has %d types, want %d", got, len(mutator.Types))
+			if !errors.Is(err, errInvalidRegistry) || r != nil {
+				t.Errorf("newRegistry() = %v, %v, want nil, %v", r, err, errInvalidRegistry)
 			}
 		})
 	}
