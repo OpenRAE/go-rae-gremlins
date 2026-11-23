@@ -69,8 +69,8 @@ func TestRegressionApplyWritesThePhysicalFileOfALineDirective(t *testing.T) {
 				t.Fatalf("Run() found %d mutants, want 1", len(res.Mutants))
 			}
 			m := res.Mutants[0]
-			if got := m.Position().Filename; got != tc.wantDisplay {
-				t.Errorf("Position().Filename = %q, want %q", got, tc.wantDisplay)
+			if got, want := m.Position().Filename, filepath.FromSlash(tc.wantDisplay); got != want {
+				t.Errorf("Position().Filename = %q, want %q", got, want)
 			}
 			if got := string(m.OrigSnippet()); !strings.Contains(got, "return a + b") {
 				t.Errorf("OrigSnippet() = %q, want the line with a + b", got)
