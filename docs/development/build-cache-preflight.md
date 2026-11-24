@@ -1,5 +1,9 @@
 # Build-cache boundaries for issue #8
 
+> Current context (2026-11-24): This is a historical record of issue #8 at its reviewed revision.
+> Current decision: [ADR 0009, temporary build cache](../adr/0009-temporary-build-cache.md).
+> The coverage and mutant test commands now set `GOCACHE` in `Cmd.Env`.
+
 Issue #8 requires a separate temporary Go build cache, removed after each Gremlins run.
 The supplied issue is the contract; it requests no public setting.
 This review inspected revision `f5a9bff06ffc73fa0f156347112b49eec9578cc4`.

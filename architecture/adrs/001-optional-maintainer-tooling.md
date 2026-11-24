@@ -2,10 +2,15 @@
 
 Status: Accepted
 
-[ADR 0001](../../docs/adr/0001-module-path.md) replaces the module path statement.
-[ADR 0007](../../docs/adr/0007-dev-merge-queue.md) replaces the `main` base statement with `dev`.
-[ADR 0010](../../docs/adr/0010-maintainer-integrations-in-the-canonical-repository.md) limits maintainer
-integrations to `OpenRAE/go-rae-gremlins`.
+> Current context (2026-11-24): The decision stays in force, but some facts below changed.
+> The module path is now `github.com/OpenRAE/go-rae-gremlins` ([ADR 0001](../../docs/adr/0001-module-path.md)).
+> The Ground Control base branch is `dev`, and pull requests to `dev` merge through a queue
+> ([ADR 0007](../../docs/adr/0007-dev-merge-queue.md)). Pushes to `main` and `dev` run the full mutation run.
+>
+> The mutation and regression-proof jobs also run on `merge_group`. Coverage goes to SonarCloud.
+> [Hosted checks](../../docs/development/checks.md) gives the current check details.
+> [ADR 0010](../../docs/adr/0010-maintainer-integrations-in-the-canonical-repository.md) limits maintainer
+> integrations to `OpenRAE/go-rae-gremlins`.
 
 ## Context
 
@@ -59,12 +64,14 @@ uncovered or surviving mutants still fail the configured thresholds.
 
 All new Go test names must declare `TestRegression` for fixes or `TestFeature`
 for new behavior; unclassified new names fail CI. Existing names are unchanged.
-New regression tests use the `TestRegression` name prefix. The same workflow
-requires each new case to pass on the PR head. Each new case must also fail an
-assertion on the merge base, with the PR's tests and test fixtures overlaid.
-Compile errors, skipped or missing tests, and timeouts are failed proofs.
+New regression tests use the `TestRegression` name prefix.
 
-A private Python standard-library helper under `.github/scripts/` coordinates Git and `go test -json`; it adds no
+The same workflow requires each new case to pass on the PR head. Each case must
+also fail an assertion on the merge base with the PR's tests and test fixtures overlaid. Compile errors, skipped or
+missing tests, and timeouts are failed proofs.
+
+A private Python standard-library
+helper under `.github/scripts/` coordinates Git and `go test -json`; it adds no
 application dependency. CI discovers dynamic subtests by running both revisions'
 suites, and proves each new regression leaf independently. New subtests inherit
 the classification of their parent; new names under an unclassified historical

@@ -1,5 +1,8 @@
 # Compiler flag boundaries for issue #14
 
+> Current context (2026-11-24): This is a historical record of issue #14 at its reviewed revision.
+> Current behavior: [unleash command](../docs/usage/commands/unleash/index.md).
+
 Issue #14 asks to run target tests with `-gcflags=all=-l` for monkey patching.
 It does not require a new Gremlins flag or configuration key.
 This preflight reviewed revision `96a6e0a21291f501d051b6cb914df739000f2b16`.

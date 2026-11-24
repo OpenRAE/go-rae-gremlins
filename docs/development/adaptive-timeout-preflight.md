@@ -1,5 +1,9 @@
 # Adaptive timeout boundaries for issue #19
 
+> Current context (2026-11-24): This is a historical record of issue #19 at its reviewed revision.
+> Current behavior: [unleash command](../docs/usage/commands/unleash/index.md) and [workers and timeouts](../docs/usage/commands/unleash/workers.md).
+> The workers page now gives the default timeout coefficient of 5.
+
 Issue #19 requires package-specific timing, concurrent access, documentation, measured speedup, and the existing coefficient fallback.
 This preflight reviewed revision `f5a9bff06ffc73fa0f156347112b49eec9578cc4`.
 The issue sketch is illustrative; recording every mutant duration would make early failures into unsafe timing estimates.

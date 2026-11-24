@@ -44,15 +44,17 @@ Go's compiler retains responsibility for symbol resolution, package cycles, and 
 The checker evaluates import paths, including aliases, without resolving symbols.
 Existing lint owns syntax, formatting, security analysis, and code style.
 
-The model also names the canonical CLI, configuration, report, and exit-code contract paths.
+The model also names the canonical CLI, configuration, configuration schema, report, and exit-code contract paths.
 CLI ownership includes mutation-command flags, persistent flags, and shared flag binding.
 Each path must remain a regular file inside the checkout.
 This checks ownership locations. It does not duplicate their contents or prove compatibility.
 
-The model also owns canonical workflow, hook, lint, and design-step paths.
+The `policies` section of the model names the policy paths.
+Examples are the model, the baselines, the Makefile, CI and finalization workflows, hooks, lint, Sonar, and contributor guidance.
 CI requires explicit design review for changes to those policies.
 A design declares affected contracts and trust-boundary changes for explicit review.
-The model lists allowed contract-change kinds and development-check trust boundaries.
+The model lists the allowed contract-change kinds.
+It also lists four trust boundaries with their allowed destinations, network use, and source execution.
 
 Every affected contract needs a proposed change kind, such as `compatible`.
 Every design declares destinations, network use, and source execution for each modeled trust boundary.
@@ -82,7 +84,10 @@ An initial branch push with no preceding commit compares with an empty baseline.
 ## Design before coding
 
 1. Read the model and the affected contract sources.
-2. Write your design to `.architecture/designs/<issue>.json` with the planned packages, imports, contracts, trust boundaries, and rationale. Each change uses its own design file, so open pull requests do not conflict on the design input.
+2. Write your design to `.architecture/designs/<issue>.json`.
+   Each change uses its own design file, so open pull requests do not conflict on the design input.
+   Give `version`, `issue`, `summary`, and the prose `trust_boundaries` review, which the checker requires.
+   Give `changes` (each `package` with `imports` and `test_imports`), `contracts`, `contract_changes`, `policies`, `trust_changes`, and `conflicts` where they apply.
 3. Run `make architecture-design` before editing implementation files. This executes `scripts/check-design.sh`, which checks the design files changed against the comparison branch.
 4. Record the model digest and rule results in the issue plan.
 5. Resolve every conflict before coding. Update the model only through a reviewed architecture decision.
@@ -96,8 +101,10 @@ CI checks each changed design against the model in the commit that last changed 
 An uncommitted design uses the checkout model. At least one changed design must also pass the checkout model.
 CI cannot prove when a developer ran a command. The issue plan records the pre-code evidence.
 
-A new checker cannot execute before it exists. For #76, review the initial model and design manually before implementation.
-Then execute that same design as the bootstrap verification. Future changes use the executable pre-code command.
+Historical context: the checker could not run before it existed.
+For #76, the maintainer reviewed the initial model and design manually before implementation.
+That same design then ran as the bootstrap verification.
+All later changes use the executable pre-code command.
 
 ## Security and failure behavior
 
@@ -116,6 +123,9 @@ Maintainer review remains necessary because a PR can change its own model, check
 No baseline rule protects against an arbitrary rewrite of those controls.
 
 ## References and design review
+
+These references record the sources read for #76. The Go versions are the versions of that review; `go.mod` and `mise.toml` set the current toolchain.
+
 
 - [Go parser](https://pkg.go.dev/go/parser), Go 1.26.10 local standard-library source, `ParseFile` and `ImportsOnly`: import facts without execution.
 - [Go JSON](https://pkg.go.dev/encoding/json), Go 1.26.10 local source, `Decoder.DisallowUnknownFields`: strict policy decoding.

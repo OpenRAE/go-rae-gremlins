@@ -1,5 +1,9 @@
 # Transport regression boundaries for issue #124
 
+> Current context (2026-11-24): This is a historical record of issue #124 at its reviewed revision.
+> Current design: [pre-merge transport verification](phase-e-design.md#pre-merge-transport-verification).
+> The model now lets the `transport_verification` boundary execute source.
+
 This is architecture guidance, not implementation or evidence that the check runs.
 The review used revision `bd52c783d808ac70a250016c25b68f783b42b31b`.
 Issue #124 requires affected transport and utility changes to run the existing harness, with visible results and failure propagation.

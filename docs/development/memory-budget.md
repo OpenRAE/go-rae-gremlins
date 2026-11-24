@@ -5,6 +5,11 @@ A fast allocating mutant can exhaust the host before the time limit.
 `scripts/run-bounded.sh` bounds the whole run with a Linux cgroup-v2 memory controller.
 [ADR 0006](../adr/0006-bounded-memory-for-mutation-runs.md) records the decision.
 
+This outer budget is different from the Gremlins `--memory-budget` flag.
+That flag divides a budget between the mutant test runs, and a mutant over its limit gets the `MemoryError` status.
+The [unleash command](../docs/usage/commands/unleash/index.md) documents the flag.
+The full mutation run of the Gremlins workflow uses both bounds.
+
 ## What it does
 
 The script runs a command inside a systemd transient service.
@@ -14,17 +19,21 @@ The kernel ends the whole unit when the budget is reached.
 A child stays bound even when it starts a new process group.
 
 The script stays outside the unit.
-On an OOM result it prints a clear message, deletes any partial output, and exits with code 137.
+On an OOM result it prints a clear message and exits with code 137.
+When you give `--output-file`, it also deletes that partial output file.
 On any other result it passes the command exit code through unchanged.
 So the Gremlins threshold exits 10 and 11 stay intact.
 
 ## Requirements
 
 - Linux with the unified cgroup-v2 hierarchy.
+- systemd 243 or later.
 - A per-user systemd manager with the memory controller delegated to the user slice.
 
 Start the per-user manager with `loginctl enable-linger "$(id -un)"`.
 This needs no sudo, because polkit authorizes a user for their own account.
+
+## Safety and environment
 
 The script uses only the per-user manager, so the command runs as the unprivileged user.
 It never uses sudo, it refuses to run as root, and it never runs the command as root.
@@ -56,6 +65,8 @@ scripts/run-bounded.sh --budget 8G --output-file report.json -- \
 ```
 
 Without the matching `--output-file`, the wrapper cannot delete a partial report.
+
+To run the unit in a named systemd slice, give `--slice`, for example `--slice gremlins.slice`.
 
 ## Verify the enforcement
 

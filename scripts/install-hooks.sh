@@ -2,7 +2,7 @@
 # install-hooks.sh — activate and verify commit-time pre-commit hooks for THIS clone.
 #
 # This repository treats pre-commit as an active local gate, but three
-# things are distinct contracts (ADR-079): the committed .pre-commit-config.yaml,
+# things are distinct contracts (Ground Control ADR-079): the committed .pre-commit-config.yaml,
 # CI pre-commit execution, and commit-time hook ACTIVATION in a given clone.
 # `pre-commit install` cowardly-refuses whenever git's core.hooksPath is set, so a
 # repo onboarded under a global hooks dispatcher (e.g. ~/.git-hooks with a _chain
@@ -29,7 +29,7 @@
 #   --help      print this header and exit
 #
 # Fresh clones must re-run this (via `make hooks`) because .git/hooks is not
-# versioned — that is by design (ADR-079), not a bug.
+# versioned — that is by design (Ground Control ADR-079), not a bug.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -122,7 +122,7 @@ managed_hook_body() {
 # ${MANAGED_MARKER} ${MANAGED_VERSION} (${hook_type})
 # Installed by scripts/install-hooks.sh — do not edit. Regenerate with: make hooks
 # Activates .pre-commit-config.yaml at ${hook_type} time, including under a global
-# core.hooksPath dispatcher that delegates to this clone's git hook path (ADR-079).
+# core.hooksPath dispatcher that delegates to this clone's git hook path (Ground Control ADR-079).
 set -euo pipefail
 
 # Activation probe used by scripts/install-hooks.sh — proves git's effective
@@ -147,7 +147,7 @@ EOF
 
 # Fail closed unless the existing hook is safe to replace: our managed marker, or a
 # stock pre-commit-generated shim. An unmanaged, hand-written hook is never clobbered
-# without --force (ADR-079: managed vs user-managed content must be distinguished).
+# without --force (Ground Control ADR-079: managed vs user-managed content must be distinguished).
 guard_existing_hook() {
   local target="$1" hook_type="$2"
   # A symlink is never GC-managed (we write regular files) and must never be
@@ -195,7 +195,7 @@ write_managed_hook() {
 
 # Prove git's EFFECTIVE dispatch (including any global core.hooksPath dispatcher)
 # reaches our managed hook for this type. Never infers activation from config
-# presence, installed packages, or CI (ADR-079 Verification Boundary).
+# presence, installed packages, or CI (Ground Control ADR-079 Verification Boundary).
 verify_activation() {
   local hook_type="$1"
   local out

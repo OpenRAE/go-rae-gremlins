@@ -1,5 +1,9 @@
 # Memory-budget architecture preflight (#127)
 
+> Current context (2026-11-24): This is a historical record of issue #127 at its reviewed revision.
+> Current procedure: [memory budget](memory-budget.md) and [ADR 0006](../adr/0006-bounded-memory-for-mutation-runs.md).
+> The Gremlins workflow now runs inside `scripts/run-bounded.sh`, and #194 added a per-mutant memory budget.
+
 Status: design guidance; no runtime protection or allocator experiment is delivered here.
 Reviewed repository revision: `425a996`.
 The issue body supplies the contract; no formal requirement is attached.

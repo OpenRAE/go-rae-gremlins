@@ -4,6 +4,13 @@ Assessment date: 2026-11-03. Issue: [#78](https://github.com/OpenRAE/go-rae-grem
 Inspected revision: `67008e1c54c758f0bd300ea26a21e3a0f4e2cde8`.
 Requirements: [Go test standard](test-standard.md), T01–T10, introduced by this change.
 
+> Current context (2026-11-24): This is a historical record.
+> The inventory and the observations describe the inspected revision; the `internal/process` row was added by #116.
+> The repair record lists the repairs of G01–G12 by issue.
+> Package and test counts changed after these records, and the inventory was not refreshed.
+> For example, the mutator now has nine statuses, and CI uploads Go coverage from Linux, Windows, and macOS.
+> For current rules, use the [Go test standard](test-standard.md) and [Hosted checks](checks.md).
+
 ## Method and limits
 
 Compared the [architecture model](../../.architecture/model.json) with Go source directories in the checkout.
@@ -104,7 +111,7 @@ Those absences alone are not findings.
 ## Updating the record
 
 Keep this revision as the reference for the findings above.
-When a gap is repaired, record the new revision, affected requirement, test name, command or hosted run, result, and remaining limits.
-Refresh the package inventory when packages change.
+When a gap is repaired, record the issue, affected requirement, test name, command or hosted run, result, and remaining limits.
+Keep the package inventory at the inspected revision; record later package changes as current context.
 Do not turn an open gap into an exception or remove it solely because an aggregate check passes.
 Issue #78 delivers the standard and this record; it does not claim that all test debt has been repaired.

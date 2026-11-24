@@ -5,8 +5,9 @@ default_stages: [pre-commit]
 repos:
 # Commit time runs only the fast file-hygiene and secret checks. The broad Go
 # checks (lint, vulnerability analysis, and the race test suite) run at the
-# `manual` stage, so a developer can run them on demand. The hosted CI jobs
-# enforce them for every push and pull request (ADR-079, issue #122).
+# `manual` stage, so a developer can run them on demand. The CI workflow
+# enforces them for pushes to `main` and `dev`, pull requests to those branches,
+# and merge groups (Ground Control ADR-079, issue #122).
 
   # ===========================================================================
   # STAGE 1: Fast checks (file hygiene and syntax)

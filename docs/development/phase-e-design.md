@@ -18,7 +18,7 @@ No additional activation flag or transfer-approval gate is required.
 The workflow adds no marker parser, completion schema, issue-discovery algorithm, or closure implementation.
 Both delivery lanes and repair use the same finalizer.
 The Go packages, CLI, Configuration keys/schema, JSON report, and Exit errors remain unchanged.
-Existing Logger, Work directory copy, runtime diagrams, and ADRs 0001–0005 need no implementation changes.
+Existing Logger, Work directory copy, runtime diagrams, and ADRs 0001–0005 needed no implementation changes. Later ADRs do not change this boundary.
 
 ADR 0004 governs the model and design declarations.
 The existing static development-check boundary stays unchanged; finalization has a separate network boundary.
@@ -35,8 +35,8 @@ The workflow commits the digest. It does not download a checksum as runtime auth
 Dependencies use a standard npm lockfile, not fresh floating resolution in each job.
 The lockfile starts from the release's own lockfile, and the manifest copies the release's `overrides`.
 
-The manifest pins `hono` 4.13.16 and `@hono/node-server` 2.1.6, which fix three moderate npm advisories in the release pins.
-Ground Control `dev` uses the same two pins. `npm audit --omit=dev` reports no findings.
+The manifest copies the 11 `overrides` of the release package, including `hono` 4.13.16 and `@hono/node-server` 2.1.6.
+At the v1.12.0 upgrade (#186), `npm audit --omit=dev` reported no findings.
 Node and external actions are pinned. Private packages are neither committed nor uploaded as artifacts.
 
 Ground Control v1.9.0 found the issue from a delivery pointer comment that readiness wrote on the PR.

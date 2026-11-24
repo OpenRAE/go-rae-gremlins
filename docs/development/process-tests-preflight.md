@@ -1,5 +1,8 @@
 # Process test boundaries for issue #116
 
+> Current context (2026-11-24): This is a historical record of issue #116 at its reviewed revision.
+> Current rules: [Go test standard](test-standard.md) and [test assessment](test-assessment.md).
+
 This note defines guardrails for [#116](https://github.com/OpenRAE/go-rae-gremlins/issues/116), including test-assessment gaps G07 and G11.
 It specifies test boundaries and evidence, not implementation steps.
 Source review used revision `23274c65f7c175e55c76d0ff8732c29463ef5dce` and the existing local process-test edits.

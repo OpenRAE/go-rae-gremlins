@@ -1,5 +1,9 @@
 # Reviewed equivalent mutants: architecture preflight
 
+> Current context (2026-11-24): This is a historical record of issue #201 at its reviewed revision.
+> Current decision and use: [ADR 0008](../adr/0008-equivalent-mutant-annotations.md) and [equivalent mutants](../docs/usage/equivalent-mutants.md).
+> The executor now runs only `Runnable` mutants.
+
 Issue #201 requires one reviewed exception per mutant, an audit reason, distinct metrics, and a tagged release.
 The supplied issue is the contract. This note defines design boundaries; it does not implement the feature or prescribe implementation steps.
 The source review used revision `bd52c783d808ac70a250016c25b68f783b42b31b`.

@@ -1,5 +1,10 @@
 # Unary logical inversion: architecture preflight for issue 7
 
+> Current context (2026-11-24): This is a historical record of issue 7 at its reviewed revision.
+> Current design: [mutation registry](mutation-registry.md).
+> The spec registry replaced `TokenMutator` and `tokenMutations`.
+> `runOnFile` now collects the mutants of a file before it sends them, and the `!x` to `!!x` edit exists.
+
 This note defines design boundaries for issue 7. It does not implement the mutation or prescribe an implementation sequence.
 The issue requires `!` to become `!!` under the existing `INVERT_LOGICAL` type.
 For `!x`, the mutant evaluates `!(!x)`. It evaluates `x` once and preserves its grouping.
