@@ -1,107 +1,116 @@
 # Contributing to go-rae-gremlins
 
-go-rae-gremlins is the OpenRAE fork of Gremlins. Use the
-[OpenRAE issue tracker](https://github.com/OpenRAE/go-rae-gremlins/issues) for work on this fork and follow the
-[Code of Conduct](../CODE_OF_CONDUCT.md).
+go-rae-gremlins is the OpenRAE fork of Gremlins.
+This guide gives the contribution tasks from issue to release.
+Use the [OpenRAE issue tracker](https://github.com/OpenRAE/go-rae-gremlins/issues) for work on this fork.
+Follow the [Code of Conduct](../CODE_OF_CONDUCT.md).
 
-The [development process review](development/process-review.md) compares the upstream conventions with the
-OpenRAE and Ground Control process and records the decisions behind this guide.
+Related guidance:
+
+- [Hosted checks](development/checks.md): the CI workflows, the merge queue, and the pull request test gates.
+- [Go coding standard](development/coding-standards.md) and [Go test standard](development/test-standard.md): the exact rules.
+- [Architecture checks](development/architecture.md) and the [ADRs](adr/README.md): the design rules and decisions.
+- [Maintainer setup](MAINTAINER_SETUP.md): the optional Ground Control registration.
+- [Development process review](development/process-review.md): the 2026-11-02 record of the decisions behind this guide.
 
 ## Start with an issue
 
-Search existing issues before reporting a bug or suggesting a feature. Use the issue templates where applicable.
-For bugs, include the Gremlins version, Go version, operating system, reproduction steps, and expected and actual
-results. For features, explain the problem, the proposed behavior, and alternatives.
+1. Search the existing issues before you report a bug or suggest a feature.
+2. Use the issue templates where they apply.
+3. For a bug, give the Gremlins version, the Go version, and the operating system.
+   Also give the steps, and the expected and actual results.
+4. For a feature, give the problem, the proposed behavior, and the alternatives.
+5. Before you start a significant change, agree on it with a maintainer.
 
-Coordinate significant changes with a maintainer before implementation. Give the issue a clear outcome and
-checkable acceptance criteria. Ground Control takes an issue number as its input; the issue body and discussion
-carry the requirements and decisions.
+Give the issue a clear outcome and acceptance criteria that you can check.
+Ground Control takes an issue number as its input.
+The issue body and discussion hold the requirements and decisions.
 
-Copied upstream issues and PRs need a keep, rework, or close decision under
-[the maintenance plan](development/maintenance-plan.md) before implementation or merge.
+A copied upstream issue or PR needs a keep, rework, or close decision before implementation or merge.
+The [maintenance plan](development/maintenance-plan.md) records this triage.
 
 ## Prepare the clone
 
-Install [mise](https://mise.jdx.dev) and [pre-commit](https://pre-commit.com).
-Install the pinned tools:
+1. Install [mise](https://mise.jdx.dev) and [pre-commit](https://pre-commit.com).
+2. Install the pinned tools and the hooks:
 
-```shell
-make requirements
-make hooks
-```
+   ```shell
+   make requirements
+   make hooks
+   ```
 
-`make requirements` installs the linter and the `go.mod` Go toolchain from `mise.toml`. It then installs fieldalignment
-v0.48.0, the `golang.org/x/tools` version that `go.mod` requires, with that Go. `FIELDALIGNMENT_VERSION` in the
-[Makefile](../Makefile) sets this version. Review the tool before you change it.
+3. Run `make hooks` again for each new clone, because Git does not copy local hooks.
 
-`make hooks` installs and verifies the clone's commit-time hook dispatch and runs an initial check of all files.
-That initial check runs the fast file-hygiene and secret checks. Run it for each new clone; Git does not copy local
-hooks. If installation reports an existing unmanaged hook or a dispatcher problem, inspect and resolve that problem
-before committing. Do not bypass the hooks or overwrite a shared hook configuration.
+`make requirements` installs golangci-lint and the Go toolchain that `mise.toml` pins.
+It then uses that Go to install fieldalignment v0.48.0, the `golang.org/x/tools` version that `go.mod` requires.
+`FIELDALIGNMENT_VERSION` in the [Makefile](../Makefile) sets this version.
+Review the tool before you change its version.
 
-The [pre-commit configuration](../.pre-commit-config.yaml) checks file hygiene, syntax, merge conflicts, private
-keys, and secrets at commit time. The broad Go checks (lint, vulnerability analysis, and the race test suite) run at
-the `manual` stage. The hosted CI jobs enforce them for every push and pull request. During development, run the
-targeted checks for the changed behavior. To run a broad check on demand, use
-`pre-commit run <hook-id> --hook-stage manual`.
+`make hooks` installs the commit-time hook dispatch of the clone and verifies it.
+It then runs the commit-stage checks on all files.
+If the installation reports an unmanaged hook or a dispatcher problem, examine and correct the problem before you commit.
+Do not bypass the hooks.
+Do not overwrite a shared hook configuration.
+
+The [pre-commit configuration](../.pre-commit-config.yaml) checks file hygiene, syntax, merge conflicts, private keys, and secrets at commit time.
+The broad Go checks are at the `manual` stage: lint, vulnerability analysis, and the race test suite.
+CI enforces them; see [Hosted checks](development/checks.md).
+To run a broad check on demand, use `pre-commit run <hook-id> --hook-stage manual`.
 
 ## Branch and implement
 
-Start an issue branch from current `dev`, named `<issue>-<short-slug>`, and target its PR at `dev`. `main` receives
-reviewed promotions from `dev`; maintainers approve those merges and all feature PR merges.
+1. Start an issue branch from the current `dev`. Name it `<issue>-<short-slug>`.
+2. Before you change code, read `CLAUDE.md`, the [plan rules](../.gc/plan-rules.md), and the [ADRs](adr/README.md).
+3. Write your design to `.architecture/designs/<issue>.json`, as the [architecture design check](development/architecture.md#design-before-coding) describes.
+4. Run `make architecture-design`. Record its model digest and result in the issue plan.
+5. Resolve all design conflicts before implementation.
+6. Run the design check again when the design or the model changes.
+7. Implement the change, and update the documentation that it affects.
+8. Target the PR at `dev`.
 
-Keep the issue branch current by fetching and merging `origin/dev` into it. Resolve conflicts with a real merge
-and verify the result. Preserve existing work and history; do not use a hard reset or force-push to discard
-conflicts. Ground Control performs this synchronization at publication and rechecks it before PR creation and
-readiness.
+`main` receives reviewed promotions from `dev`.
+Maintainers approve those merges and all feature PR merges.
 
-Read `CLAUDE.md`, the [plan rules](../.gc/plan-rules.md), and the [ADRs](adr/README.md) before changing code. Reuse
-existing helpers and dependencies. Keep the change bounded by the issue, and update the documentation it affects.
-Changes to flags or configuration keys must also update the JSON schema and usage pages. Preserve the CLI,
-configuration, report, and exit-code contracts used by dependent repositories unless the issue authorizes a change.
-Keep `testdata` files byte-exact unless the fixture itself needs to change.
+To keep the issue branch current, fetch `origin/dev` and merge it into the branch.
+Resolve conflicts with a real merge and verify the result.
+Keep the existing work and history.
+Do not use a hard reset or a force-push to discard conflicts.
+Ground Control does this synchronization at publication, and checks it again before PR creation and readiness.
 
-Before coding, follow the [architecture design check](development/architecture.md). Write your design to
-`.architecture/designs/<issue>.json` with the proposed packages, dependencies, affected contracts, trust boundaries,
-and unresolved conflicts. Each change uses its own design file, so open pull requests do not conflict on the design
-input. Run `make architecture-design` and record its model digest and result in the issue plan.
+Keep the change in the scope of the issue.
+Use the existing helpers and dependencies.
+When a change adds or changes a flag or a configuration key, also update the JSON schema and the usage pages.
+Keep the CLI, configuration, report, and exit-code contracts unless the issue permits a change, because dependent repositories use them.
+Keep `testdata` files byte-exact unless the fixture itself must change.
 
-Resolve conflicts before implementation. Recheck when the design or model changes. CI requires an updated design
-for package, contract, and policy changes and checks every changed package against it.
+CI requires an updated design for package, contract, and policy changes.
+To scan all packages against a fetched target commit, run `make architecture ARCHITECTURE_BASE=origin/dev`.
+Each finding gives a repair instruction.
+When you fix a violation, remove its stale baseline entry.
+Do not regenerate or enlarge the architecture baseline.
+Architecture policy changes need maintainer review.
 
-Run `make architecture ARCHITECTURE_BASE=origin/dev` to scan all packages and compare baseline identities against
-a fetched target commit. Tests and platform files are included. Each finding gives a repair instruction.
-
-Remove stale baseline entries when fixing violations. Never regenerate or enlarge the baseline. Architecture
-policy changes need maintainer review. CI runs this check without secrets and requires it in `PR Gate`.
-
-Follow the [Go coding standard and upstream comparison](development/coding-standards.md).
-Provision the pinned linter and Go with mise and download Go modules before analysis.
-`make lint` fails when the Go version is newer than the Go that built golangci-lint,
-because the linter then cannot run its type-aware checks.
-`make lint` checks formatting and analyzes Linux, Darwin, and Windows with tests.
-
-`make lint` compares lint identities and counts against the fetched target baseline.
-CI passes the event's comparison commit to both lint and policy checks.
-The first `main` promotion adopts the reviewed `dev` baseline, and rejects any additions to it.
-For local checks, use `make lint LINT_BASE=origin/dev` or another fetched target commit.
-
-Repair findings and run `make lint-shrink` to remove stale allowances.
-The shrink command cannot add or replace debt. Do not regenerate the baseline.
+Follow the [Go coding standard](development/coding-standards.md).
+Provision the pinned linter and Go with mise, and run `go mod download` before analysis.
+For a local lint check, run `make lint LINT_BASE=origin/dev` or give another fetched target commit.
+Repair the findings, then run `make lint-shrink` to remove stale allowances.
+Do not regenerate the lint baseline.
 Changes to rules, suppressions, contexts, and tool versions need explicit review.
 
-For upstream commits, follow [ADR 0003](adr/0003-upstream-changes.md): cherry-pick with `-x`, retain the original
-author, adapt the module path, and open a PR to `dev`. Do not merge an upstream branch into this fork.
+For an upstream commit, follow [ADR 0003](adr/0003-upstream-changes.md).
+Cherry-pick it with `-x`, keep the original author, adapt the module path, and open a PR to `dev`.
+Do not merge an upstream branch into this fork.
 
 ## Documentation
 
-Write documentation in ASD-STE100 Simplified Technical English. The checks use the
-[doc-tools v0.1.0](https://github.com/OpenRAE/doc-tools/releases/tag/v0.1.0) release.
+Write documentation in ASD-STE100 Simplified Technical English.
+The checks use the [doc-tools v0.1.0](https://github.com/OpenRAE/doc-tools/releases/tag/v0.1.0) release.
 [`scripts/doc-tools.sh`](../scripts/doc-tools.sh) records the release version and the archive SHA-256.
 The script verifies the archive before extraction and installs it in `.tools/`, which Git ignores.
-The package installer verifies the ste-cli archive in the same way. A checksum mismatch stops the check.
+The package installer verifies the ste-cli archive in the same way.
+A checksum mismatch stops the check.
 
-Check the Markdown files that you change. Give explicit paths:
+To check the Markdown files that you change, give explicit paths:
 
 ```shell
 bash scripts/doc-tools.sh lint docs/CONTRIBUTING.md README.md
@@ -113,12 +122,14 @@ To check all Markdown files that changed since the merge base with `origin/dev`,
 make docs-changed
 ```
 
-The check examines each changed file completely. When you edit a page, correct its existing findings too.
+The check examines each changed file completely.
+When you edit a page, also correct its existing findings.
 The check does not examine `CHANGELOG.md`, `CODE_OF_CONDUCT.md`, or files in `testdata` directories.
-A passing check does not prove full ASD-STE100 conformance. Also review the accuracy, the links, and the diff.
+A passing check does not prove full ASD-STE100 conformance.
+Also review the accuracy, the links, and the diff.
 
 For agent-assisted writing, use the shared `documentation` skill of the same release.
-Remove an older personal skill named `documentation` first, because two skills with the same name can both show.
+First remove an older personal skill named `documentation`, because two skills with the same name can both show.
 In Claude Code, run these commands:
 
 ```text
@@ -133,178 +144,125 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-installer/scripts/inst
   --repo OpenRAE/doc-tools --path skills/documentation --ref v0.1.0
 ```
 
-To upgrade or roll back, follow the package's
-[installation and upgrade guide](https://github.com/OpenRAE/doc-tools/blob/v0.1.0/docs/how-to-install.md).
-Change `VERSION` and `SHA256` in `scripts/doc-tools.sh` to the values in the release `SHA256SUMS` file.
+To upgrade or roll back, follow the [installation and upgrade guide](https://github.com/OpenRAE/doc-tools/blob/v0.1.0/docs/how-to-install.md) of the package.
+Set `VERSION` and `SHA256` in `scripts/doc-tools.sh` to the values in the `SHA256SUMS` file of the release.
 
 ## Verify the change
 
 Follow the [Go test standard](development/test-standard.md) for test behavior, isolation, and evidence.
-The [test assessment](development/test-assessment.md) records current gaps against that standard.
+The [test assessment](development/test-assessment.md) records the gaps found against that standard and their repairs.
 
-Add a regression test for a bug or tests for new behavior. Run the narrowest relevant tests with the race detector,
-for example:
+1. For a bug, add a regression test. For new behavior, add tests.
+2. Name each new Go test `TestRegression...` for a fix or `TestFeature...` for new behavior. The [regression proof](development/checks.md#regression-proof) gives the full rule.
+3. Run the narrowest tests that exercise your change, with the race detector. For example:
 
-```shell
-go test -race ./internal/coverage -run '^TestCoverageParsesOutput$'
-```
+   ```shell
+   go test -race ./internal/coverage -run '^TestCoverageParsesOutput$'
+   ```
 
-Choose the package and test names that exercise your change. Check mutation results where applicable to test
-effectiveness. For documentation-only changes, run the [documentation checks](#documentation); no new Go test is needed.
-Format changed Go files with the pinned formatter:
+4. Where it applies, examine the mutation results to measure test effectiveness.
+5. Format the changed Go files with the pinned formatter:
 
-```shell
-mise exec -- golangci-lint fmt path/to/changed.go
-```
+   ```shell
+   mise exec -- golangci-lint fmt path/to/changed.go
+   ```
 
-CI owns the full verification runs. The repository still provides `make all` (lint, tests, build), `make cover`
-(race tests and coverage), and `make policy` (all configured hooks), but do not repeat those broad runs as a daily
-local completion check. Run targeted checks locally, then let the publication hooks and hosted checks enforce
-their configured gates.
+For a documentation-only change, run the [documentation checks](#documentation).
+A documentation-only change needs no new Go test.
 
-The current hosted checks are defined in the repository:
+CI owns the full verification runs.
+The repository also gives `make all` (lint, tests, build) and `make cover` (race tests and coverage).
+Do not run these broad targets as a daily local check.
+`make policy` runs the commit-stage hooks on all files, and it is fast.
+Run targeted checks locally.
+The publication hooks and the hosted checks then enforce their gates.
 
-| Workflow | Verification |
-| --- | --- |
-| [CI](../.github/workflows/ci.yml) | Architecture model and design checks, shrink-only baselines, and lint. STE checks on changed Markdown. Python line and branch coverage. Race tests and Go coverage on Linux, macOS, and Windows. Policy hooks, the memory budget, Sonar admission, and SonarCloud. [Phase E transport tests](development/phase-e-design.md#pre-merge-transport-verification) when a change touches the transport. `PR Gate` combines the architecture, lint, docs, test, policy, memory, Sonar, and transport results. |
-| [Gremlins](../.github/workflows/gremlins.yml) | Mutation testing with the Gremlins source from the candidate commit. |
-| [PR title](../.github/workflows/pr-title.yml) | A Conventional Commit PR title with a lowercase subject. |
-| [GitGuardian](../.github/workflows/ggshield.yml) | A `ggshield` secret scan of the new commits of the PR or merge group. |
-| [Maintainer gate](../.github/workflows/maintainer-gate.yml) | The maintainer wrote or approved the PR. |
+The [hosted checks](development/checks.md) reference lists each workflow, the `PR Gate` inputs, and the merge queue checks.
+Examine every check on the current PR head, including the installed security checks.
+A green `PR Gate` alone does not show that every hosted check passed.
 
-Pull requests to `dev` merge through a GitHub merge queue ([ADR 0007](adr/0007-dev-merge-queue.md)).
-The queue requires `PR Gate`, `Mutation testing`, `Conventional PR title`, `ggshield`, and `maintainer-gate` on each
-merge group commit. These workflows run on merge groups. They compare with the merge group base commit and read the
-queued PR. A failed check removes the PR from the queue. `main` has no merge queue.
+If the merge queue removes your PR, the `merge-queue-removed` label shows on the PR.
+Repair the cause, then add the PR to the queue again.
 
-The [Merge Queue Removed](../.github/workflows/merge-queue-removed.yml) workflow adds the `merge-queue-removed`
-label to an open PR that the queue removed without a merge. It removes the label when the PR enters the queue
-again or closes. Fix a labeled PR, then add it to the queue again.
-
-The `Policy` job of CI runs `make merge-queue-policy`. This check reads the live branch rules of `dev` and `main`.
-It fails when `dev` has no merge queue, when `main` has a merge queue, or when `dev` has required checks in classic
-branch protection. It also fails when `dev` has non-strict checks and no merge queue. It fails when a required `dev`
-check has no workflow job that runs on `merge_group`.
-
-CI deliberately skips the Sonar jobs for PRs from other repositories because they have no access to the token;
-`PR Gate` accepts that specific skip. Ground Control readiness still requires the configured Sonar result.
-Fork and Dependabot PRs also skip the Phase E transport tests, because they get no secrets. The merge queue runs them.
-
-Inspect every check on the current PR head, including installed security checks. A green `PR Gate` alone does
-not establish that every hosted check passed.
-
-Repair failures caused by or directly blocking the change and verify the new head. Report unrelated concerns with
-evidence without expanding the issue. For Ground Control runs, `GitGuardian Security Checks` findings belong to
-the user: report the check name, status, and URL, then stop for the user's resolution.
+Repair the failures that the change causes or that directly block it, and verify the new head.
+Report other concerns with evidence, and do not expand the issue.
+For Ground Control runs, `GitGuardian Security Checks` findings belong to the user.
+Report the check name, the status, and the URL, then stop until the user resolves the finding.
 
 ## Commit messages and pull requests
 
-Use Conventional Commits for commit messages and PR titles, such as:
+Use Conventional Commits for commit messages and PR titles, for example:
 
 ```text
 fix(coverage): preserve slash-separated profile paths
 ```
 
-Allowed types are `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `build`, `ci`, `perf`, `style`, and `revert`.
-A scope is optional; the subject starts with a lowercase letter. This replaces upstream's `area: description`
-convention and supports the fork's release automation.
+The allowed types are `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `build`, `ci`, `perf`, `style`, and `revert`.
+A scope is optional.
+The subject starts with a lowercase letter.
+This convention replaces the upstream `area: description` convention, and the release automation of the fork uses it.
 
-Keep branch names and repository metadata free of assistant or vendor attribution. Required Ground Control review
-records and the required review attestation are the narrow exceptions.
+Keep branch names and repository metadata free of assistant or vendor attribution.
+The required Ground Control review records and the required review attestation are the only exceptions.
 
-Use the [PR template](../.github/PULL_REQUEST_TEMPLATE.md) to describe the resulting behavior, link the issue,
-state ADR impact, and report actual checks and results. Ground Control renders its own PR body with the same
-evidence and its required attestation. Include `Closes #<issue>` for the delivered issue. GitHub closes issues
-automatically only on the default branch, so a merge into `dev` still needs explicit post-merge finalization.
+Use the [PR template](../.github/PULL_REQUEST_TEMPLATE.md).
+Describe the resulting behavior, link the issue, give the ADR impact, and report the checks that you ran and their results.
+Ground Control renders its own PR body with the same evidence and its required attestation.
+To close the delivered issue at merge, write `Closes #<issue>`.
+GitHub closes issues automatically only for merges into the default branch.
+A merge into `dev` therefore needs an explicit post-merge finalization.
 
-Maintainers review the change and choose the merge method. Multiple commits are acceptable; an upstream rule to
-squash every PR does not override synchronization merges or the maintainer's choice here. Merge only after the
-current head has the required checks and review. A contributor or agent preparing the PR does not merge it.
+Maintainers review the change.
+Pull requests to `dev` merge through the merge queue, which squashes them.
+Merges into `main` stay manual, and the maintainer selects the merge method.
+Merge only after the current head has the required checks and review.
+A contributor or agent who prepares the PR does not merge it.
 
 ## Ground Control delivery
 
-[`.ground-control.yaml`](../.ground-control.yaml) supplies this repository's commands, `dev` base branch, PR-title
-rules, Sonar project, and review cap. Ground Control's installed skills and tools supply the workflow contract.
-Contributors working manually still follow the branch, hook, verification, review, and release rules above.
+[`.ground-control.yaml`](../.ground-control.yaml) supplies the commands, the `dev` base branch, the PR title rules, the Sonar project, and the review cap of this repository.
+The installed skills and tools of Ground Control supply the workflow contract.
+Contributors who work manually also follow the branch, hook, verification, review, and release rules in this guide.
 
-1. Invoke `/implement <issue>` for the normal issue workflow, or `/quickfix <issue>` for a small, settled change.
-   The issue branch and pickup record identify the work. The normal workflow adds design, planning, and pre-push
-   review. Quickfix omits those steps. It runs no pre-push review unless you supply `--review`.
-2. Implement the issue's acceptance criteria and run targeted verification. Record significant decisions and any
-   required review findings on the issue. A quickfix with `--review` runs one pre-push review cycle; act on its
-   findings and follow the returned stop conditions.
-3. Let the workflow publish the change. It stages the diff, scans for sensitive content, runs configured pre-commit
-   checks, commits, pushes, and synchronizes with current `dev`. Repair a failed gate and retry through the workflow.
-4. Let the workflow render and create the synchronized PR, observe CI and Sonar, and record readiness for the
-   checked head. A later head change requires a new readiness check. For a PR that targets `dev`, readiness adds
-   the PR to the merge queue. The queue merges the PR when every required check passes on the merge group. For
-   other bases, readiness hands the PR to the maintainer for merge. Readiness does not close the issue.
-5. After the PR merges, the [Phase E workflow](../.github/workflows/ground-control-phase-e.yml) calls the
-   existing finalizer. The finalizer posts the final report and closes the issue. Follow [setup and recovery](development/phase-e.md)
-   for release access, first installation, restricted fork events, or a failed run. When readiness reports
-   `finalization: reentry`, re-invoke the same `/implement <issue>` or `/quickfix <issue>` after merge.
+1. Start the normal issue workflow with `/implement <issue>`.
+   For a small, settled change, use `/quickfix <issue>`.
+   The issue branch and the pickup record identify the work.
+   The normal workflow adds design, planning, and a pre-push review.
+   Quickfix omits those steps, and it runs no pre-push review unless you give `--review`.
+2. Implement the acceptance criteria of the issue, and run targeted verification.
+   Record significant decisions and required review findings on the issue.
+   A quickfix with `--review` runs one pre-push review cycle.
+   Act on its findings and obey the stop conditions that it returns.
+3. Let the workflow publish the change.
+   It stages the diff, scans for sensitive content, runs the configured pre-commit checks, commits, pushes, and merges the current `dev`.
+   If a gate fails, repair it and retry through the workflow.
+4. Let the workflow render and create the synchronized PR.
+   It monitors CI and Sonar, and records readiness for the checked head.
+   A later head change needs a new readiness check.
+   For a PR that targets `dev`, readiness adds the PR to the merge queue.
+   For other bases, readiness gives the PR to the maintainer for merge.
+   Readiness does not close the issue.
+5. After the PR merges, the [Phase E workflow](../.github/workflows/ground-control-phase-e.yml) calls the existing finalizer.
+   The finalizer posts the final report and closes the issue.
+   For release access, restricted fork events, or a failed run, follow [Automatic Phase E finalization](development/phase-e.md).
+   When readiness reports `finalization: reentry`, run the same `/implement <issue>` or `/quickfix <issue>` again after the merge.
 
 ## Release
 
-Follow the [fork release procedure](development/release.md) and [ADR 0002](adr/0002-binary-name-and-versions.md).
-Maintainers approve the `dev` to `main` promotion and the release PR. release-please manages versions, tags, release
-notes, and `CHANGELOG.md`; GoReleaser adds the binaries, source archive, and checksums. Review and merge the automated
-`main` to `dev` synchronization PR afterward.
+Follow the [fork release procedure](development/release.md).
+[ADR 0002](adr/0002-binary-name-and-versions.md) records the release decisions.
+Maintainers approve the `dev` to `main` promotion and the release PR.
 
-The fork does not inherit upstream's release freeze or maintenance-release branches. Release and synchronization
-PRs opened with `GITHUB_TOKEN` do not trigger the normal PR checks; maintainer review remains necessary. Do not edit
-release versions or `CHANGELOG.md` manually, or publish to upstream Docker, Homebrew, or documentation channels.
+release-please manages the versions, tags, release notes, and `CHANGELOG.md`.
+GoReleaser adds the binary archives, the source archive, and the checksums.
+Do not edit release versions or `CHANGELOG.md` manually.
+Do not publish to the upstream Docker, Homebrew, or documentation channels.
+
+The fork does not use the upstream release freeze or maintenance release branches.
+`GITHUB_TOKEN` opens the release PR and the synchronization PR, so the normal PR checks do not start on them.
+Maintainer review stays necessary.
+After a release, review and merge the automated `main` to `dev` synchronization PR as the release procedure describes.
 
 ### Pull request test gates
 
-The Gremlins workflow builds this fork and mutation tests the added Go lines
-relative to the pull request's merge base. The existing `.gremlins.yaml`
-thresholds apply. Lines outside the diff are skipped; a change without mutation
-candidates passes without applying thresholds to an empty selection. Pushes to
-`main` still run mutation testing across the repository.
-
-Classify every new Go test by name: `TestRegression...` for a fix,
-or `TestFeature...` for new behavior. CI rejects unclassified new tests, so
-omitting a regression prefix cannot silently bypass the proof check. Existing
-test names need no changes. A new named subtest inherits its parent's
-classification. Put a new regression under a `TestRegression...` parent;
-new subtests under an unclassified historical test fail CI too.
-
-Name each new Go regression test `TestRegression` followed by its behavior,
-for example `TestRegressionDiffSeparatedAdditions`. Give each regression a
-distinct test or `t.Run` name; unnamed table rows cannot prove separate
-regressions. CI runs the head and base suites to discover test and subtest names.
-
-CI then proves each new regression leaf separately, with the race detector on
-and the test cache off. A failing sibling cannot establish proof for a passing case.
-Each case must pass on the PR head. It must also fail an assertion against the
-merge base, with the PR's test files, `testdata` fixtures, and Go dependency files overlaid.
-
-A case that passes on base, fails to compile, panics, times out, skips, or does
-not run fails the proof check. An existing regression name is not treated as a
-new case; give each new regression its own name. `TestFeature...` cases run
-through the normal test suite and do not need to prove a regression.
-
-Keep each regression file compatible with base production signatures.
-Other test files in the package can use APIs that the PR adds. When the
-package does not compile on base, CI runs the case again. The second run keeps
-the PR files that declare the regression test. The other test files of the
-package come from the base, and test files that the base does not have are
-removed. A case that does not compile in the second run fails the proof check.
-
-The base production files are never replaced by PR production files.
-Test-file and fixture symlinks are rejected rather than copied. A PR without
-new regression names reports that no proof cases are required.
-
-CI invokes `python .github/scripts/regression_proof.py "$BASE_COMMIT"` with
-Python 3.12, the Go version in `go.mod`, and full Git history. Test files and
-fixtures must be tracked by Git. The helper creates and removes a temporary
-base snapshot; it leaves the working tree and Git index intact. Keep local
-verification targeted: the full-suite discovery runs belong in CI.
-
-A pull request from `dev` into `main` uses the `--per-change` option. A later
-`dev` change can alter an API that an earlier regression test calls. That test
-then does not compile against `main`. With this option, the helper finds the
-first-parent `dev` change that adds each new regression case. It proves the
-case at that change against the parent of that change. A case that no change
-adds and proves fails the proof check.
+This content moved to [Pull request test gates](development/checks.md#pull-request-test-gates) in the hosted checks reference.

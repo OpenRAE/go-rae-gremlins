@@ -1,5 +1,8 @@
 # Module declaration design — issue #35
 
+> Current context (2026-11-24): This is a historical record of issue #35 at its reviewed revision.
+> The `internal/gomodule` package holds the current behavior.
+
 Gremlins must read the module path from a valid `go.mod` file.
 Comments, blank lines, quoted paths, and the block form can come before or around the `module` directive.
 A malformed or missing declaration must cause a useful error.

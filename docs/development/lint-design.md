@@ -6,9 +6,11 @@ The small Go helper in `tools/lintcontext` identifies enclosing declarations wit
 It uses only standard-library imports and runs as one explicit source file.
 Module mode is disabled and GOPATH is an empty temporary directory.
 This prevents candidate application and dependency initializers from running during lint.
+
 The Go tool selects the host OS and architecture for this executable.
 Static analysis still uses its separate amd64 platform contexts.
 [ADR 0005](../adr/0005-static-lint-parser.md) records this exception to application Logger reuse.
+
 `make lint` is the common entry point for developers, hooks, and CI.
 The adapter is development tooling. The shipped command does not load it.
 The [preflight](lint-preflight.md) records the existing owners and constraints.
@@ -37,12 +39,14 @@ Source and lint baselines remain in the checkout or its Git history.
 Coverage reports use the existing GitHub artifact store and existing Sonar project.
 Candidate code runs only in existing CI jobs without secrets.
 The Sonar token boundary stays in its separate job.
-Sonar classifies the new Python test module as test code, alongside Go tests.
+There is no runtime deployment or runtime data-flow change.
+
+Sonar classifies the Python test modules as test code, with the Go tests.
 The lint job uses pinned Coverage.py to report Python line and branch coverage.
 Only the XML report passes through the existing GitHub coverage-artifact flow.
-Admission requires the exact Go and Python reports and rejects linked or unexpected files.
+Admission requires exactly four reports: Linux Go, Windows Go, macOS Go, and Python.
+It rejects linked or unexpected files.
 It rejects XML entity and document-type declarations before the token-bearing scanner runs.
-There is no runtime deployment or runtime data-flow change.
 
 The configuration uses explicit linters and settings rather than enabling every available linter.
 Some available linters impose preferences that conflict with Google style.
@@ -50,10 +54,12 @@ Depguard permits only the standard library, fork packages, and exact approved th
 The approved third-party set contains existing runtime imports and go-cmp.
 Unknown assertion or testing libraries therefore fail without relying on their names.
 A new external package needs explicit policy review before it can be imported.
+
 The adapter requests complete JSON output with no count limits or per-line collapsing.
 It checks Linux, Darwin, and Windows as separate `amd64`, non-cgo contexts.
 Tests and development tools are included. No custom build tags are declared.
 Fixtures, vendor, and build output are excluded from package analysis.
+
 Generated files use the strict Go marker policy.
 The formatter runs separately because golangci-lint v2 separates formatting from analysis.
 Formatting differences fail directly. The current tree needs no formatting allowance.
@@ -65,6 +71,7 @@ The fingerprint includes the enclosing declaration, diagnostic text, and surroun
 The parser identifies functions, receiver-qualified methods, types, and value declarations.
 It handles comments, strings, and generic receivers through Go syntax rather than text matching.
 It excludes line numbers, absolute paths, and indentation.
+
 Each identity has a positive occurrence count.
 Identical diagnostics across build contexts use the maximum count, rather than the sum.
 Distinct checker messages and source contexts remain distinct identities.
@@ -74,11 +81,15 @@ Tool upgrades require explicit policy review.
 Let F contain current identities and counts, B contain candidate allowances, and T contain target allowances.
 Require F = B and B ≤ T for every identity.
 This rejects new findings, stale entries, growth, and equal-count substitutions.
+
 Duplicate JSON keys, repeated identities, invalid fields, and invalid counts are errors.
 Analysis errors and type errors cannot enter the baseline.
 Normal checks never write a baseline.
 An explicit shrink operation may only remove identities or reduce their counts.
 It uses the same comparison checks and replaces a regular file atomically.
+
+Historical context: both `dev` and `main` now have a lint baseline, so the first-adoption rules below no longer apply to them.
+They stay in the adapter for a target without a baseline.
 
 First adoption permits a nonempty baseline only when the target tree has no lint adapter or lint baseline.
 All existing Go source and dependency inputs must remain identical to that pinned target.
@@ -86,22 +97,28 @@ Only the new, separately modeled `tools/lintcontext` package may add Go files.
 That package must be absent from the target and must have no baseline allowance.
 The first baseline must equal the findings under the selected strict settings.
 Deleting an established baseline is an error.
+
 This permits checking the initial debt without exporting a second checkout.
 The helper executes development-tool code. It parses scanned source without executing it.
 
-PR checks use the event's base SHA. Push checks use the preceding commit SHA.
+PR checks use the base SHA of the event.
+Merge group checks use the merge group base SHA.
+Push checks use the preceding commit SHA.
+An initial branch push uses `origin/dev`.
+
 Manual and local checks resolve `origin/dev`, unless an explicit comparison is supplied.
+The Lint job fetches history and receives this comparison. Missing comparison history fails.
+
 Comparisons accept a named Git ref or a full commit hash.
-Reject options, range syntax, and revision expressions before invoking Git.
-Pass ref queries through cat-file stdin, never as command arguments.
-An initial branch push uses `origin/dev`. Missing comparison history fails.
-Lint and policy jobs fetch history and receive the same comparison.
-For the first promotion to `main`, CI supplies `origin/dev` as an explicit adoption base.
-This applies only when the target has never had a lint baseline.
-The promoted head must contain that integration commit.
-Its baseline must already exist and bounds every candidate allowance.
-An established target baseline always takes precedence.
+The adapter rejects options, range syntax, and revision expressions before it invokes Git.
+It passes ref queries through cat-file stdin, never as command arguments.
 The existing `PR Gate` requires lint success.
+
+For a pull request or push to `main`, CI supplies `origin/dev` as an explicit adoption base.
+The adapter uses it only when the target has never had a lint baseline.
+In that condition, the promoted head must contain that integration commit.
+Its baseline must already exist, and it bounds every candidate allowance.
+An established target baseline always takes precedence.
 
 ## Security and failure behavior
 
@@ -122,6 +139,8 @@ Existing architecture policy remains separate from lint rule selection.
 Its model records the lint adapter, baseline, and version pin as policy owners.
 
 ## References and design review
+
+These references record the sources read for #77. The Go version is the version of that review.
 
 - [Google Go style](https://google.github.io/styleguide/go/), Guide, Decisions, and advisory Best Practices: standard precedence and coverage.
 - [golangci-lint v2.15.0 reference](https://raw.githubusercontent.com/golangci/golangci-lint/v2.15.0/.golangci.reference.yml), settings and output: explicit checks, filters, and formatter separation.

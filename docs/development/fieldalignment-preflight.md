@@ -1,5 +1,9 @@
 # Fieldalignment provisioning design — issue #125
 
+> Current context (2026-11-24): This is a historical record of issue #125 at its reviewed revision.
+> Current procedure: [Prepare the clone](../CONTRIBUTING.md#prepare-the-clone).
+> `make requirements` now installs `FIELDALIGNMENT_VERSION`, not `@latest`.
+
 Issue #125 requires a reviewed fieldalignment version and matching provisioning instructions.
 This change belongs to developer provisioning. Existing architecture decisions cover it; no new ADR is needed.
 

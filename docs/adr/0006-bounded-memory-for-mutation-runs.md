@@ -2,6 +2,12 @@
 
 Status: Accepted when #127 merges.
 
+> Current context (2026-11-24): #127 merged, and the outer runner budget stays in force.
+> #194 (2026-11-16) later added a per-mutant memory budget: the `--memory-budget` flag, the `unleash.memory-budget`
+> configuration key, and the `MemoryError` status. Thus these statements below no longer apply: "the budget lives
+> in the runner configuration, not in a Viper key or a CLI flag" and the CLI and configuration items of the
+> non-goals. No ADR records the #194 decision. See [Memory budget for mutation runs](../development/memory-budget.md).
+
 Design guidance: [memory-budget preflight](../development/memory-budget-preflight.md).
 Operator guidance: [memory budget](../development/memory-budget.md).
 

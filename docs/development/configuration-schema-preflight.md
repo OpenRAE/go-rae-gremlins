@@ -1,5 +1,9 @@
 # Configuration schema boundaries for issue #123
 
+> Current context (2026-11-24): This is a historical record of issue #123 at its reviewed revision.
+> Current reference: [configuration](../docs/usage/configuration.md) and its JSON schema.
+> The schema now has the keys that this record lists as missing.
+
 Issue #123 corrects the published configuration reference against the existing runtime contract.
 It does not change configuration behavior. ADR 0004 already establishes ownership; no new ADR is needed.
 This review used revision `3810ca84d3163bcf8ee7dc248ff453df948cedf4`.

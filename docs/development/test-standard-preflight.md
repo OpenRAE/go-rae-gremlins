@@ -1,5 +1,8 @@
 # Test standard architecture preflight — issue #78
 
+> Current context (2026-11-24): This is a historical record of issue #78 at its reviewed revision.
+> Current rules: [Go test standard](test-standard.md).
+
 Issue #78 requires one documented standard for Go package tests and a record of current gaps.
 This note bounds that work. It does not define the standard, supply the gap record, or plan implementation.
 Existing ADRs cover the design; no new architecture decision or runtime layer is needed.
@@ -24,6 +27,7 @@ Python tooling tests retain their existing checks but are outside the Go test st
 Use stable requirement anchors in the standard as the extension seam. The record can reference those anchors,
 package/file/test names, the inspected revision, evidence, and applicability without duplicating rule text.
 Account for the full package scope and explain exclusions; mark unverified claims explicitly.
+
 Each reported gap needs a concrete observation tied to a requirement. A few examples cannot establish
 repository-wide compliance. The record is a dated assessment, not a suppression baseline or an automatic gate.
 Do not invent a JSON schema, scoring engine, debt ratchet, or generated inventory for a prose deliverable.
@@ -121,6 +125,7 @@ No test or mutation results were produced in this preflight.
 Contributor guidance links to this authority instead of repeating test rules.
 The coding standard continues to own Go style and lint policy.
 The assessment records test debt; it does not grant exceptions or change tests.
+
 Each gap has a requirement, source location, observed weakness, and verification needed for closure.
 Every modeled Go package has an inventory row, including packages tested elsewhere.
 Source review cannot establish measured coverage, race freedom, or mutation effectiveness.

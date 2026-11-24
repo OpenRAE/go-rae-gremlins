@@ -1,5 +1,9 @@
 # Maintenance plan
 
+> Current context (2026-11-24): This is a historical plan, and all its phases are complete.
+> Issues #1, #66, and #75 to #84 are closed, and PR #64 is merged.
+> The fork released v0.7.0 and later versions. Current work uses the [contributor guide](../CONTRIBUTING.md).
+
 This plan makes go-rae-gremlins a well-maintained fork of Gremlins. Its issues are in the Maintenance baseline
 milestone. The phases run in order.
 
@@ -14,8 +18,8 @@ The open upstream issues and PRs are in the fork. Nobody merges a copied item be
 
 ## 2. Ready for development
 
-#64 onboards the repository to Ground Control, aligns the workflows, moves the Sonar analysis to raesystem, records
-ADRs 0001 to 0003 (module path, binary name and versions, upstream changes), and sets up the release process.
+#64 onboards the repository to Ground Control, aligns the workflows, and moves the Sonar analysis to raesystem. It
+records ADRs 0001 to 0003 (module path, binary name and versions, upstream changes), and sets up the release process.
 `docs/development/upstream-release.md` describes the upstream build and release.
 
 ## 3. Understand
