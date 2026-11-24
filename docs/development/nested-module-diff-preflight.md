@@ -1,5 +1,8 @@
 # Nested-module diff selection — issue #217
 
+> Current context (2026-11-24): This is a historical record of issue #217 at its reviewed revision.
+> The `internal/diff` package holds the current behavior.
+
 `unleash --diff` must select changed mutants in a Go module below the Git repository root.
 Changes outside that module must not select its mutants.
 The fix also needs a tagged release through the existing release procedure.

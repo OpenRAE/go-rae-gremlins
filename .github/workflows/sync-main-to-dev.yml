@@ -4,7 +4,8 @@ name: Sync main -> dev
 #
 # Release Please cuts releases on `main`: when its `chore(main): release ...` PR merges,
 # the version bump + CHANGELOG commit lives ONLY on `main`. This workflow opens a
-# back-merge PR (main -> dev) so `dev` catches up automatically — a human just merges it.
+# back-merge PR (main -> dev) so `dev` catches up automatically. A maintainer merges it with a
+# merge commit outside the merge queue, because the `dev` queue squashes (docs/development/release.md).
 #
 # Why `push: main` and not `release: published`: Release Please creates the GitHub Release
 # with GITHUB_TOKEN, and GITHUB_TOKEN-created events do not trigger other workflows — a
@@ -117,9 +118,12 @@ jobs:
           fi
 
           if [ "${skip_push}" != true ]; then
-            # The token is in this one command only, not in the Git configuration.
-            git push --force-with-lease="refs/heads/${branch}:${remote_sha}" \
-              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            # The credential helper reads GH_TOKEN from the environment. The token is not
+            # in the process arguments, the remote URL, or the Git configuration.
+            git -c credential.helper= \
+              -c 'credential.helper=!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=${GH_TOKEN}"; }; f' \
+              push --force-with-lease="refs/heads/${branch}:${remote_sha}" \
+              "https://github.com/${GITHUB_REPOSITORY}.git" \
               "origin/main:refs/heads/${branch}"
           fi
 

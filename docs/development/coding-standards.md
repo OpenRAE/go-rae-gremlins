@@ -11,9 +11,11 @@ The fixtures assert 64 checker predicates, formatter simplification, Windows-onl
 They use local stand-ins for blocked assertion packages. They download no test dependency and execute no Go fixture.
 Baseline tests cover growth, substitutions, occurrences, stale entries, history, initial adoption, and malformed input.
 
-CI uses Coverage.py 7.16.0 for the Python adapter, with line and branch reporting through the existing Sonar pipeline.
+CI uses Coverage.py 7.16.0 for the Python lint adapter and the `.github/scripts` tools.
+It reports line and branch coverage through the existing Sonar pipeline.
 The admission check requires the Linux Go, Windows Go, macOS Go, and Python coverage reports. It rejects unexpected files, links, and XML entity declarations.
-Use `make lint-cover` when the pinned Coverage.py is installed; `make lint-test` needs only the standard library.
+Use `make lint-cover` when Coverage.py 7.16.0 and PyYAML 6.0.3 are installed.
+`make lint-test` needs only the standard library.
 
 Reference snapshots reviewed for issue #77:
 
@@ -109,7 +111,7 @@ Unlisted default settings of retained linters stay unchanged.
 | `nonamedreturns` | Drop. Use `nakedret` with 30 lines. | Google permits useful named results, especially for deferred updates. |
 | `predeclared`, `unconvert`, `usestdlibvars` | Keep. | Preserve naming and simplification checks. |
 | `tagliatelle` with JSON snake case | Keep unchanged. | Runtime JSON compatibility is a separate contract. |
-| Revive's 25 explicit rules and confidence 0.8 | Keep rules; lower confidence to zero; extend with documented Google predicates. | Do not silently discard lower-confidence deterministic findings. |
+| Revive's 24 explicit rules and confidence 0.8 | Keep rules; lower confidence to zero; extend with documented Google predicates. | Do not silently discard lower-confidence deterministic findings. |
 | Revive additions | `package-naming`, `redundant-import-alias`, `import-alias-naming`, `enforce-slice-style` (`nil`), `use-any`, `useless-break`, `unnecessary-if`, `unnecessary-format`, `waitgroup-by-value`, `imports-blocklist`. | Cover the table above. Block testify, gomega, and goconvey assertion packages; depguard also rejects all unapproved external imports. |
 | Revive exported comments | Check public interfaces and private receivers too. | Exported methods still need meaningful documentation. |
 | Staticcheck default style exclusions | Enable `all`. | Include package, naming, receiver, and documentation checks normally disabled by default. |
@@ -148,8 +150,9 @@ The shrink command refuses new identities and higher counts before writing.
 It cannot create a new baseline or refresh changed fingerprints.
 Normal checks are read-only.
 
-The initial baseline records 152 findings in 151 identities with Go 1.26.10 and golangci-lint 2.15.0.
+At #77, the initial baseline recorded 152 findings in 151 identities with Go 1.26.10 and golangci-lint 2.15.0.
 The existing Go source and dependency inputs match comparison commit `bb2a9b44a8237ce0db2c6d78cafa030b8fd71b60`.
 Do not edit allowances, add generated markers, weaken rules, or add suppressions to conceal new debt.
 Policy changes need explicit review and updated coverage documentation.
 See the design for first-adoption restrictions and comparison failures.
+Repairs after #77 removed allowances; `.lint/baseline.json` holds the current allowances.

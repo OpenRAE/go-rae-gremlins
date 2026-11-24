@@ -13,14 +13,16 @@ ADR 0002 records the release decisions. This page describes the steps and the di
 4. Merge the release pull request. release-please creates the tag `vX.Y.Z` and the GitHub release with the release
    notes. In the same run, goreleaser builds the binaries and adds the archives, the source archive, and
    `checksums.txt` to the release.
-5. The Sync main -> dev workflow opens a pull request from `main` to `dev`. Merge it, so that `dev` has the release
-   commit.
+5. The Sync main -> dev workflow opens a pull request from `main` to `dev`. Merge it with a merge commit, outside the
+   merge queue, so that `dev` has the release commit as a parent. The `dev` queue squashes, so a queue merge drops
+   that parent. A maintainer with bypass permission merges it, for example with `gh pr merge <number> --merge --admin`.
 
 `GITHUB_TOKEN` opens the release pull request and the back-merge pull request, so CI does not run on them. Do not edit
 the version or `CHANGELOG.md` by hand.
 
-The manifest starts at 0.6.0, and `bootstrap-sha` in `release-please-config.json` is the commit of upstream v0.6.0. The
-first release is v0.7.0 and lists the changes since upstream v0.6.0.
+Historical context: the manifest started at 0.6.0, and `bootstrap-sha` in `release-please-config.json` is the commit of
+upstream v0.6.0. The first fork release was v0.7.0, with the changes since upstream v0.6.0.
+`.release-please-manifest.json` holds the current version.
 
 ## Assets
 
@@ -45,4 +47,4 @@ A dependent repository can also pin a module version, for example
 | Homebrew | `go-gremlins/homebrew-tap` | None |
 | Documentation site | gremlins.dev, deployed with mike | None |
 | Credentials | `WORKFLOW_PAT` and `DOCKER_HUB_TOKEN` | `GITHUB_TOKEN` only |
-| goreleaser | Any v2 release | v2.19.0 |
+| goreleaser | Any v2 release | v2.19.0 in the Release workflow |

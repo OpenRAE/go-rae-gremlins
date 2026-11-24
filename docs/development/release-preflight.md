@@ -1,5 +1,8 @@
 # Release readiness architecture preflight — issue #84
 
+> Current context (2026-11-24): This is a historical record of issue #84 at its reviewed revision.
+> Current procedure: [release](release.md).
+
 Issue #84 requires repository readiness for a release that dependent repositories can pin after `dev` reaches `main`.
 It does not require publishing the release or completing remediation.
 Reuse the existing release architecture under ADRs [0001](../adr/0001-module-path.md) and [0002](../adr/0002-binary-name-and-versions.md).
@@ -102,6 +105,7 @@ Inspected source revision: `3d24c2ec478602f6a52b9ac9ea9c1cbe15c8332a`, with pre-
 Those edits initially affected `.ground-control.yaml`, `maintenance-plan.md`, and `documentation-review.md`.
 The shared `.architecture/design.json` changed during inspection; this preflight preserves all those edits.
 The model's trust declarations do not certify release publication or hosted settings.
+
 `make architecture-design` passed for design #84 under ARCH001–ARCH004, with network access disabled through Go settings.
 Model SHA256: `f50ccf387b1870da4a12fa781ffc2ba38db3dad4ed6d0ced9b70e19f3e1c41f0`.
 Document whitespace and six local links passed inspection. This preflight produced no test or mutation results.

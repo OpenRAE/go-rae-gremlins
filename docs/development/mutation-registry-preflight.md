@@ -1,5 +1,8 @@
 # Mutation registry: architecture preflight for issue 20
 
+> Current context (2026-11-24): This is a historical record of issue 20 at its reviewed revision.
+> Current design: [mutation registry](mutation-registry.md).
+
 This explanation sets boundaries for the Stage 4 refactor. It is not an implementation plan.
 The supplied issue is the delivery contract. Source inspection used revision `cc0df46`.
 

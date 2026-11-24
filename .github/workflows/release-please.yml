@@ -23,7 +23,8 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  # Adds the binaries and checksums to the release that release-please made.
+  # Adds the binary archives, the source archive, and the checksums to the release that
+  # release-please made.
   goreleaser:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'

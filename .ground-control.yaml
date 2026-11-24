@@ -11,8 +11,9 @@ workflow:
   # The formatter of .golangci.yml is goimports. golangci-lint fmt, at the
   # version that mise.toml pins, applies it.
   format_command: mise exec -- golangci-lint fmt ./...
-  # make policy runs the hooks of .pre-commit-config.yaml on all files: file
-  # checks, golangci-lint, gitleaks, govulncheck, and the race tests.
+  # make policy runs the pre-commit-stage hooks of .pre-commit-config.yaml on
+  # all files: the file checks, gitleaks on staged changes, and the @latest
+  # check. golangci-lint, govulncheck, and the race tests are manual-stage hooks.
   policy_command: make policy
   precommit_command: pre-commit run --hook-stage pre-commit
   base_branch: dev
@@ -54,7 +55,7 @@ architecture:
     patterns:
       - name: Mutation type
         applies_to: a new mutation type; the steps are in the Adding New Mutation Type section of CLAUDE.md
-        example_path: internal/engine/tokenmutator.go
+        example_path: internal/engine/specs.go
       - name: Table-driven test
         applies_to: unit tests
         example_path: internal/engine/executor_test.go
