@@ -4,6 +4,9 @@ The [Phase E workflow](../../.github/workflows/ground-control-phase-e.yml) runs 
 It calls Ground Control's existing merged-PR finalizer to post the delivery report and close the delivered issue.
 It does not merge PRs or execute delivered Go code, tests, hooks, or workflow commands.
 
+This page is for the maintainer. The workflow and its CI transport tests run only in `OpenRAE/go-rae-gremlins`.
+A fork skips them ([ADR 0010](../adr/0010-maintainer-integrations-in-the-canonical-repository.md)).
+
 The finalizer finds the issue from the `<issue>-<slug>` head branch of the merged PR.
 The issue must have a pickup record for that branch from a user with write access.
 `/implement` and `/quickfix` write this record when they start work on the issue.

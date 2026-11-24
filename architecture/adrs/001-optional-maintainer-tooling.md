@@ -9,6 +9,8 @@ Status: Accepted
 >
 > The mutation and regression-proof jobs also run on `merge_group`. Coverage goes to SonarCloud.
 > [Hosted checks](../../docs/development/checks.md) gives the current check details.
+> [ADR 0010](../../docs/adr/0010-maintainer-integrations-in-the-canonical-repository.md) limits maintainer
+> integrations to `OpenRAE/go-rae-gremlins`.
 
 ## Context
 

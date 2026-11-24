@@ -21,6 +21,8 @@ concurrency:
 
 jobs:
   maintainer-gate:
+    # The maintainer applies to OpenRAE/go-rae-gremlins only, so forks skip it (ADR 0010).
+    if: github.repository_id == '1441387140'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

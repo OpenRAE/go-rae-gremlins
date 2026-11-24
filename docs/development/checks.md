@@ -18,16 +18,36 @@ For the contributor procedure, see [Verify the change](../CONTRIBUTING.md#verify
 | [Release](../../.github/workflows/release-please.yml) and [Sync main -> dev](../../.github/workflows/sync-main-to-dev.yml) | Pushes to `main`. | The [release procedure](release.md) describes these workflows. |
 | [Ground Control Phase E](../../.github/workflows/ground-control-phase-e.yml) and [fork dispatcher](../../.github/workflows/ground-control-fork-finalization.yml) | Merged pull requests and manual dispatch. | Post-merge finalization. See [Automatic Phase E finalization](phase-e.md). |
 
+## Forks
+
+Some jobs need an OpenRAE secret, service, person, or branch setting.
+They run only when `github.repository_id` identifies `OpenRAE/go-rae-gremlins` ([ADR 0010](../adr/0010-maintainer-integrations-in-the-canonical-repository.md)).
+A rename or a transfer keeps this ID, and a fork has a different ID.
+In a fork, these jobs skip:
+
+- CI: `Sonar admission`, `SonarCloud`, `Phase E release`, and the merge queue policy step of `Policy`.
+  `Phase E transport scope` runs, but it selects no transport tests.
+- `ggshield`, `maintainer-gate`, and the `merge-queue-removed` label job.
+- The Release, Sync main -> dev, Ground Control Phase E, and fork dispatcher workflows.
+
+All other jobs run in a fork.
+In `OpenRAE/go-rae-gremlins`, a missing secret still fails its job.
+[`test_workflow_applicability.py`](../../.github/scripts/test_workflow_applicability.py) checks the repository condition of each of these jobs.
+
 ## PR Gate
 
 `PR Gate` requires success from these CI jobs: `Architecture`, `Lint`, `Vulnerability scan`, `Docs`, `Test`, `Release build`, `Policy`, and `Memory budget`.
 It also requires success from `Phase E transport scope`.
 
-`SonarCloud` must succeed, with one exception.
+`SonarCloud` must succeed in `OpenRAE/go-rae-gremlins`, with one exception.
 For a pull request from another repository, `SonarCloud` must be skipped, because that pull request gets no `SONAR_TOKEN`.
+In a fork, `SonarCloud` must be skipped.
 
 `Phase E transport tests` must succeed when the scope job selects them, and must be skipped when it does not.
-The scope job selects them only on pull requests and merge groups that change the transport or its verification wiring, including `ci.yml` and the `Makefile`.
+A selection other than `true` or `false` fails `PR Gate`.
+
+The scope job selects them only in `OpenRAE/go-rae-gremlins`.
+It selects them on pull requests and merge groups that change the transport or its verification wiring, including `ci.yml` and the `Makefile`.
 Fork and Dependabot pull requests get no secrets, so they skip the transport tests.
 The merge queue runs the tests for them.
 See [pre-merge transport verification](phase-e-design.md#pre-merge-transport-verification).
@@ -49,6 +69,7 @@ A failed check removes the pull request from the queue.
 
 The `Policy` job of CI runs `make merge-queue-policy`.
 This check reads the live branch rules of `dev` and `main` with the GitHub API.
+A fork skips this step.
 It fails in each of these conditions:
 
 - `dev` has no merge queue.
@@ -113,8 +134,8 @@ With this option, the helper finds the first-parent `dev` change that adds each 
 It proves the case at that change against the parent of that change.
 A case that no change adds and proves fails.
 
-## Sonar and Ground Control readiness
+## Sonar
 
 CI skips the Sonar jobs for pull requests from other repositories, because those pull requests have no access to the token.
-Ground Control readiness still requires the configured Sonar result.
+A fork also skips them, because the Sonar project belongs to `OpenRAE/go-rae-gremlins`.
 `.ground-control.yaml` and `sonar-project.properties` set the same Sonar project key.

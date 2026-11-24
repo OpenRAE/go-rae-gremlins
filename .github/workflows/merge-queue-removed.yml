@@ -2,7 +2,7 @@ name: Merge Queue Removed
 
 # Marks a pull request that the `dev` merge queue removed without a merge (issue #181).
 # The authoring agent ends its run when its pull request enters the queue, so this label is
-# the signal that the pull request needs work. The `/requeue` skill finds the labeled pull
+# the signal that the pull request needs work. The maintainer finds the labeled pull
 # requests, fixes them, and adds them to the queue again. The label goes away when the pull
 # request enters the queue again or closes. The job reads and writes only the GitHub API and
 # checks out no code.
@@ -20,6 +20,8 @@ concurrency:
 
 jobs:
   label:
+    # The label applies to the OpenRAE merge queue only, so forks skip it (ADR 0010).
+    if: github.repository_id == '1441387140'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

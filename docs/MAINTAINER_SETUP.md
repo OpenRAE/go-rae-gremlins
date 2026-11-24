@@ -1,6 +1,6 @@
 # Maintainer setup
 
-This guide sets up the local checks and the optional Ground Control registration for maintainers of `OpenRAE/go-rae-gremlins`.
+This guide sets up the local checks for maintainers of `OpenRAE/go-rae-gremlins`, and it describes the maintainer tooling.
 Contributors can use ordinary Git, GitHub, and the Go commands in the Makefile.
 They need no Ground Control installation and no review-provider credentials.
 
@@ -47,38 +47,19 @@ To scan the full Git history for secrets, run this command:
 pre-commit run gitleaks-history --hook-stage manual --all-files
 ```
 
-## Register Ground Control locally
+## Maintainer tooling
 
-1. Install a released `grndctl` package and the workflow skills, as the installation instructions of Ground Control describe.
-2. Do not build or change a sibling checkout that another agent uses.
-3. From the root of this repository, run these commands:
+The maintainer uses private Ground Control tooling with this repository.
+Its source and installation are not public, and this repository gives no installation steps.
+The tooling reads `.ground-control.yaml` and `.gc/plan-rules.md`.
+Git ignores `.env` and `.mcp.json`, which hold the local credentials and server settings.
+Do not commit them.
 
-   ```sh
-   grndctl init
-   grndctl doctor
-   ```
+Jobs that need an OpenRAE secret, service, person, or branch setting run only in this repository.
+A fork skips them; see [Forks](development/checks.md#forks).
 
-4. Review the preview of `init` before you confirm it.
-5. Configure only the credentials for approved review providers, as the documentation of the installed release describes.
-6. Do not copy the credentials of another repository.
-7. Restart the agent session after the registration.
-
-`grndctl doctor` checks the supported versions of `grndctl`, Node.js, `gh`, and `codex`, and the GitHub authentication.
-`init` keeps the committed `.ground-control.yaml`.
-It changes only the `ground-control` entry in the local `.mcp.json`, and it keeps the existing `.env` values.
-Git ignores both `.env` and `.mcp.json`.
-The server entry is:
-
-```json
-{
-  "type": "stdio",
-  "command": "grndctl",
-  "args": ["mcp"]
-}
-```
-
-A client that does not read `.mcp.json` needs the same stdio server entry in its own MCP settings.
-Use this repository as the working directory.
+When an agent run finds a `GitGuardian Security Checks` finding, the finding belongs to the user.
+Report the check name, the status, and the URL, then stop until the user resolves the finding.
 
 ## Configuration reference
 
@@ -86,7 +67,7 @@ The settings and the plan rules are committed, so all agents use the same comman
 
 | Item | Location and check |
 | --- | --- |
-| Ground Control settings | `.ground-control.yaml`. `make policy` checks its YAML syntax. `grndctl doctor` also checks the Ground Control schema, the repository identity, and the local server registration. |
+| Ground Control settings | `.ground-control.yaml`. `make policy` checks its YAML syntax. |
 | Plan rules | `.gc/plan-rules.md`. |
 | SonarCloud | `sonar-project.properties` and the `sonarcloud` block of `.ground-control.yaml`. CI runs the analysis. |
 | Coverage | `make cover` writes `coverage.out` with race detection. CI sends the Go and Python coverage to SonarCloud. |

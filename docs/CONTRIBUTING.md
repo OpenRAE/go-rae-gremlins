@@ -10,7 +10,7 @@ Related guidance:
 - [Hosted checks](development/checks.md): the CI workflows, the merge queue, and the pull request test gates.
 - [Go coding standard](development/coding-standards.md) and [Go test standard](development/test-standard.md): the exact rules.
 - [Architecture checks](development/architecture.md) and the [ADRs](adr/README.md): the design rules and decisions.
-- [Maintainer setup](MAINTAINER_SETUP.md): the optional Ground Control registration.
+- [Maintainer setup](MAINTAINER_SETUP.md): the local checks and the tooling of the maintainers.
 - [Development process review](development/process-review.md): the 2026-11-02 record of the decisions behind this guide.
 
 ## Start with an issue
@@ -23,7 +23,6 @@ Related guidance:
 5. Before you start a significant change, agree on it with a maintainer.
 
 Give the issue a clear outcome and acceptance criteria that you can check.
-Ground Control takes an issue number as its input.
 The issue body and discussion hold the requirements and decisions.
 
 A copied upstream issue or PR needs a keep, rework, or close decision before implementation or merge.
@@ -75,7 +74,6 @@ To keep the issue branch current, fetch `origin/dev` and merge it into the branc
 Resolve conflicts with a real merge and verify the result.
 Keep the existing work and history.
 Do not use a hard reset or a force-push to discard conflicts.
-Ground Control does this synchronization at publication, and checks it again before PR creation and readiness.
 
 Keep the change in the scope of the issue.
 Use the existing helpers and dependencies.
@@ -181,13 +179,15 @@ The [hosted checks](development/checks.md) reference lists each workflow, the `P
 Examine every check on the current PR head, including the installed security checks.
 A green `PR Gate` alone does not show that every hosted check passed.
 
+A fork does not need Ground Control, SonarCloud, GitGuardian, or maintainer access.
+In a fork, the jobs that need an OpenRAE secret, service, or branch setting skip.
+[Forks](development/checks.md#forks) lists these jobs.
+
 If the merge queue removes your PR, the `merge-queue-removed` label shows on the PR.
 Repair the cause, then add the PR to the queue again.
 
 Repair the failures that the change causes or that directly block it, and verify the new head.
 Report other concerns with evidence, and do not expand the issue.
-For Ground Control runs, `GitGuardian Security Checks` findings belong to the user.
-Report the check name, the status, and the URL, then stop until the user resolves the finding.
 
 ## Commit messages and pull requests
 
@@ -203,11 +203,10 @@ The subject starts with a lowercase letter.
 This convention replaces the upstream `area: description` convention, and the release automation of the fork uses it.
 
 Keep branch names and repository metadata free of assistant or vendor attribution.
-The required Ground Control review records and the required review attestation are the only exceptions.
+The review records and the review attestation that the maintainer tooling requires are the only exceptions.
 
 Use the [PR template](../.github/PULL_REQUEST_TEMPLATE.md).
 Describe the resulting behavior, link the issue, give the ADR impact, and report the checks that you ran and their results.
-Ground Control renders its own PR body with the same evidence and its required attestation.
 To close the delivered issue at merge, write `Closes #<issue>`.
 GitHub closes issues automatically only for merges into the default branch.
 A merge into `dev` therefore needs an explicit post-merge finalization.
@@ -218,34 +217,15 @@ Merges into `main` stay manual, and the maintainer selects the merge method.
 Merge only after the current head has the required checks and review.
 A contributor or agent who prepares the PR does not merge it.
 
-## Ground Control delivery
+## Maintainer tooling
 
-[`.ground-control.yaml`](../.ground-control.yaml) supplies the commands, the `dev` base branch, the PR title rules, the Sonar project, and the review cap of this repository.
-The installed skills and tools of Ground Control supply the workflow contract.
-Contributors who work manually also follow the branch, hook, verification, review, and release rules in this guide.
+The maintainer uses private tooling to deliver issues.
+Contributors do not need it, and this guide does not depend on it.
+[`.ground-control.yaml`](../.ground-control.yaml) and [`.gc/plan-rules.md`](../.gc/plan-rules.md) configure that tooling for this repository.
 
-1. Start the normal issue workflow with `/implement <issue>`.
-   For a small, settled change, use `/quickfix <issue>`.
-   The issue branch and the pickup record identify the work.
-   The normal workflow adds design, planning, and a pre-push review.
-   Quickfix omits those steps, and it runs no pre-push review unless you give `--review`.
-2. Implement the acceptance criteria of the issue, and run targeted verification.
-   Record significant decisions and required review findings on the issue.
-   A quickfix with `--review` runs one pre-push review cycle.
-   Act on its findings and obey the stop conditions that it returns.
-3. Let the workflow publish the change.
-   It stages the diff, scans for sensitive content, runs the configured pre-commit checks, commits, pushes, and merges the current `dev`.
-   If a gate fails, repair it and retry through the workflow.
-4. Let the workflow render and create the synchronized PR.
-   It monitors CI and Sonar, and records readiness for the checked head.
-   A later head change needs a new readiness check.
-   For a PR that targets `dev`, readiness adds the PR to the merge queue.
-   For other bases, readiness gives the PR to the maintainer for merge.
-   Readiness does not close the issue.
-5. After the PR merges, the [Phase E workflow](../.github/workflows/ground-control-phase-e.yml) calls the existing finalizer.
-   The finalizer posts the final report and closes the issue.
-   For release access, restricted fork events, or a failed run, follow [Automatic Phase E finalization](development/phase-e.md).
-   When readiness reports `finalization: reentry`, run the same `/implement <issue>` or `/quickfix <issue>` again after the merge.
+After a PR merges, the [Phase E workflow](../.github/workflows/ground-control-phase-e.yml) can post a final report and close the delivered issue.
+It runs only in `OpenRAE/go-rae-gremlins`.
+[Automatic Phase E finalization](development/phase-e.md) is for the maintainer.
 
 ## Release
 

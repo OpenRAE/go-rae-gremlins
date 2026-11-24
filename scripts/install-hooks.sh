@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install-hooks.sh — activate and verify commit-time pre-commit hooks for THIS clone.
 #
-# Ground Control onboarding treats pre-commit as an active local gate, but three
+# This repository treats pre-commit as an active local gate, but three
 # things are distinct contracts (Ground Control ADR-079): the committed .pre-commit-config.yaml,
 # CI pre-commit execution, and commit-time hook ACTIVATION in a given clone.
 # `pre-commit install` cowardly-refuses whenever git's core.hooksPath is set, so a
@@ -10,7 +10,7 @@
 # silently. This script is the repo-native installer + verifier that closes that gap.
 #
 # What it does, for the current clone only:
-#   * writes a Ground-Control-managed pre-commit hook into git's
+#   * writes a managed pre-commit hook into git's
 #     resolved hook path (the location a _chain-style dispatcher delegates to, and
 #     the location git uses directly when no dispatcher is set). Each managed hook
 #     execs `pre-commit hook-impl` — the same entrypoint `pre-commit install` wires.

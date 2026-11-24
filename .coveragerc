@@ -9,3 +9,5 @@ source =
 omit =
     */scripts/test_lint.py
     */.github/scripts/test_regression_proof.py
+    */.github/scripts/test_merge_queue_policy.py
+    */.github/scripts/test_workflow_applicability.py

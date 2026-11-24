@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "issue": 231,
+  "summary": "Make Ground Control and other maintainer integrations optional for forks and contributors. Each maintainer-only workflow job and the merge queue policy step run only when github.repository_id identifies OpenRAE/go-rae-gremlins (ADR 0010). The transport scope selects no transport tests elsewhere. PR Gate requires SonarCloud success only for canonical events that are not pull requests from another repository. Native build, test, architecture, lint, documentation, mutation, and policy checks run in every repository. A public unit test enforces the repository condition and runs the PR Gate script against a result table. Contributor and agent guidance names only repository commands. No Go package, CLI flag, configuration key, JSON report, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "contract_changes": {},
+  "policies": [
+    "ci",
+    "build",
+    "contributing",
+    "sonar",
+    "lint_coverage",
+    "delivery_finalization",
+    "fork_finalization"
+  ],
+  "trust_boundaries": "Existing modeled trust boundaries remain. The repository condition narrows where delivery_finalization, transport_verification, and merge_queue_policy run; it adds no destination, credential, permission, store, or provider. In the canonical repository, a missing secret still fails its job. The public applicability test reads workflow files and runs the PR Gate shell with fixed inputs; it uses no network and no secret.",
+  "conflicts": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  }
+}
