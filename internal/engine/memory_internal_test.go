@@ -33,10 +33,13 @@ func availableBytes(n uint64) func() (uint64, error) {
 	return func() (uint64, error) { return n, nil }
 }
 
-// setBudget sets the configured memory budget for the test.
+// setBudget sets the configured memory budget for the test and restores the
+// previous budget when the test ends. It does not change other keys, which
+// other tests of the package set.
 func setBudget(t *testing.T, budget string) {
 	t.Helper()
-	t.Cleanup(configuration.Reset)
+	prev := configuration.Get[string](configuration.UnleashMemoryBudgetKey)
+	t.Cleanup(func() { configuration.Set(configuration.UnleashMemoryBudgetKey, prev) })
 	configuration.Set(configuration.UnleashMemoryBudgetKey, budget)
 }
 

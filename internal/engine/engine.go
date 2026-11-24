@@ -100,7 +100,7 @@ func WithDirFs(dirFS fs.FS) Option {
 // Run executes the mutation testing.
 //
 // It walks the fs.FS provided and checks every .go file which is not a test.
-// For each file it will scan for tokenMutations and gather all the mutants found.
+// For each file it gathers the mutants of the registered mutation types.
 // A walk, open, or parse failure stops the discovery. When an executor fails,
 // Run stops the discovery and schedules no new mutants. Run then returns the
 // joined errors with the partial results, which the caller must not report as
@@ -185,10 +185,9 @@ func goIgnored(name string) bool {
 // sourceFile is a parsed Go file of the module and the data that decides the
 // status of its mutants.
 type sourceFile struct {
-	set        *token.FileSet
-	file       *ast.File
+	*parsedFile
 	directives fileDirectives
-	name       string
+	pkg        string
 	cov        fileCoverage
 }
 
@@ -208,16 +207,15 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 		return err
 	}
 	sf := &sourceFile{
-		set:        set,
-		file:       file,
+		parsedFile: &parsedFile{set: set, file: file, name: fileName},
 		directives: dirs,
-		name:       fileName,
+		pkg:        mu.pkgName(fileName),
 		cov:        newFileCoverage(set, file, mu.codeData.Cov, built),
 	}
 	// Collect all the mutants of the file before the first one is sent. A
 	// running mutant changes the shared AST, so the discovery must not read
 	// the AST after that.
-	var mutants []*TokenMutator
+	var mutants []*mutant
 	inspectTokens(file, func(n *NodeToken) bool {
 		if ctx.Err() != nil {
 			return false
@@ -284,23 +282,17 @@ func (mu *Engine) hostBuilds(fileName string) (bool, error) {
 	return ok, nil
 }
 
-// findMutations returns the mutants of node with their status. It does not
-// create the mutants of disabled or ignored types.
-func (mu *Engine) findMutations(sf *sourceFile, node *NodeToken) []*TokenMutator {
-	mutantTypes, ok := TokenMutantType[node.Tok()]
-	if !ok {
-		return nil
-	}
-
-	pkg := mu.pkgName(sf.name)
-	var mutants []*TokenMutator
-	for _, mt := range mutantTypes {
+// findMutations returns the mutants of node with their status, in
+// registration order. It does not create the mutants of disabled or ignored
+// types.
+func (mu *Engine) findMutations(sf *sourceFile, node *NodeToken) []*mutant {
+	var mutants []*mutant
+	for mt := range builtins.eligibleTypes(node) {
 		if !configuration.Get[bool](configuration.MutantTypeEnabledKey(mt)) ||
 			sf.directives.ignores.ignored(node.TokPos, mt) {
 			continue
 		}
-		tm := NewTokenMutant(pkg, sf.set, sf.file, node)
-		tm.SetType(mt)
+		tm := builtins.newMutant(sf.parsedFile, sf.pkg, node, mt)
 		status := mu.mutationStatus(sf.cov, node.TokPos)
 		if reason, ok := sf.directives.equivalents[equivalentKey{pos: node.TokPos, mt: mt}]; ok {
 			tm.SetEquivalentReason(reason)

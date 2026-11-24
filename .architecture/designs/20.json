@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "issue": 20,
+  "summary": "Refactor mutation discovery and edits to private registered specs, a validated registry indexed by operator token, a factory, and one mutant and parsed-file lifecycle inside internal/engine. Preserve the internal/mutator contract and the 11 type identities. ! to !! stays in INVERT_LOGICAL as an expression edit of that spec. Registry eligibility replaces TokenMutantType for discovery and equivalent annotation matching, in an explicit registration order. Finish per-file candidate collection and status assignment before dispatch. Specs are stateless; AST edits and immediate restoration run under one lock owned by the parsed file. Worker reads, writes, and snippets use the physical, module-relative file name and line, so //line directives cannot redirect a write. An os.Root at the worker copy confines each worker file access. The executor keeps disk rollback, discard, cancellation, resources, and status policy. Configuration defaults, flags, reports, and exits do not change. Update CLAUDE.md architecture and adding-mutations guidance. No package split, dependency, runtime contract change, or policy relaxation. Explanation: docs/development/mutation-registry.md. Boundaries and evidence obligations: docs/development/mutation-registry-preflight.md.",
+  "changes": [
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/process",
+        "internal/report"
+      ],
+      "test_imports": []
+    }
+  ],
+  "contracts": [],
+  "contract_changes": {},
+  "policies": [
+    "guidance"
+  ],
+  "trust_boundaries": "Preserve local source parsing, existing module/path and configuration validation, directive binding, source-relative identity, worker copies, bounded process execution, runtime child environments, temporary cache ownership, and existing report destinations. Bind locks and worker write destinations to the original parsed source file and its physical module-relative name, keeping //line adjusted display positions separate. Specs cannot read configuration, choose filesystem paths, run commands, emit output, or transfer source. The runtime has no application authentication layer and still executes operator-selected code with operator permissions; workdir copies are not a hostile-code sandbox. No secret files, new credentials, persistence store, service, network destination, report envelope, or OS argument/environment surface is introduced. The entries below restate existing modeled boundaries and do not authorize transfers or implementation during preflight.",
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  },
+  "conflicts": []
+}

@@ -20,7 +20,6 @@ import (
 	"errors"
 	"go/ast"
 	"go/token"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -132,7 +131,7 @@ func matchAnnotations(set *token.FileSet, file *ast.File, anns []*annotation) {
 	inspectTokens(file, func(node *NodeToken) bool {
 		pos := set.PositionFor(node.TokPos, false)
 		for _, a := range byLine[pos.Line] {
-			if (a.column == 0 || a.column == pos.Column) && slices.Contains(TokenMutantType[node.Tok()], a.mt) {
+			if (a.column == 0 || a.column == pos.Column) && builtins.eligible(node, a.mt) {
 				a.matches = append(a.matches, node.TokPos)
 			}
 		}
