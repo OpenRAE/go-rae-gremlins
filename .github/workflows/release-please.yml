@@ -9,6 +9,8 @@ permissions:
 
 jobs:
   release-please:
+    # Only OpenRAE/go-rae-gremlins publishes releases; forks skip it (ADR 0010).
+    if: github.repository_id == '1441387140'
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -172,7 +172,9 @@ jobs:
           export LINT_BASE="$COMPARISON"
           make policy
       # The live dev and main rules must keep every required dev check on the merge queue.
+      # The rules are OpenRAE settings, so forks skip this step (ADR 0010).
       - name: Check the dev merge queue policy
+        if: github.repository_id == '1441387140'
         env:
           GH_TOKEN: ${{ github.token }}
         run: make merge-queue-policy
@@ -248,7 +250,8 @@ jobs:
 
   # Selects Phase E transport tests for a change to the transport or its verification
   # wiring (docs/development/phase-e-design.md). Only PR and merge group runs select a
-  # change: a cache entry from dev or main would be readable by fork PRs.
+  # change: a cache entry from dev or main would be readable by fork PRs. Only
+  # OpenRAE/go-rae-gremlins selects a change, because forks cannot read the release (ADR 0010).
   transport-scope:
     name: Phase E transport scope
     runs-on: ubuntu-latest
@@ -267,11 +270,17 @@ jobs:
         id: select
         env:
           EVENT_NAME: ${{ github.event_name }}
+          MAINTAINER_REPOSITORY: ${{ github.repository_id == '1441387140' }}
           BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
           # Fork and Dependabot PR runs get no repository secrets.
           NO_SECRETS: ${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.actor == 'dependabot[bot]') }}
         run: |
           set -euo pipefail
+          if [[ "$MAINTAINER_REPOSITORY" != true ]]; then
+            echo '::notice::Only OpenRAE/go-rae-gremlins runs the Phase E transport tests.'
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [[ "$EVENT_NAME" != pull_request && "$EVENT_NAME" != merge_group ]]; then
             echo "::notice::$EVENT_NAME runs do not run the Phase E transport tests; the merge queue ran them."
             echo 'run=false' >> "$GITHUB_OUTPUT"
@@ -318,7 +327,7 @@ jobs:
   transport-release:
     name: Phase E release
     needs: transport-scope
-    if: needs.transport-scope.outputs.run == 'true'
+    if: github.repository_id == '1441387140' && needs.transport-scope.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {}
@@ -386,9 +395,10 @@ jobs:
   # Validates coverage reports and scanner settings in a secret-free job.
   # The token-bearing scan runs separately. Secrets are not available to
   # pull requests from other repositories, so those skip the Sonar jobs.
+  # The Sonar project belongs to OpenRAE/go-rae-gremlins, so forks skip them too (ADR 0010).
   sonar-admission:
     name: Sonar admission
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.repository_id == '1441387140' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs: [test, lint]
     runs-on: ubuntu-latest
     permissions:
@@ -475,6 +485,7 @@ jobs:
   sonar:
     name: SonarCloud
     needs: sonar-admission
+    if: github.repository_id == '1441387140'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -524,7 +535,8 @@ jobs:
           POLICY_RESULT: ${{ needs.policy.result }}
           MEMORY_RESULT: ${{ needs.memory.result }}
           SONAR_RESULT: ${{ needs.sonar.result }}
-          FOREIGN_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # SonarCloud runs only for OpenRAE/go-rae-gremlins events with secrets (ADR 0010).
+          SONAR_APPLIES: ${{ github.repository_id == '1441387140' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         run: |
           test "$ARCHITECTURE_RESULT" = success
           test "$LINT_RESULT" = success
@@ -534,14 +546,14 @@ jobs:
           test "$RELEASE_BUILD_RESULT" = success
           test "$POLICY_RESULT" = success
           test "$MEMORY_RESULT" = success
-          if [ "$FOREIGN_PR" = true ]; then
-            test "$SONAR_RESULT" = skipped
-          else
+          if [ "$SONAR_APPLIES" = true ]; then
             test "$SONAR_RESULT" = success
+          else
+            test "$SONAR_RESULT" = skipped
           fi
           test "$TRANSPORT_SCOPE_RESULT" = success
-          if [ "$TRANSPORT_SELECTED" = true ]; then
-            test "$TRANSPORT_RESULT" = success
-          else
-            test "$TRANSPORT_RESULT" = skipped
-          fi
+          case "$TRANSPORT_SELECTED" in
+            true) test "$TRANSPORT_RESULT" = success ;;
+            false) test "$TRANSPORT_RESULT" = skipped ;;
+            *) echo "::error::The transport selection '$TRANSPORT_SELECTED' is not true or false."; exit 1 ;;
+          esac

@@ -14,8 +14,7 @@ For bugs, include the Gremlins version, Go version, operating system, reproducti
 results. For features, explain the problem, the proposed behavior, and alternatives.
 
 Coordinate significant changes with a maintainer before implementation. Give the issue a clear outcome and
-checkable acceptance criteria. Ground Control takes an issue number as its input; the issue body and discussion
-carry the requirements and decisions.
+checkable acceptance criteria. The issue body and discussion carry the requirements and decisions.
 
 Copied upstream issues and PRs need a keep, rework, or close decision under
 [the maintenance plan](development/maintenance-plan.md) before implementation or merge.
@@ -52,8 +51,7 @@ reviewed promotions from `dev`; maintainers approve those merges and all feature
 
 Keep the issue branch current by fetching and merging `origin/dev` into it. Resolve conflicts with a real merge
 and verify the result. Preserve existing work and history; do not use a hard reset or force-push to discard
-conflicts. Ground Control performs this synchronization at publication and rechecks it before PR creation and
-readiness.
+conflicts.
 
 Read `CLAUDE.md`, the [plan rules](../.gc/plan-rules.md), and the [ADRs](adr/README.md) before changing code. Reuse
 existing helpers and dependencies. Keep the change bounded by the issue, and update the documentation it affects.
@@ -172,6 +170,15 @@ The current hosted checks are defined in the repository:
 | [GitGuardian](../.github/workflows/ggshield.yml) | A `ggshield` secret scan of the new commits of the PR or merge group. |
 | [Maintainer gate](../.github/workflows/maintainer-gate.yml) | The maintainer wrote or approved the PR. |
 
+Some jobs need an OpenRAE secret, service, or branch setting. They run only in `OpenRAE/go-rae-gremlins`
+([ADR 0010](adr/0010-maintainer-integrations-in-the-canonical-repository.md)). In a fork, these jobs skip:
+
+- The SonarCloud jobs, the Phase E transport tests, and the merge queue policy step of CI.
+- The GitGuardian, maintainer gate, and merge queue label workflows.
+- The release, synchronization, Phase E, and fork finalization workflows.
+
+All other checks run in a fork. A fork does not need Ground Control, SonarCloud, GitGuardian, or maintainer access.
+
 Pull requests to `dev` merge through a GitHub merge queue ([ADR 0007](adr/0007-dev-merge-queue.md)).
 The queue requires `PR Gate`, `Mutation testing`, `Conventional PR title`, `ggshield`, and `maintainer-gate` on each
 merge group commit. These workflows run on merge groups. They compare with the merge group base commit and read the
@@ -186,16 +193,15 @@ It fails when `dev` has no merge queue, when `main` has a merge queue, or when `
 branch protection. It also fails when `dev` has non-strict checks and no merge queue. It fails when a required `dev`
 check has no workflow job that runs on `merge_group`.
 
-CI deliberately skips the Sonar jobs for PRs from other repositories because they have no access to the token;
-`PR Gate` accepts that specific skip. Ground Control readiness still requires the configured Sonar result.
+CI deliberately skips the Sonar jobs for PRs from other repositories because they have no access to the token.
+`PR Gate` accepts that skip, and the skip in a fork. It requires a Sonar result for all other events.
 Fork and Dependabot PRs also skip the Phase E transport tests, because they get no secrets. The merge queue runs them.
 
 Inspect every check on the current PR head, including installed security checks. A green `PR Gate` alone does
 not establish that every hosted check passed.
 
 Repair failures caused by or directly blocking the change and verify the new head. Report unrelated concerns with
-evidence without expanding the issue. For Ground Control runs, `GitGuardian Security Checks` findings belong to
-the user: report the check name, status, and URL, then stop for the user's resolution.
+evidence without expanding the issue.
 
 ## Commit messages and pull requests
 
@@ -209,40 +215,26 @@ Allowed types are `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `build`, `
 A scope is optional; the subject starts with a lowercase letter. This replaces upstream's `area: description`
 convention and supports the fork's release automation.
 
-Keep branch names and repository metadata free of assistant or vendor attribution. Required Ground Control review
-records and the required review attestation are the narrow exceptions.
+Keep branch names and repository metadata free of assistant or vendor attribution. The review records and the review
+attestation that the maintainer tooling requires are the narrow exceptions.
 
 Use the [PR template](../.github/PULL_REQUEST_TEMPLATE.md) to describe the resulting behavior, link the issue,
-state ADR impact, and report actual checks and results. Ground Control renders its own PR body with the same
-evidence and its required attestation. Include `Closes #<issue>` for the delivered issue. GitHub closes issues
+state ADR impact, and report actual checks and results. Include `Closes #<issue>` for the delivered issue. GitHub closes issues
 automatically only on the default branch, so a merge into `dev` still needs explicit post-merge finalization.
 
 Maintainers review the change and choose the merge method. Multiple commits are acceptable; an upstream rule to
 squash every PR does not override synchronization merges or the maintainer's choice here. Merge only after the
 current head has the required checks and review. A contributor or agent preparing the PR does not merge it.
 
-## Ground Control delivery
+## Maintainer tooling
 
-[`.ground-control.yaml`](../.ground-control.yaml) supplies this repository's commands, `dev` base branch, PR-title
-rules, Sonar project, and review cap. Ground Control's installed skills and tools supply the workflow contract.
-Contributors working manually still follow the branch, hook, verification, review, and release rules above.
+The maintainer uses private tooling to deliver issues. Contributors do not need it, and this guide does not
+depend on it. [`.ground-control.yaml`](../.ground-control.yaml) and [`.gc/`](../.gc/plan-rules.md) configure
+that tooling for this repository.
 
-1. Invoke `/implement <issue>` for the normal issue workflow, or `/quickfix <issue>` for a small, settled change.
-   The issue branch and pickup record identify the work. The normal workflow adds design, planning, and pre-push
-   review. Quickfix omits those steps. It runs no pre-push review unless you supply `--review`.
-2. Implement the issue's acceptance criteria and run targeted verification. Record significant decisions and any
-   required review findings on the issue. A quickfix with `--review` runs one pre-push review cycle; act on its
-   findings and follow the returned stop conditions.
-3. Let the workflow publish the change. It stages the diff, scans for sensitive content, runs configured pre-commit
-   checks, commits, pushes, and synchronizes with current `dev`. Repair a failed gate and retry through the workflow.
-4. Let the workflow render and create the synchronized PR, observe CI and Sonar, and record readiness for the
-   checked head. A later head change requires a new readiness check. For a PR that targets `dev`, readiness adds
-   the PR to the merge queue. The queue merges the PR when every required check passes on the merge group. For
-   other bases, readiness hands the PR to the maintainer for merge. Readiness does not close the issue.
-5. After the PR merges, the [Phase E workflow](../.github/workflows/ground-control-phase-e.yml) calls the
-   existing finalizer. The finalizer posts the final report and closes the issue. Follow [setup and recovery](development/phase-e.md)
-   for release access, first installation, restricted fork events, or a failed run. When readiness reports
-   `finalization: reentry`, re-invoke the same `/implement <issue>` or `/quickfix <issue>` after merge.
+After a PR merges, the [Phase E workflow](../.github/workflows/ground-control-phase-e.yml) can post a final report
+and close the delivered issue. It runs only in `OpenRAE/go-rae-gremlins`. [Setup and recovery](development/phase-e.md)
+is for the maintainer.
 
 ## Release
 

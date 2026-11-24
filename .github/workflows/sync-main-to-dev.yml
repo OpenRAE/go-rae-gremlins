@@ -31,6 +31,8 @@ concurrency:
 jobs:
   backmerge:
     name: Open main -> dev back-merge PR
+    # Runs only in OpenRAE/go-rae-gremlins; forks skip it (ADR 0010).
+    if: github.repository_id == '1441387140'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -117,10 +119,11 @@ jobs:
           fi
 
           if [ "${skip_push}" != true ]; then
-            # The token is in this one command only, not in the Git configuration.
+            # The gh credential helper reads GH_TOKEN from the environment. The token is
+            # not in the process arguments, the remote URL, or the Git configuration.
+            gh auth setup-git --hostname github.com
             git push --force-with-lease="refs/heads/${branch}:${remote_sha}" \
-              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-              "origin/main:refs/heads/${branch}"
+              origin "origin/main:refs/heads/${branch}"
           fi
 
           if [ -n "${existing}" ]; then

@@ -20,7 +20,8 @@ concurrency:
 
 jobs:
   finalize:
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository) }}
+    # Runs only in OpenRAE/go-rae-gremlins; forks skip it (ADR 0010).
+    if: ${{ github.repository_id == '1441387140' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

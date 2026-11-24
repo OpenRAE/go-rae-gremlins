@@ -1,9 +1,10 @@
 # Maintainer setup
 
-Ground Control is optional tooling for maintainers of
-`OpenRAE/go-rae-gremlins`. Contributors can use ordinary Git, GitHub, and the
-Go commands in the Makefile. Pull requests target `main`; the user approves
-merges. The upstream Go module path remains `github.com/go-gremlins/gremlins`.
+This page is for the maintainers of `OpenRAE/go-rae-gremlins`. Contributors
+use [contributing](CONTRIBUTING.md) and ordinary Git, GitHub, and Go
+commands. Pull requests target `dev`; the user approves merges. The Go module
+path is `github.com/OpenRAE/go-rae-gremlins`
+([ADR 0001](adr/0001-module-path.md)).
 
 ## Native checks
 
@@ -38,13 +39,11 @@ history. No external scanning service is added.
 key named `tvsa.float64.key`. Its exception is limited to that exact commit,
 path, rule, and line; it does not disable a rule or exclude a file.
 
-For a standard clone, install the hook with `pre-commit install`. If
+For a clone, install and verify the hook with `make hooks`. If
 `git config --get core.hooksPath` names a shared dispatcher, preserve it. This
 maintainer host already delegates to `.git/hooks/pre-commit`; its existing hook
 loads this configuration. Do not replace the shared hooks or unset
-`core.hooksPath`. For another shared setup, use its documented local hook
-installation procedure. Ground Control also runs the configured pre-commit
-command before committing.
+`core.hooksPath`.
 
 To run the history scan explicitly:
 
@@ -52,45 +51,28 @@ To run the history scan explicitly:
 pre-commit run gitleaks-history --hook-stage manual --all-files
 ```
 
-## Local Ground Control registration
+## Maintainer tooling
 
-Install a released `grndctl` package and the workflow skills using Ground
-Control's installation instructions. Do not build or modify a sibling checkout
-that another agent is using. The maintainer host already has `grndctl`, Node.js,
-`gh`, and `codex`; use `grndctl doctor` to check supported versions and GitHub
-authentication.
+The maintainer uses private Ground Control tooling with this repository. Its
+source and installation are not public. Its own documentation describes its
+installation and registration. This repository gives no installation steps.
 
-From this repository root, run:
+The tooling reads `.ground-control.yaml` and `.gc/plan-rules.md`. The Phase E
+workflow and the CI transport tests use `.github/ground-control/`.
+[Setup and recovery](development/phase-e.md) describes the workflow secret and
+recovery.
 
-```sh
-grndctl init
-grndctl doctor
-```
+Both `.env` and `.mcp.json` are ignored. Keep credentials and local server
+settings in them, and do not commit them. `make policy` checks the YAML syntax
+of the committed settings. CI does not require the tooling.
 
-`init` keeps the committed `.ground-control.yaml`, updates only the
-`ground-control` entry in local `.mcp.json`, and preserves existing `.env`
-values. Review its preview before confirming. The server entry is:
+Jobs that need an OpenRAE secret, service, or branch setting run only in this
+repository ([ADR 0010](adr/0010-maintainer-integrations-in-the-canonical-repository.md)).
+A fork skips them.
 
-```json
-{
-  "type": "stdio",
-  "command": "grndctl",
-  "args": ["mcp"]
-}
-```
-
-Both `.env` and `.mcp.json` are ignored. Configure only credentials for approved
-review providers, following the installed release's documentation. Do not copy
-another repository's credentials. SonarCloud is not configured for this fork.
-Restart the agent session after registration. Clients that do not read
-`.mcp.json` need the equivalent stdio server entry in their own MCP settings,
-with this repository as the working directory.
-
-Settings and plan rules are committed so agents share the same commands and
-repository identity. `make policy` checks their YAML syntax;
-`grndctl doctor` additionally validates Ground Control's schema, repository
-identity, and local server registration. CI does not require Ground Control or
-review-provider credentials.
+When an agent run finds a `GitGuardian Security Checks` finding, the finding
+belongs to the user. Report the check name, status, and URL, then stop for the
+user's resolution.
 
 ## Architecture references
 
@@ -99,9 +81,3 @@ The package responsibilities and maintainer-tooling boundary are recorded in
 `architecture.vocabulary` section of `.ground-control.yaml`. Update them when
 package ownership changes. Native compilation, dependency inspection, and Go
 tests remain the source of implementation evidence.
-
-The configuration supports the installed Ground Control 1.8.1 release. Newer
-development checkouts may require additional design-validation commands,
-acceptance adapters, or module mappings. Upgrade the installed release and
-configuration together before using those features; do not copy settings from
-an unreleased sibling checkout.
