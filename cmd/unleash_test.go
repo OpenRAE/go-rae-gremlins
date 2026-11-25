@@ -515,7 +515,7 @@ func TestFeatureUnleashRegistersMemoryBudgetFlag(t *testing.T) {
 // TestRegressionUnleashCreatesOnlyMutantsThatBuild checks, from the type load
 // to the report, that the run creates no mutant that cannot build and no
 // second mutant with the same change. See
-// docs/adr/0010-mutant-eligibility-type-information.md.
+// docs/adr/0011-mutant-eligibility-type-information.md.
 func TestRegressionUnleashCreatesOnlyMutantsThatBuild(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs the go command on a temporary module")

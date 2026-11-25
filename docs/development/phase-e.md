@@ -4,6 +4,9 @@ The [Phase E workflow](../../.github/workflows/ground-control-phase-e.yml) runs 
 It calls Ground Control's existing merged-PR finalizer to post the delivery report and close the delivered issue.
 It does not merge PRs or execute delivered Go code, tests, hooks, or workflow commands.
 
+This page is for the maintainer. The workflow and its CI transport tests run only in `OpenRAE/go-rae-gremlins`.
+A fork skips them ([ADR 0010](../adr/0010-maintainer-integrations-in-the-canonical-repository.md)).
+
 The finalizer finds the issue from the `<issue>-<slug>` head branch of the merged PR.
 The issue must have a pickup record for that branch from a user with write access.
 `/implement` and `/quickfix` write this record when they start work on the issue.
@@ -25,6 +28,10 @@ The local developer `.env` is not copied or changed.
 A missing download credential fails with a setup message; it does not silently skip finalization.
 
 ## First installation and fork deliveries
+
+Current context: the Phase E workflow and the fork dispatcher are on `dev` and `main`, so the first installation is complete.
+Manual dispatch and automatic fork finalization are available.
+The steps below record how the first installation worked.
 
 Merge the workflow through the normal reviewed PR into `dev`.
 The installation PR can have `finalization: reentry` because its base did not yet contain the workflow.
@@ -80,7 +87,9 @@ The [design](phase-e-design.md) records data flow, permissions, integrity, and f
 
 Install the pinned utility in a temporary directory using the committed manifest, lockfile, and checksum-verified tarball.
 Use the same disabled lifecycle scripts as the workflow.
-Point `GROUND_CONTROL_TEST_ROOT` at the installed `node_modules/grndctl` directory and run:
+Point `GROUND_CONTROL_TEST_ROOT` at the installed `node_modules/grndctl` directory.
+Put the release tarball two directories above that directory, or set `GROUND_CONTROL_RELEASE_ASSET` to its path.
+Then run:
 
 ```shell
 make phase-e-test
@@ -95,7 +104,9 @@ The cases cover:
 - A `dev` to `main` promotion that has no required checks and is not a delivery.
 - Skips for a missing pickup record, a pickup record for another branch, and an untrusted pickup author.
 - Refusal of an unmerged PR, of a token without issue-write access, and of a mismatched Actions run.
-- Rejection of a tampered download, the locked installation, and the fork dispatch.
+- Rejection of a tampered download.
+- Installation of the pinned executable from the locked manifest.
+- Fork dispatch for both base branches.
 
 The stand-in enforces the permission map of each job. Each finalization case uses a fresh checksum-verified, locked installation.
 The reference package supplies only the YAML parser.

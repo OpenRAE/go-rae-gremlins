@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "issue": 223,
+  "summary": "Contributor-documentation rewrite under the Diataxis adoption design (#133). Rewrite maintained contributor, maintainer, agent, and development pages in ASD-STE100; move hosted-check reference facts from docs/CONTRIBUTING.md to a new reference page; add current context to historical records and ADRs without changing decision IDs or original observations. Correct source comments that disagree with behavior in .ground-control.yaml, .pre-commit-config.yaml, ci.yml, and scripts/install-hooks.sh. Fix defects found during source verification: remove unused lint inputs from the commit-stage policy jobs, classify the merge-queue policy test as Sonar test code, and keep the back-merge token out of process arguments. No Go package, dependency, CLI flag, configuration key, schema, JSON report, exit code, hook stage, or required check changes. See docs/development/contributor-documentation-preflight.md.",
+  "changes": [],
+  "contracts": [],
+  "policies": [
+    "guidance",
+    "contributing",
+    "plan",
+    "workflow",
+    "hooks",
+    "ci",
+    "sonar"
+  ],
+  "contract_changes": {},
+  "trust_boundaries": "Review and explicit-path documentation validation remain local or in existing CI. Existing checksum-verified tool downloads do not transfer document contents. The Policy job keeps its read-only checkout and existing GitHub API read for the merge-queue policy; removing unused lint inputs removes no control. The back-merge workflow keeps its existing GITHUB_TOKEN permissions and destination; Git reads the token from the job environment through a credential helper, so the token no longer appears in process arguments. Sonar classification changes only which tracked file counts as test code. No credential file is inspected; no new service, provider, upload, hosting, publication, or external destination is authorized. No runtime environment binding, error envelope, persistence, or application authorization boundary changes.",
+  "conflicts": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  }
+}

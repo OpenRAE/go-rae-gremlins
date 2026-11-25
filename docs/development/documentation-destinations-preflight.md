@@ -1,5 +1,9 @@
 # Documentation destination boundaries for issue #126
 
+> Current context (2026-11-24): This is a historical record of issue #126 at its reviewed revision.
+> Current pages: [configuration](../docs/usage/configuration.md) and the [contributor guide](../CONTRIBUTING.md#documentation).
+> The configuration page now links the schema with a relative path.
+
 Issue #126 corrects maintained fork destinations and links in the built documentation.
 This preflight inspected revision `bd52c783d808ac70a250016c25b68f783b42b31b`.
 It changes no installation instructions, site configuration, application code, or workflow.

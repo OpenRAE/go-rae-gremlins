@@ -18,7 +18,7 @@ No additional activation flag or transfer-approval gate is required.
 The workflow adds no marker parser, completion schema, issue-discovery algorithm, or closure implementation.
 Both delivery lanes and repair use the same finalizer.
 The Go packages, CLI, Configuration keys/schema, JSON report, and Exit errors remain unchanged.
-Existing Logger, Work directory copy, runtime diagrams, and ADRs 0001–0005 need no implementation changes.
+Existing Logger, Work directory copy, runtime diagrams, and ADRs 0001–0005 needed no implementation changes. Later ADRs do not change this boundary.
 
 ADR 0004 governs the model and design declarations.
 The existing static development-check boundary stays unchanged; finalization has a separate network boundary.
@@ -35,8 +35,8 @@ The workflow commits the digest. It does not download a checksum as runtime auth
 Dependencies use a standard npm lockfile, not fresh floating resolution in each job.
 The lockfile starts from the release's own lockfile, and the manifest copies the release's `overrides`.
 
-The manifest pins `hono` 4.13.16 and `@hono/node-server` 2.1.6, which fix three moderate npm advisories in the release pins.
-Ground Control `dev` uses the same two pins. `npm audit --omit=dev` reports no findings.
+The manifest copies the 11 `overrides` of the release package, including `hono` 4.13.16 and `@hono/node-server` 2.1.6.
+At the v1.12.0 upgrade (#186), `npm audit --omit=dev` reported no findings.
 Node and external actions are pinned. Private packages are neither committed nor uploaded as artifacts.
 
 Ground Control v1.9.0 found the issue from a delivery pointer comment that readiness wrote on the PR.
@@ -71,12 +71,20 @@ No Ground Control source, release, or event-trust change is required.
 Manual and automatic dispatch require the finalization workflow on the default branch.
 The installation PR can still require local reentry because its readiness used the earlier base.
 
+## Repository applicability
+
+Issue #231 limits the integration to `OpenRAE/go-rae-gremlins` ([ADR 0010](../adr/0010-maintainer-integrations-in-the-canonical-repository.md)).
+The finalization job and the fork dispatcher run only when `github.repository_id` is `1441387140`.
+This condition applies to the full job condition, also to manual dispatch.
+A rename or a transfer keeps the ID. A fork has a different ID, so it skips both jobs before a download or API write.
+In the canonical repository, a missing release secret still fails the job.
+
 ## Data flow
 
 ```mermaid
 flowchart LR
-  event[Merge event or maintainer dispatch] -->|PR number| job[Phase E transport]
-  fork[Fork merge event] -->|PR number only| dispatcher[Trusted dispatcher: no checkout]
+  event[Merge event or maintainer dispatch in the canonical repository] -->|PR number| job[Phase E transport]
+  fork[Fork PR merge event in the canonical repository] -->|PR number only| dispatcher[Trusted dispatcher: no checkout]
   dispatcher -->|fixed workflow and default branch| event
   subgraph runner[Temporary GitHub Actions runner]
     job -->|live merge SHA| checkout[(Delivered checkout)]
@@ -96,6 +104,7 @@ flowchart LR
 
 | Boundary or threat | Control | Verification |
 | --- | --- | --- |
+| Execution in a fork | The finalization and dispatcher jobs require the canonical repository ID. A fork skips them. | `.github/scripts/test_workflow_applicability.py` checks each job condition. |
 | Untrusted PR input | Validate positive decimal input; pass arguments through quoted variables. Resolve live merged state and permitted base in the current repository. | Execute transport scripts with synthetic invalid, unmerged, and wrong-base cases. |
 | Untrusted delivery code | Install outside the checkout. Read manifests from the workflow revision. Execute no delivered action, Go file, hook, generator, or configured command. Keep checkout credentials disabled. | Actionlint and review of executable steps and checkout refs. |
 | Release or dependency replacement | Verify committed SHA256 before installation; use `npm ci` with locked integrity values and disabled lifecycle scripts. | Tampered-download rejection and clean locked installation. |
@@ -129,13 +138,15 @@ The scope job compares the candidate with the PR base or the merge group base.
 It selects the change when a changed path is in the two transport workflows, `.github/ground-control/`, `ci.yml`, or `Makefile`.
 A renamed path counts with its old and new names. A failed comparison fails the job.
 
-Only `pull_request` and `merge_group` runs select a change.
+Only `pull_request` and `merge_group` runs in the canonical repository select a change.
+In a fork, the scope job selects nothing, and the release job has the repository condition too.
 Push and manual runs select nothing, because fork PRs can restore cache entries from `dev` and `main`.
 The merge queue verifies each change before it gets to `dev`.
 Fork and Dependabot PRs get no secrets. Their PR runs skip the check with a warning, and the merge queue runs it.
 
 `PR Gate` requires a successful scope job.
 When the scope job selects the change, `PR Gate` requires a successful test job. Otherwise, the test job must skip.
+A selection other than `true` or `false` fails `PR Gate`.
 A failed release job skips the test job, so `PR Gate` fails.
 
 ### Tarball handoff
@@ -211,6 +222,9 @@ For issue #182, 16 cases passed against v1.12.0. [Setup and recovery](phase-e.md
 Finalization runs against a fresh checksum-verified locked installation, not the separately supplied reference executable.
 The fixture enforces the workflow permission map and returns installation-token denial for user-identity access.
 Actual Actions credential access, API permissions, and report/close behavior need the first configured post-merge run.
+
+For issue #231, `make architecture-design` passed with ARCH001–ARCH004 and model SHA256
+`c28bab810f1497d79aea1fcac11781ad83abf8d2e7b36cb8c78a8e7225243f6b`.
 
 The reviewed release/version/asset/digest tuple, manifest, and lockfile form the upgrade seam.
 The validated PR number is the repair seam; dispatch cannot select arbitrary code, repository, or completion evidence.

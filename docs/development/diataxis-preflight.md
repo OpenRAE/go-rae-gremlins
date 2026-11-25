@@ -1,5 +1,8 @@
 # Diataxis adoption boundaries for issue #133
 
+> Current context (2026-11-24): This is a historical record of issue #133 at its reviewed revision.
+> Current design: [Diataxis adoption design](diataxis-adoption.md).
+
 This preflight reviews revision `8a37862b6d73d229de4930ba90460d0894b70401` against the supplied issue contract.
 It records design constraints, not an implementation plan or a claim that adoption is complete.
 Issue #133 delivers a small design and implementation issues in a milestone.

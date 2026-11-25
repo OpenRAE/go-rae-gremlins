@@ -61,7 +61,7 @@ Use the shared `documentation` skill of doc-tools v0.1.0. See
 # Basic mutation testing
 gremlins unleash              # Or: gremlins run, gremlins r
 
-# Dry-run mode (find mutants without running their tests)
+# Dry-run mode: run the coverage tests and find mutants, but run no mutant tests
 gremlins unleash --dry-run    # Or: -d
 
 # Configuration file
@@ -74,8 +74,9 @@ gremlins unleash --dry-run    # Or: -d
 # Install required tools
 make requirements
 
-# Full development cycle
-make all                      # lint + test + build
+# Full cycle (lint + test + build). CI owns this gate; run targeted
+# tests locally (docs/CONTRIBUTING.md#verify-the-change)
+make all
 
 # Create snapshot release
 make snap                     # lint + test + snapshot
@@ -148,7 +149,7 @@ make clean
    commands of a run use one temporary build cache in the run work directory
 3. `internal/typeinfo` loads the package types once and gives operand
    facts, for example a `+` without a valid `-` form. See
-   [ADR 0010](docs/adr/0010-mutant-eligibility-type-information.md)
+   [ADR 0011](docs/adr/0011-mutant-eligibility-type-information.md)
 4. `Engine.Run()` walks file tree, parses Go AST
 5. For each operator, the registry gives the eligible mutation types
    in registration order. A spec selects only operators whose mutants
@@ -177,8 +178,10 @@ make clean
    candidate position in the registration order
 4. Set the default in `internal/configuration/mutantenabled.go`. The
    configuration key and the flag come from `mutator.Types`
-5. Add the type to `docs/docs/schema/configuration.json` and add its
-   page to `docs/docs/usage/mutations/`
+5. Add the type to `docs/docs/schema/configuration.json`. Add its page
+   to `docs/docs/usage/mutations/`, a row to
+   `docs/docs/usage/mutations/index.md`, and a `nav` entry to
+   `docs/mkdocs.yml`
 
 Registration alone does not make a public type. A new type changes the
 CLI, configuration, and report contracts.
@@ -189,8 +192,9 @@ CLI, configuration, and report contracts.
   original operator position and restores the AST before `Apply`
   returns. Worker writes use the physical file name, not `//line`
   positions
-- **Workdir isolation**: Each mutation runs in temporary directory
-  copy to avoid interference
+- **Workdir isolation**: Each mutation runs in a temporary copy of the
+  module, so mutants do not interfere. The copy is not a sandbox: the
+  tests of the target module run with the permissions of the user
 - **Worker pool**: Concurrent mutation execution with configurable
   parallelism
 - **Configuration cascade**: Flags override config file, which
@@ -202,13 +206,15 @@ CLI, configuration, and report contracts.
 ## Testing Conventions
 
 Follow the [Go test standard](docs/development/test-standard.md) for all Go packages.
-The [test assessment](docs/development/test-assessment.md) records current gaps and evidence limits.
+The [test assessment](docs/development/test-assessment.md) records the gaps found against that standard, their repairs, and the evidence limits.
 Use the [contributor guide](docs/CONTRIBUTING.md#verify-the-change) for local and hosted verification.
 
 ## Module Structure
 
 ```text
-cmd/                    - CLI commands (main.go, unleash.go, cobra setup)
+cmd/                    - CLI commands (gremlins.go, unleash.go, cobra setup)
+  gremlins/            - Binary entry point (main.go)
+  internal/flags/      - Shared flag binding
 internal/
   configuration/        - Config handling (Viper-based)
   coverage/            - Test coverage analysis
@@ -222,6 +228,9 @@ internal/
   process/             - Command runs that stop the process group
   report/              - Result formatting and output
   typeinfo/            - Operand type facts for mutant eligibility
+tools/
+  architecture/        - Architecture model and design checker (make architecture)
+  lintcontext/         - Declaration identities for the lint baseline (make lint)
 ```
 
 ## Quality Standards
@@ -232,7 +241,7 @@ internal/
   Provision the mise-pinned linter and Go, and run `go mod download` before offline analysis.
   Set `LINT_BASE` to the fetched comparison commit when needed.
   Fix debt, then use `make lint-shrink`; never add baseline allowances.
-- Test coverage tracked (Codecov integration)
+- CI sends test coverage to SonarCloud
 - All commits must pass: lint, tests, build
 - Mutation testing runs on itself (`.gremlins.yaml` configured)
 
@@ -244,4 +253,4 @@ Record the model digest, affected rules, and result in the issue plan.
 
 Resolve conflicts before implementation. Repeat after model or design changes.
 See [the architecture model and design check](docs/development/architecture.md).
-CI runs `make architecture` and rejects baseline growth and missing design coverage.
+CI runs the same architecture check as `make architecture`. It rejects baseline growth and missing design coverage.

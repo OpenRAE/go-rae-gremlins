@@ -13,7 +13,7 @@ They supersede the runtime-repair non-goals of this note:
 - Integration mode halves a test CPU value greater than 1.
 - Specs select only operators whose mutants can build, and no two types make the same edit.
 
-[ADR 0010](../adr/0010-mutant-eligibility-type-information.md) records the mutant decision.
+[ADR 0011](../adr/0011-mutant-eligibility-type-information.md) records the mutant decision.
 The [mutation registry](mutation-registry.md#eligibility) describes the design.
 `.architecture/designs/222.json` declares the new `internal/typeinfo` package and the compatible contract changes.
 These repairs need regression tests, because they change executable behavior.

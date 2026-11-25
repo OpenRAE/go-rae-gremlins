@@ -2,7 +2,7 @@
 
 This explanation describes how the engine finds and applies mutations.
 Issue 20 introduced this design. The [preflight](mutation-registry-preflight.md) records its boundaries and evidence obligations.
-Issue 222 added the eligibility checks and the operand facts. [ADR 0010](../adr/0010-mutant-eligibility-type-information.md) records that decision.
+Issue 222 added the eligibility checks and the operand facts. [ADR 0011](../adr/0011-mutant-eligibility-type-information.md) records that decision.
 
 ## Components
 
@@ -13,9 +13,10 @@ The `internal/mutator` package keeps the `Type`, `Status`, and `Mutator` contrac
 | --- | --- | --- |
 | Spec | `spec.go` | The behavior of one mutation type: eligibility of an original operator, and one reversible AST edit. |
 | Token spec | `spec.go` | A spec that replaces the operator token from a fixed table. An optional check limits the operators that it selects. |
+| Logical spec | `spec.go` | The `INVERT_LOGICAL` spec: its token table and the `!x` to `!!x` edit. |
+| Expression edit helpers | `spec_expression.go` | Find a `!x` negation and apply the `!!x` edit for the logical spec. |
 | Operator context | `node.go` | The operator token, its unary or binary form, its operand facts, and the loop context of a `break`. |
 | Operand facts | `internal/typeinfo` | Loads the types of the scanned packages once. Gives the `+` and `+=` operators whose `-` form does not type-check, and the shift assignments whose count cannot be assigned. |
-| Expression spec | `spec_expression.go` | The `!x` to `!!x` edit. The `INVERT_LOGICAL` spec uses it with its token table. |
 | Built-in specs | `specs.go` | The registration list of the 11 built-in types, in candidate order. |
 | Registry | `registry.go` | Validates the registration once and indexes the specs by operator token. Gives the eligible types of an operator, in registration order. |
 | Factory | `registry.go` | Binds a type, an operator, a package, and a parsed file into a `mutator.Mutator`. |

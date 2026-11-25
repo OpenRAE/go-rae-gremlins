@@ -1,5 +1,9 @@
 # Issue #77: lint architecture preflight
 
+> Current context (2026-11-24): This is a historical record of issue #77 at its reviewed revision.
+> Current rules: [strict lint design](lint-design.md) and [Go coding standard](coding-standards.md).
+> `make requirements` now installs pinned versions, and the Lint job fetches full history.
+
 Status: guidance before implementation. This document does not establish the coding standard or deliver #77.
 It identifies the boundaries for strict linting, a shrink-only baseline, and the upstream comparison record.
 No implementation sequence is prescribed.
@@ -26,7 +30,7 @@ Its `.golangci.yml` is identical to the fork's at these revisions.
 
 The architecture decoder, Git reader, and ratchet are currently private functions in a `package main`, not
 an importable library. They are the reference implementation for these concerns. Reuse through a small shared
-extraction only where actual common code warrants it; do not import a command, paste a second generic ratchet,
+extraction only where actual common code warrants it. Do not import a command, paste a second generic ratchet,
 or turn architecture tooling into a general policy framework. A lint-specific diagnostic adapter is a separate concern.
 
 ## Standards and comparison record
@@ -36,8 +40,8 @@ Distinguish the canonical [Guide](https://google.github.io/styleguide/go/guide),
 [Decisions](https://google.github.io/styleguide/go/decisions), and advisory Best Practices, as explained by
 the [Google overview](https://google.github.io/styleguide/go/). Do not claim that enabling a linter proves full compliance.
 
-The record must account for each rule: source section, deterministic predicate, selected checker/subrule and
-settings, or the precise reason it requires human judgment or lacks tool support. A deterministic coverage gap
+The record must account for each rule. Give the source section, the deterministic predicate, and the selected
+checker/subrule and settings. Otherwise, give the precise reason it requires human judgment or lacks tool support. A deterministic coverage gap
 must remain explicit and be resolved before claiming the outcome; calling it subjective does not resolve it.
 Prefer supported checks within golangci-lint over custom analyzers. Keep configuration as the executable authority;
 the record explains coverage and decisions rather than defining another policy schema.
@@ -46,7 +50,9 @@ Compare enabled and disabled rules, options, formatter behavior, exclusions, sup
 against upstream. Record each difference and its keep/adapt/drop decision with a reason, including rules retained
 from upstream. Existing complexity and whitespace preferences are not automatically Google rules. In particular,
 Google permits useful named results and has no fixed line-length limit; upstream enables `nonamedreturns`.
-Resolve that conflict explicitly. Preserve the repository Logger rather than adopting Google-internal logging examples.
+Resolve that conflict explicitly.
+
+Preserve the repository Logger rather than adopting Google-internal logging examples.
 Keep runtime JSON `snake_case` tags stable; identifier naming guidance does not authorize report/schema changes.
 
 Observed drift to resolve within lint integration: `make requirements` still installs the old v1 module at `@latest`,
@@ -73,6 +79,7 @@ First adoption needs an explicit reviewed initial baseline evidenced against unt
 commit under the selected strict settings. Only findings already present there may seed the candidate baseline.
 The architecture check's missing-target-baseline-means-empty behavior cannot admit nonempty lint debt unchanged.
 Normal checks must never regenerate or enlarge allowances; deleting the target baseline later is not adoption.
+
 PRs compare with the event's base SHA, pushes with the preceding SHA, and local/manual runs with an explicitly
 resolved target. Define initial-push behavior. Missing comparison history is an error; the lint checkout currently
 lacks the architecture job's full history. Pass the same comparison to `make lint` wherever policy hooks invoke it.
@@ -80,6 +87,7 @@ lacks the architecture job's full history. Pass the same comparison to `make lin
 Use the pinned tool's structured output, not scraped console text. Validate the emitted shape and distinguish
 the documented findings exit status from crashes, timeout, package/type errors, missing tools, and malformed or
 truncated output. Bound input/report sizes and fail on overflow rather than trimming findings.
+
 A subprocess failure must never become an empty successful findings set. Severity is display
 metadata, not permission to ignore a finding. Review all output filters before baselining: disable issue-count
 caps and per-line collapsing; do not use changed-lines/new-only mode for the authoritative gate.
@@ -106,7 +114,7 @@ exceptions need narrow scope, a reason, and visible policy review; `nolintlint` 
 | Model validation | Before implementation, update `.architecture/design.json` with the actual packages, dependencies, and affected policies, then run `make architecture-design`. New tool packages and canonical lint/baseline paths need explicit ownership. Preserve ARCH001–ARCH004, local/existing-CI destinations, no analysis network use, and no scanned-source execution. Provision approved tools/dependencies separately rather than silently weakening that trust contract. |
 
 The existing syntax, secret, vulnerability, architecture, lint, and Sonar checks have distinct jobs. Lint integration
-does not replace them. The candidate can edit its own baseline, config, checker, and workflow together; maintainer
+does not replace them. The candidate can edit its own baseline, config, checker, and workflow together. Maintainer
 review remains the boundary for policy changes, including suppressions and weakened rule settings.
 
 ## Extension seam, proof, and non-goals
@@ -116,13 +124,15 @@ as explicit inputs to the common evaluation path. A new checker or supported bui
 separate CI, hook, and Ground Control implementations. Version the lint identity contract; tool upgrades and
 new checks need reviewed coverage/identity decisions and cannot automatically buy more baseline debt.
 
-Use existing table-driven tests and targeted race tests to prove same-count substitution, repeated occurrences,
-line movement, stale entries, first adoption, invalid input/history, tool failures, and policy-only CI changes.
-Demonstrate that a new violation fails even when the candidate adds it to B. Exercise shared Go comparison logic
-with the existing hosted mutation workflow where applicable; do not introduce a new test framework or redefine #78–#79.
+Use existing table-driven tests and targeted race tests for these proofs: same-count substitution, repeated
+occurrences, line movement, and stale entries. Also prove first adoption, invalid input/history, tool failures, and
+policy-only CI changes. Demonstrate that a new violation fails even when B, the candidate baseline, contains it.
+Exercise shared Go comparison logic with the existing hosted mutation workflow where applicable. Do not introduce a new test framework or redefine #78–#79.
 
-This preflight changes guidance only. #77's implementation remains development tooling and its standards record:
-no new mutation type, runtime configuration/schema/report/exit-code changes, broad debt cleanup, upstream merge,
-service, storage system, or replacement workflow. [ADR 0003](../adr/0003-upstream-changes.md) still governs any imported
+This preflight changes guidance only. #77's implementation remains development tooling and its standards record.
+It adds no new mutation type, no runtime configuration/schema/report/exit-code changes, and no broad debt cleanup.
+It adds no upstream merge, service, storage system, or replacement workflow.
+
+[ADR 0003](../adr/0003-upstream-changes.md) still governs any imported
 upstream changes. Architecture checks remain under ADR 0004; wider test, mutation, quality, and security work stays
 with #78–#81. This note is neither the completed standards comparison nor evidence that the new gate exists.

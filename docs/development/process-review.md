@@ -2,6 +2,12 @@
 
 Issue: [#75](https://github.com/OpenRAE/go-rae-gremlins/issues/75). Reviewed on 2026-11-02.
 
+> Current context (2026-11-24): This is a historical record of the process at the fork baseline below.
+> Some decisions changed later. [ADR 0007](../adr/0007-dev-merge-queue.md) added the `dev` merge queue, which squashes,
+> and readiness now adds a ready PR to the queue. The Gremlins workflow now builds a binary, runs it inside the
+> [memory budget](memory-budget.md), and mutates only changed lines on pull requests. Issues #76 to #83 are closed.
+> The [contributor guide](../CONTRIBUTING.md) and [Hosted checks](checks.md) give the current process.
+
 ## Scope and baseline
 
 This record compares upstream Gremlins with the process established for the OpenRAE fork and its Ground Control
@@ -61,12 +67,18 @@ PR review, post-merge closure, and release. It replaces the inherited guide's up
 commit convention, branch assumptions, local full-suite instruction, and mandatory squash/release-freeze rules.
 Existing ADRs 0001–0003 remain binding; this review reconciles their application and requires no new ADR.
 
-The guide distinguishes configured checks from a successful delivery: `PR Gate` summarizes part of CI, while
+The guide distinguishes configured checks from a successful delivery. `PR Gate` summarizes part of CI, so the
 mutation, title, and any installed hosted security checks must also be inspected. Ground Control readiness
 requires its configured Sonar result even though foreign-fork CI permits a Sonar skip. The user owns any
 `GitGuardian Security Checks` investigation and resolution.
 
-The review records current practice without changing workflows or branch protection. Architecture modeling (#76),
-coding standards (#77), test standards (#78), changed-line mutation gates (#79), code/security/documentation reviews
-(#80–#82), and upstream triage (#83) remain separate items in the [maintenance plan](maintenance-plan.md).
+The review records current practice without changing workflows or branch protection. These items remain separate in
+the [maintenance plan](maintenance-plan.md):
+
+- Architecture modeling (#76).
+- Coding standards (#77) and test standards (#78).
+- Changed-line mutation gates (#79).
+- Code, security, and documentation reviews (#80–#82).
+- Upstream triage (#83).
+
 This record does not claim those gates or reviews already exist.

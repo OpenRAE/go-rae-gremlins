@@ -9,7 +9,7 @@ Apply this standard with the [Go coding standard](coding-standards.md).
 That document owns style, approved imports, and lint exceptions.
 This document owns test behavior and evidence requirements.
 
-The [assessment](test-assessment.md) records current gaps; it grants no exceptions.
+The [assessment](test-assessment.md) records the gaps found at its inspected revision and their repairs. It grants no exceptions.
 Apply the requirements to new and changed tests. Record gaps found in existing tests against the same requirements.
 Requirement IDs remain stable when the wording changes.
 

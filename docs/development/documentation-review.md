@@ -1,5 +1,10 @@
 # Documentation review
 
+> Current context (2026-11-24): This is a historical record of issue #82 at its reviewed revision.
+> Current guidance: [Diataxis adoption design](diataxis-adoption.md) and [Documentation](../CONTRIBUTING.md#documentation).
+> The CI Docs job now runs the STE check on changed Markdown.
+> This record gives no resolution status for findings D01 to D20.
+
 Issue: [#82](https://github.com/OpenRAE/go-rae-gremlins/issues/82). Review date: 2026-11-05.
 
 ## Baseline and scope

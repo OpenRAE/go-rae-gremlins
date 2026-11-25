@@ -30,13 +30,13 @@ Git hook dispatcher. Never bypass hooks or secret scanning. Commit only the
 files belonging to the issue. The user owns PR merges and changes into `dev`
 and `main`.
 
-## Ground Control context
+## Maintainer tooling
 
-Ground Control is optional maintainer tooling. Repository commands and context
-live in `.ground-control.yaml`, plan rules in `.gc/plan-rules.md`, and decisions
-in `docs/adr/`. The MCP context tool is
-`gc_get_repo_ground_control_context`. Keep architecture references aligned with
-the Go code; do not copy another repository's configuration.
+The maintainer uses private tooling with this repository. Contributors and
+agents do not need it. Use the Git, GitHub, Go, and Make commands above.
+`.ground-control.yaml`, `.gc/`, and `.github/ground-control/` belong to that
+tooling. Change them only when the issue asks for it.
 
-See [maintainer setup](docs/MAINTAINER_SETUP.md) for local registration and
-verification. Contributors may use ordinary Git, GitHub, and Go commands.
+Some workflows run only in `OpenRAE/go-rae-gremlins`. A fork skips them, as
+[ADR 0010](docs/adr/0010-maintainer-integrations-in-the-canonical-repository.md)
+records.

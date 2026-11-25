@@ -193,7 +193,7 @@ func TestFeatureSpecRejectsIneligibleOperator(t *testing.T) {
 
 // TestFeatureSpecEligibility checks that each spec selects only the
 // operators whose mutants can build and that no other type edits the same
-// way. docs/adr/0010-mutant-eligibility-type-information.md gives the rules.
+// way. docs/adr/0011-mutant-eligibility-type-information.md gives the rules.
 func TestFeatureSpecEligibility(t *testing.T) {
 	t.Parallel()
 

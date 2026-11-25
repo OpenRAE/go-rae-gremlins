@@ -1,4 +1,4 @@
-# ADR 0010: Create only mutants that can build
+# ADR 0011: Create only mutants that can build
 
 Status: Accepted when the PR of #222 merges.
 

@@ -1,5 +1,8 @@
 # Ignore directive: architecture preflight
 
+> Current context (2026-11-24): This is a historical record of issue #9 at its reviewed revision.
+> Current decision and use: [ADR 0009, ignore directives](../adr/0009-ignore-mutant-directives.md) and [ignore mutants](../docs/usage/ignore-mutants.md).
+
 Issue #9 is the contract. [ADR 0009](../adr/0009-ignore-mutant-directives.md) records the syntax and scope decision.
 This note defines the design boundaries. It does not prescribe implementation steps.
 Sources were inspected at revision `f5a9bff`.

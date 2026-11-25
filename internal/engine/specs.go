@@ -108,7 +108,7 @@ func builtinSpecs() []spec {
 
 // The accepts checks below select only the operators whose mutants can build
 // and that no other type edits the same way. See
-// docs/adr/0010-mutant-eligibility-type-information.md.
+// docs/adr/0011-mutant-eligibility-type-information.md.
 
 // arithmeticOperands accepts binary operators and unary +. INVERT_NEGATIVES
 // owns unary -. A + whose - form does not type-check, for example with

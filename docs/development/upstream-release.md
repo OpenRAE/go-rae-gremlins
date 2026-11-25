@@ -1,6 +1,7 @@
 # Upstream build and release
 
-This page describes how upstream Gremlins (`go-gremlins/gremlins`) builds and releases. ADR 0002 records what the
+This page describes how upstream Gremlins (`go-gremlins/gremlins`) builds and releases at v0.6.0, commit `e05b1d4`.
+That commit is the `bootstrap-sha` of the fork release configuration. ADR 0002 records what the
 fork publishes, and `release.md` describes the release of the fork.
 
 ## Build
