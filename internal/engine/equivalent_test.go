@@ -36,6 +36,7 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/log"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 	"github.com/OpenRAE/go-rae-gremlins/internal/report"
+	"github.com/OpenRAE/go-rae-gremlins/internal/typeinfo"
 )
 
 // annotatedSrc has a same-line annotation of the first < on line 4 and a
@@ -285,6 +286,18 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 		{name: "type not on line", src: lineFourSrc("//gremlins:equivalent INVERT_LOOPCTRL r"), wantLine: 4},
 		{name: "ambiguous without column", src: lineFourSrc("//gremlins:equivalent CONDITIONALS_BOUNDARY r"), wantLine: 4},
 		{
+			name: "unary minus has no arithmetic base mutant",
+			src: "package main\n\nfunc f(a int) int {\n" +
+				"\treturn -a //gremlins:equivalent ARITHMETIC_BASE r\n}\n",
+			wantLine: 4,
+		},
+		{
+			name: "break outside a loop has no loop control mutant",
+			src: "package main\n\nfunc f(a bool) {\n\tswitch {\n\tcase a:\n" +
+				"\t\tbreak //gremlins:equivalent INVERT_LOOPCTRL r\n\t}\n}\n",
+			wantLine: 6,
+		},
+		{
 			name: "ambiguous logical without column",
 			src: "package main\n\nfunc f(a, b bool) bool {\n" +
 				"\treturn !a && b //gremlins:equivalent INVERT_LOGICAL r\n}\n",
@@ -322,6 +335,22 @@ func TestFeatureEquivalentAnnotationErrors(t *testing.T) {
 				t.Errorf("Run() error = %q, want it to name %q", err, want)
 			}
 		})
+	}
+}
+
+// TestFeatureEquivalentAnnotationUsesOperandFacts checks that directive
+// matching applies the operand facts, as the discovery does: a directive for a
+// mutant that the facts remove selects no mutant.
+func TestFeatureEquivalentAnnotationUsesOperandFacts(t *testing.T) {
+	const src = "package main\n\nfunc f(s, t string) string {\n" +
+		"\treturn s + t //gremlins:equivalent ARITHMETIC_BASE r\n}\n"
+	facts := typeinfo.Facts{fileBad: {strings.Index(src, "+ t"): typeinfo.InvalidSubtraction}}
+	sys := fstest.MapFS{fileBad: {Data: []byte(src)}}
+
+	_, err := runEquivalentEngine(t, sys, engine.CodeData{Facts: facts}, map[string]any{})
+
+	if !errors.Is(err, engine.ErrEquivalentAnnotation) {
+		t.Fatalf("Run() error = %v, want %v", err, engine.ErrEquivalentAnnotation)
 	}
 }
 

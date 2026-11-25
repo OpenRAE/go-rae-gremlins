@@ -1,38 +1,77 @@
 # Install
 
-go-rae-gremlins publishes pre-compiled binaries as assets of its GitHub releases. You can also install it from source.
+Install the `gremlins` binary from a release archive or from source.
+To run Gremlins, you also need Go 1.25 or later, because Gremlins runs `go test`.
 
 ## Pre-compiled binaries
 
-Download the archive for your OS and architecture from the
-[release page](https://github.com/OpenRAE/go-rae-gremlins/releases/latest). Each release has archives for Linux
-(386, amd64, arm64), macOS (amd64, arm64), and Windows (386, amd64, arm64), and a `checksums.txt` file.
+Each [release](https://github.com/OpenRAE/go-rae-gremlins/releases/latest) has archives for these systems:
 
-Extract the archive and copy the `gremlins` binary to a directory in your `PATH`. For example, on GNU/Linux:
+| System | Architectures |
+| --- | --- |
+| Linux | `386`, `amd64`, `arm64` |
+| macOS | `amd64`, `arm64` |
+| Windows | `386`, `amd64`, `arm64` |
 
-```shell
-tar -xvf gremlins_<version>_linux_amd64.tar.gz
-sudo cp gremlins /usr/local/bin
-```
+All archives are `.tar.gz` files. A release also has a `checksums.txt` file with the SHA-256 of each archive.
+
+1. Download the archive for your system and the `checksums.txt` file of the same release.
+    The archive name is `gremlins_<version>_<os>_<arch>.tar.gz`.
+
+2. Check the archive. For example, on Linux:
+
+    ```shell
+    sha256sum --check --ignore-missing checksums.txt
+    ```
+
+    The command prints `OK` for the archive. If it does not, download the archive again.
+
+3. Extract the archive:
+
+    ```shell
+    tar -xzf gremlins_<version>_linux_amd64.tar.gz
+    ```
+
+4. Copy the `gremlins` binary to a directory in your `PATH`. For example:
+
+    ```shell
+    sudo cp gremlins /usr/local/bin
+    ```
 
 ## From source
 
 ### Go install
 
-Only the [Go compiler](https://go.dev) is necessary:
+You need the [Go toolchain](https://go.dev/dl/), 1.25 or later.
 
-```sh
+```shell
 go install github.com/OpenRAE/go-rae-gremlins/cmd/gremlins@v<version>
 ```
 
+The `go` command puts the binary in `$(go env GOPATH)/bin`, or in `GOBIN` if it is set.
+
 ### Build
 
-To build Gremlins, you need the [Go compiler](https://go.dev) and `make`:
+You need the [Go toolchain](https://go.dev/dl/), Git, and `make`.
 
-```sh
+```shell
 git clone https://github.com/OpenRAE/go-rae-gremlins.git
 cd go-rae-gremlins
 make build
 ```
 
 The binary is `dist/bin/gremlins`.
+
+## Check the installation
+
+Run this command:
+
+```shell
+gremlins --version
+```
+
+The output gives the version, the operating system, and the architecture. For example:
+
+```text
+gremlins version 0.10.0 linux/amd64
+```

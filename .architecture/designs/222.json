@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "issue": 222,
+  "summary": "Rewrite the user documentation (quick start, install, usage pages) in Diataxis forms and ASD-STE100, and correct schema descriptions and unleash help against code. The maintainer added runtime repairs to this issue (issue comment 2026-11-24): (1) configuration file discovery uses the documented paths and order: current directory, module root, /etc/gremlins, $XDG_CONFIG_HOME/gremlins, $HOME; (2) integration mode halves a test CPU value greater than 1; (3) specs select only operators whose mutants can build and that no other type edits the same way: INVERT_NEGATIVES unary minus only, ARITHMETIC_BASE binary operators and unary plus where the - form type-checks, INVERT_BITWISE binary only, INVERT_ASSIGNMENTS where the -= form type-checks, REMOVE_SELF_ASSIGNMENTS without typed shift counts that are not assignable, INVERT_LOOPCTRL break only where continue with the same label is valid. New package internal/typeinfo loads package types once after coverage with golang.org/x/tools/go/packages, the run build tags, -buildvcs=false, and the run GOCACHE, and returns operand facts keyed by module-relative file and operator offset. cmd passes the facts to the engine in CodeData. The depguard approved-imports list in .golangci.yml adds golang.org/x/tools/go/packages; golang.org/x/sync becomes an indirect module requirement. A load failure stops the run; a package with type errors gives no facts and keeps earlier behavior. Flags, keys, schema semantics, report structure, and exit codes do not change; mutant counts can decrease. Decision: docs/adr/0010-mutant-eligibility-type-information.md. Design: docs/development/mutation-registry.md. Boundaries: docs/development/user-docs-preflight.md.",
+  "changes": [
+    {
+      "package": "internal/configuration",
+      "imports": [
+        "internal/mutator"
+      ],
+      "test_imports": []
+    },
+    {
+      "package": "internal/typeinfo",
+      "imports": [
+        "internal/log"
+      ],
+      "test_imports": []
+    },
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/process",
+        "internal/report",
+        "internal/typeinfo"
+      ],
+      "test_imports": []
+    },
+    {
+      "package": "cmd",
+      "imports": [
+        "cmd/internal/flags",
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine",
+        "internal/engine/workdir",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/report",
+        "internal/typeinfo"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator"
+      ]
+    }
+  ],
+  "contracts": [
+    "cli",
+    "configuration",
+    "schema",
+    "report"
+  ],
+  "contract_changes": {
+    "cli": "compatible",
+    "configuration": "compatible",
+    "schema": "compatible",
+    "report": "compatible"
+  },
+  "policies": [
+    "model",
+    "guidance",
+    "lint",
+    "lint_baseline"
+  ],
+  "trust_boundaries": "Prose and schema review read checkout sources. Existing doc-tools checks explicit Markdown paths; a local MkDocs build writes HTML outside the checkout. Nothing is uploaded or published. At runtime, the type load runs go list in the operator-selected module with the environment of the run and the run build cache, as the coverage step already does. It reads source and export data, runs no tests, and writes nothing to the module. Configuration discovery still reads only local files that the operator controls; the order now prefers the project file over system and user files. No new service, credential, provider, network destination, persistence format, or modeled trust change. The unchanged modeled boundaries below are restated for admission.",
+  "conflicts": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  }
+}

@@ -4,12 +4,6 @@
     {
       "linter": "errcheck",
       "file": "internal/configuration/configuration.go",
-      "fingerprint": "1434a864b92d907034465528082f879097d59012476f3efdc173b01158474a81",
-      "count": 1
-    },
-    {
-      "linter": "errcheck",
-      "file": "internal/configuration/configuration.go",
       "fingerprint": "4bfd8f560911e664080a9c41efafc15465eb08544c24f4a07663f71dcbaacd75",
       "count": 1
     },

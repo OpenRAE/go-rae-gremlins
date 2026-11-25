@@ -713,14 +713,18 @@ func runInSequence(
 	return rec.calls
 }
 
+// cpuCase is a test case of the -cpu flag of the go test command of a
+// mutant.
+type cpuCase struct {
+	name        string
+	testCPU     int
+	wantTestCPU int
+	intMode     bool
+	cpuPresent  bool
+}
+
 func TestCPU(t *testing.T) {
-	testCases := []struct {
-		name        string
-		testCPU     int
-		wantTestCPU int
-		intMode     bool
-		cpuPresent  bool
-	}{
+	testCPUCases(t, []cpuCase{
 		{
 			name:       "default normal mode doesn't set CPU",
 			cpuPresent: false,
@@ -743,9 +747,37 @@ func TestCPU(t *testing.T) {
 			wantTestCPU: 1,
 			cpuPresent:  true,
 		},
-	}
+		{
+			name:        "integration mode rounds half of an odd CPU value down",
+			intMode:     true,
+			testCPU:     3,
+			wantTestCPU: 1,
+			cpuPresent:  true,
+		},
+		{
+			name:        "integration mode keeps a CPU value of one",
+			intMode:     true,
+			testCPU:     1,
+			wantTestCPU: 1,
+			cpuPresent:  true,
+		},
+	})
+}
+
+// TestRegressionIntegrationModeHalvesTestCPU checks that integration mode
+// halves a test CPU value that is more than 1, as the documentation states,
+// and does not set every value to 1.
+func TestRegressionIntegrationModeHalvesTestCPU(t *testing.T) {
+	testCPUCases(t, []cpuCase{
+		{name: "even value", intMode: true, testCPU: 4, wantTestCPU: 2, cpuPresent: true},
+	})
+}
+
+// testCPUCases runs each case and checks the -cpu flag of the go test
+// command of a mutant.
+func testCPUCases(t *testing.T, testCases []cpuCase) {
+	t.Helper()
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			viperSet(map[string]any{
 				configuration.UnleashIntegrationMode: tc.intMode,
@@ -753,48 +785,52 @@ func TestCPU(t *testing.T) {
 			})
 			defer viperReset()
 
-			mod := gomodule.GoModule{
-				Name:       expectedModule,
-				Root:       ".",
-				CallingDir: ".",
-			}
-			wdDealer := newWdDealerStub(t)
-			holder := &commandHolder{}
-			mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
-				engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
-			mut := &mutantStub{
-				status:  mutator.Runnable,
-				mutType: mutator.ConditionalsBoundary,
-				pkg:     "test",
-			}
-			outCh := make(chan engine.ExecutorResult)
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-			executor := mjd.NewExecutor(mut, outCh, &wg)
-			w := &workerpool.Worker{
-				Name: testWorkerName,
-				ID:   1,
-			}
-			startExecutor(t, executor, w, outCh, &wg, "executor")
+			args := mutantTestArgs(t)
 
-			for _, arg := range holder.args {
-				if !tc.cpuPresent && strings.Contains(arg, "-cpu") {
-					t.Fatalf("go test command args = %q, want no -cpu flag", holder.args)
+			got := fmt.Sprintf("go %v", strings.Join(args, " "))
+			if !tc.cpuPresent {
+				if strings.Contains(got, "-cpu") {
+					t.Fatalf("go test command args = %q, want no -cpu flag", args)
 				}
-				if !tc.cpuPresent {
-					return
-				}
-				got := fmt.Sprintf("go %v", strings.Join(holder.args, " "))
-				cpuFlag := fmt.Sprintf("-cpu %d", tc.wantTestCPU)
-				if strings.Contains(got, cpuFlag) {
-					// PASS
-					return
-				}
-				t.Fatalf("go test command args = %q, want flag %q", holder.args, cpuFlag)
-			}
 
+				return
+			}
+			if cpuFlag := fmt.Sprintf("-cpu %d ", tc.wantTestCPU); !strings.Contains(got, cpuFlag) {
+				t.Fatalf("go test command args = %q, want flag %q", args, strings.TrimSpace(cpuFlag))
+			}
 		})
 	}
+}
+
+// mutantTestArgs runs the executor of one mutant with a fake go command and
+// returns the arguments of that command.
+func mutantTestArgs(t *testing.T) []string {
+	t.Helper()
+	mod := gomodule.GoModule{
+		Name:       expectedModule,
+		Root:       ".",
+		CallingDir: ".",
+	}
+	wdDealer := newWdDealerStub(t)
+	holder := &commandHolder{}
+	mjd := newExecutorDealer(t, mod, wdDealer, expectedTimeout,
+		engine.WithExecContext(fakeExecCommandSuccessWithHolder(holder)))
+	mut := &mutantStub{
+		status:  mutator.Runnable,
+		mutType: mutator.ConditionalsBoundary,
+		pkg:     "test",
+	}
+	outCh := make(chan engine.ExecutorResult)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	executor := mjd.NewExecutor(mut, outCh, &wg)
+	w := &workerpool.Worker{
+		Name: testWorkerName,
+		ID:   1,
+	}
+	startExecutor(t, executor, w, outCh, &wg, "executor")
+
+	return holder.args
 }
 
 func absTimeDiff(a, b time.Duration) time.Duration {

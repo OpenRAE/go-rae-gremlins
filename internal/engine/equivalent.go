@@ -61,12 +61,12 @@ type annotation struct {
 // exactly one mutant among all the mutation types of the operators of the
 // file, enabled or not. fileEquivalents returns the errors of all the invalid
 // directives, which wrap ErrEquivalentAnnotation.
-func fileEquivalents(set *token.FileSet, file *ast.File, dirs []directive) (equivalents, error) {
+func fileEquivalents(set *token.FileSet, file *ast.File, dirs []directive, facts operatorFacts) (equivalents, error) {
 	anns, err := parseAnnotations(dirs)
 	if err != nil || len(anns) == 0 {
 		return nil, err
 	}
-	matchAnnotations(set, file, anns)
+	matchAnnotations(set, file, anns, facts)
 
 	return bindAnnotations(set, anns)
 }
@@ -122,13 +122,13 @@ func parseAnnotation(args string, at token.Position) (*annotation, error) {
 
 // matchAnnotations records in each annotation the operators of file that
 // are on its line, at its column if it has one, and that can produce its
-// mutation type. It compares physical positions.
-func matchAnnotations(set *token.FileSet, file *ast.File, anns []*annotation) {
+// mutation type with the operand facts. It compares physical positions.
+func matchAnnotations(set *token.FileSet, file *ast.File, anns []*annotation, facts operatorFacts) {
 	byLine := make(map[int][]*annotation, len(anns))
 	for _, a := range anns {
 		byLine[a.line] = append(byLine[a.line], a)
 	}
-	inspectTokens(file, func(node *NodeToken) bool {
+	inspectTokens(file, facts, func(node *NodeToken) bool {
 		pos := set.PositionFor(node.TokPos, false)
 		for _, a := range byLine[pos.Line] {
 			if (a.column == 0 || a.column == pos.Column) && builtins.eligible(node, a.mt) {

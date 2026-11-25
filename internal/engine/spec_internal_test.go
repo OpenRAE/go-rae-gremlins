@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/typeinfo"
 )
 
 // tokenTable returns the token replacement table of s.
@@ -118,7 +119,11 @@ func TestFeatureSpecMutatesEachOperator(t *testing.T) {
 		s := builtins.byType[mt]
 		for orig, mutated := range want[mt] {
 			tok := orig
-			n := &NodeToken{tok: &tok}
+			n := &NodeToken{tok: &tok, continuable: true}
+			if mt == mutator.InvertNegatives {
+				var operand ast.Expr = &ast.Ident{Name: "a"}
+				n.operand = &operand
+			}
 			if !s.eligible(n) {
 				t.Errorf("%s eligible(%s) = false, want true", mt, orig)
 
@@ -181,6 +186,64 @@ func TestFeatureSpecRejectsIneligibleOperator(t *testing.T) {
 			}
 			if tok != tc.tok || operand != tc.operand {
 				t.Errorf("%s mutate(%s) changed the operator to %s %v", tc.mt, tc.tok, tok, operand)
+			}
+		})
+	}
+}
+
+// TestFeatureSpecEligibility checks that each spec selects only the
+// operators whose mutants can build and that no other type edits the same
+// way. docs/adr/0010-mutant-eligibility-type-information.md gives the rules.
+func TestFeatureSpecEligibility(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		mt          mutator.Type
+		tok         token.Token
+		facts       typeinfo.Fact
+		unary       bool
+		continuable bool
+		want        bool
+	}{
+		"invert negatives, unary minus":                  {mt: mutator.InvertNegatives, tok: token.SUB, unary: true, want: true},
+		"invert negatives, binary minus":                 {mt: mutator.InvertNegatives, tok: token.SUB, want: false},
+		"arithmetic base, binary minus":                  {mt: mutator.ArithmeticBase, tok: token.SUB, want: true},
+		"arithmetic base, unary minus":                   {mt: mutator.ArithmeticBase, tok: token.SUB, unary: true, want: false},
+		"arithmetic base, unary plus":                    {mt: mutator.ArithmeticBase, tok: token.ADD, unary: true, want: true},
+		"arithmetic base, number plus":                   {mt: mutator.ArithmeticBase, tok: token.ADD, want: true},
+		"arithmetic base, string plus":                   {mt: mutator.ArithmeticBase, tok: token.ADD, facts: typeinfo.InvalidSubtraction, want: false},
+		"invert bitwise, binary and":                     {mt: mutator.InvertBitwise, tok: token.AND, want: true},
+		"invert bitwise, unary address":                  {mt: mutator.InvertBitwise, tok: token.AND, unary: true, want: false},
+		"invert bitwise, unary complement":               {mt: mutator.InvertBitwise, tok: token.XOR, unary: true, want: false},
+		"invert assignments, number add assign":          {mt: mutator.InvertAssignments, tok: token.ADD_ASSIGN, want: true},
+		"invert assignments, string add assign":          {mt: mutator.InvertAssignments, tok: token.ADD_ASSIGN, facts: typeinfo.InvalidSubtraction, want: false},
+		"remove self assignments, string add assign":     {mt: mutator.RemoveSelfAssignments, tok: token.ADD_ASSIGN, facts: typeinfo.InvalidSubtraction, want: true},
+		"remove self assignments, assignable shift":      {mt: mutator.RemoveSelfAssignments, tok: token.SHL_ASSIGN, want: true},
+		"remove self assignments, unassignable shift":    {mt: mutator.RemoveSelfAssignments, tok: token.SHL_ASSIGN, facts: typeinfo.UnassignableShiftCount, want: false},
+		"remove self assignments, unassignable shr":      {mt: mutator.RemoveSelfAssignments, tok: token.SHR_ASSIGN, facts: typeinfo.UnassignableShiftCount, want: false},
+		"invert loop control, break in a loop":           {mt: mutator.InvertLoopCtrl, tok: token.BREAK, continuable: true, want: true},
+		"invert loop control, break outside a loop":      {mt: mutator.InvertLoopCtrl, tok: token.BREAK, want: false},
+		"invert loop control, continue":                  {mt: mutator.InvertLoopCtrl, tok: token.CONTINUE, want: true},
+		"invert bitwise assignments, unassignable shift": {mt: mutator.InvertBitwiseAssignments, tok: token.SHL_ASSIGN, facts: typeinfo.UnassignableShiftCount, want: true},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			tok := tc.tok
+			n := &NodeToken{tok: &tok, facts: tc.facts, continuable: tc.continuable}
+			if tc.unary {
+				var operand ast.Expr = &ast.Ident{Name: "a"}
+				n.operand = &operand
+			}
+			s := builtins.byType[tc.mt]
+
+			if got := s.eligible(n); got != tc.want {
+				t.Errorf("%s eligible(%s) = %t, want %t", tc.mt, tc.tok, got, tc.want)
+			}
+			_, err := s.mutate(n)
+			if tc.want == errors.Is(err, ErrNoMutation) {
+				t.Errorf("%s mutate(%s) error = %v, want an edit only when eligible", tc.mt, tc.tok, err)
 			}
 		})
 	}

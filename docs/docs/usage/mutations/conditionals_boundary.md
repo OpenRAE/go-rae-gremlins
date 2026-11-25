@@ -4,8 +4,7 @@ title: Conditionals boundary
 
 # Conditionals boundary <small>:material-sign-direction: default</small>
 
-_Conditionals boundaries_ modify the boundary of a conditional, which means that exclusive/inclusive ranges will be
-inverted.
+`CONDITIONALS_BOUNDARY` changes the boundary of a comparison. An exclusive limit becomes inclusive, and an inclusive limit becomes exclusive.
 
 ## Mutation table
 
@@ -19,6 +18,7 @@ inverted.
 ## Examples
 
 === "Original"
+
     ```go
     if a > b {
       // Do something

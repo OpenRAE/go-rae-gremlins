@@ -40,7 +40,8 @@
         "internal/gomodule",
         "internal/log",
         "internal/mutator",
-        "internal/report"
+        "internal/report",
+        "internal/typeinfo"
       ],
       "test_allow": [
         "internal/configuration",
@@ -93,7 +94,8 @@
         "internal/log",
         "internal/mutator",
         "internal/process",
-        "internal/report"
+        "internal/report",
+        "internal/typeinfo"
       ],
       "test_allow": []
     },
@@ -151,6 +153,12 @@
     },
     "internal/report/internal": {
       "allow": [],
+      "test_allow": []
+    },
+    "internal/typeinfo": {
+      "allow": [
+        "internal/log"
+      ],
       "test_allow": []
     },
     "tools/architecture": {

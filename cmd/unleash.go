@@ -38,6 +38,7 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/log"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 	"github.com/OpenRAE/go-rae-gremlins/internal/report"
+	"github.com/OpenRAE/go-rae-gremlins/internal/typeinfo"
 )
 
 type unleashCmd struct {
@@ -103,8 +104,8 @@ func longExplainer() string {
 
 		Thresholds are configurable quality gates that make gremlins exit with an error
 		if those values are not met. Efficacy is the percent of KILLED mutants over
-		the total KILLED and LIVED mutants. Mutant coverage is the percent of total
-		KILLED + LIVED mutants, over the total mutants.
+		the total KILLED and LIVED mutants. Mutant coverage is the percent of KILLED
+		and LIVED mutants over the total KILLED, LIVED, and NOT COVERED mutants.
 	`)
 }
 
@@ -241,6 +242,12 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 		return report.Results{}, fmt.Errorf("failed to gather coverage: %w", err)
 	}
 
+	tags := configuration.Get[string](configuration.UnleashTagsKey)
+	facts, err := typeinfo.Load(ctx, mod.Root, scanPattern(mod), tags, buildCache)
+	if err != nil {
+		return report.Results{}, fmt.Errorf("failed to load the package types: %w", err)
+	}
+
 	wdDealer := workdir.NewCachedDealer(workDir, mod.Root)
 	defer wdDealer.Clean()
 
@@ -253,11 +260,22 @@ func run(ctx context.Context, mod gomodule.GoModule, workDir string) (report.Res
 		Cov:       cProfile.Profile,
 		Diff:      fDiff,
 		Exclusion: exclude,
+		Facts:     facts,
 	}
 
 	mut := engine.New(mod, codeData, jDealer)
 
 	return mut.Run(ctx)
+}
+
+// scanPattern returns the package pattern of the directory that the run
+// scans for mutants, relative to the module root.
+func scanPattern(mod gomodule.GoModule) string {
+	if mod.CallingDir == "." {
+		return "./..."
+	}
+
+	return "./" + filepath.ToSlash(mod.CallingDir) + "/..."
 }
 
 func setFlagsOnCmd(cmd *cobra.Command) error {

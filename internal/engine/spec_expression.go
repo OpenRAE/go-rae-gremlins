@@ -23,7 +23,7 @@ import (
 
 // isNegation reports whether n is the operator of a unary ! expression.
 func isNegation(n *NodeToken) bool {
-	return n.operand != nil && n.Tok() == token.NOT
+	return n.unary() && n.Tok() == token.NOT
 }
 
 // doubleNegation changes the unary expression !x of n to !!x. It puts the

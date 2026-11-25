@@ -39,6 +39,7 @@ nav:
             - usage/commands/unleash/index.md
             - usage/commands/unleash/workers.md
       - usage/configuration.md
+      - usage/coverage.md
       - usage/equivalent-mutants.md
       - usage/ignore-mutants.md
       - Mutations:

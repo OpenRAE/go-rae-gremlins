@@ -1,49 +1,57 @@
 # Configuration
 
-Gremlins can be configured via (in order of precedence):
+You can configure Gremlins with command flags, environment variables, and a configuration file.
+When two sources set the same key, Gremlins uses the value of the source with the higher precedence:
 
-1. command flags
-2. environment variables
-3. configuration files
+1. Command flags
+2. Environment variables
+3. The configuration file
+4. The defaults
 
 ## Command flags
 
-Flags have the higher priority and override all the other means of setting behaviours. Please refer to the specific
-command documentation to learn how to use them.
+Flags have the highest precedence. Each flag has a configuration key.
+For the flags of a command, see its [command reference](commands/index.md).
 
 ## Configuration files
 
-Gremlins can be configured with a configuration file.
+The configuration file is a YAML file with the name `.gremlins.yaml`.
+The file is optional. If Gremlins finds a file that it cannot read or parse, it stops with an error.
 
 ### Location
 
-The configuration file can be placed in (in order of precedence)
+Gremlins searches these locations in this order, and reads only the first file that it finds:
 
 1. `./.gremlins.yaml` (the current directory)
-2. The module root
-3. `/etc/gremlins/.gremlins.yaml`
+2. `.gremlins.yaml` in the root of the Go module of the current directory
+3. `/etc/gremlins/.gremlins.yaml` (not on Windows)
 4. `$XDG_CONFIG_HOME/gremlins/.gremlins.yaml`
 5. `$HOME/.gremlins.yaml`
 
-The configuration file is optional. If Gremlins finds a file that it cannot read or parse, it stops with an error.
+So a file in the project has precedence over a global file or a user file.
+Gremlins does not merge the values of two files.
 
 [//]: # (@formatter:off)
 !!! hint
-    `XDG_CONFIG_HOME` is usually `~/.config`.
+    When `XDG_CONFIG_HOME` is not set, or is not an absolute path, Gremlins uses `~/.config`.
 
 [//]: # (@formatter:on)
 
 ### Override
 
-The config file can be overridden with the `--config` flag.
+The `--config` flag sets the configuration file. Gremlins then does not search the locations above.
 
 ```shell
 gremlins unleash --config=myConfig.yaml
 ```
 
+A value with a file extension is the file. If the file does not exist, Gremlins stops with an error.
+A value without an extension is a directory. Gremlins searches only that directory for `.gremlins.yaml`.
+If the directory has no such file, Gremlins uses no configuration file.
+
 ### Reference
 
-Here is a complete configuration file with all the properties set to their defaults:
+This file sets all the keys to their defaults:
 
 ```yaml
 silent: false
@@ -92,28 +100,30 @@ mutants:
 
 ```
 
-1. By default `0`, which means that Gremlins will use the system CPUs number. Negative values are not valid.
-2. By default `0`, which means that no test process CPU will be enforced. Negative values are not valid.
-3. By default `0`, which means a default coefficient of `5` will be enforced. Negative values are not valid.
-4. By default `0`, which means a default safety margin of `2`. Negative values are not valid.
-5. Thresholds are set by default to `0`, which means they are not enforced. A threshold must be from `0` to `100`.
-6. Excluded files are set by default to empty list, which means no files skipped except tests.
+1. `0` uses the number of logical CPUs. A negative value is not valid.
+2. `0` does not set the CPUs of each test run. A negative value is not valid.
+3. `0` uses the default coefficient of `5`. A negative value is not valid.
+4. `0` uses the default safety margin of `2`. A negative value is not valid.
+5. `0` disables a threshold. A threshold must be from `0` to `100`.
+6. An empty list excludes only the test files.
 
-For further information check the specific command documentation.
+For the meaning of each key, see the flag with the same name in the [unleash reference](commands/unleash/index.md#flags).
+The `threshold` keys are the `--threshold-efficacy` and `--threshold-mcover` flags.
+Each `mutants` key is the flag of its [mutation type](mutations/index.md).
 
 [//]: # (@formatter:off)
 !!! tip
     You can validate the configuration file with the [JSON Schema](../schema/configuration.json), for example in your
-    editor.
+    editor. Gremlins does not read the schema. It checks the values itself when the command starts.
 
 [//]: # (@formatter:on)
 
 ## Environment variables
 
-Gremlins can be configured via environment variables as well. You can construct the variable name referring to the
-configuration file format. They start with `GREMLINS_`, and each dot and dash becomes an underscore.
+An environment variable sets one configuration key.
+The name is `GREMLINS_` and the key in upper case, with each `.` and `-` changed to `_`.
 
-For example:
+For example, this key:
 
 ```yaml
 mutants:
@@ -121,7 +131,7 @@ mutants:
     enabled: true
 ```
 
-Can be set with:
+has this environment variable:
 
 ```shell
 export GREMLINS_MUTANTS_ARITHMETIC_BASE_ENABLED=true
