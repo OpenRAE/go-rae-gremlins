@@ -747,20 +747,15 @@ func TestCPU(t *testing.T) {
 			wantTestCPU: 1,
 			cpuPresent:  true,
 		},
-		{
-			name:        "integration mode rounds half of an odd CPU value down",
-			intMode:     true,
-			testCPU:     3,
-			wantTestCPU: 1,
-			cpuPresent:  true,
-		},
-		{
-			name:        "integration mode keeps a CPU value of one",
-			intMode:     true,
-			testCPU:     1,
-			wantTestCPU: 1,
-			cpuPresent:  true,
-		},
+	})
+}
+
+// TestFeatureIntegrationModeHalvesTestCPU checks the halving of the test CPU
+// value in integration mode for values that the earlier code also gave.
+func TestFeatureIntegrationModeHalvesTestCPU(t *testing.T) {
+	testCPUCases(t, []cpuCase{
+		{name: "odd value rounds down", intMode: true, testCPU: 3, wantTestCPU: 1, cpuPresent: true},
+		{name: "value of one", intMode: true, testCPU: 1, wantTestCPU: 1, cpuPresent: true},
 	})
 }
 

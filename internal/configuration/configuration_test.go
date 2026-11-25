@@ -257,16 +257,20 @@ func TestConfigPaths(t *testing.T) {
 			t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
 		}
 	})
+}
 
-	t.Run("a relative XDG_CONFIG_HOME is ignored", func(t *testing.T) {
-		t.Chdir(t.TempDir())
-		t.Setenv("XDG_CONFIG_HOME", filepath.Join("my", "custom", "path"))
+// TestFeatureConfigPathsIgnoresARelativeXDGConfigHome checks that a relative
+// XDG_CONFIG_HOME gives the default ~/.config, as the XDG Base Directory
+// Specification requires.
+func TestFeatureConfigPathsIgnoresARelativeXDGConfigHome(t *testing.T) {
+	home := testHome(t)
+	t.Chdir(t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join("my", "custom", "path"))
 
-		want := wantConfigPaths("", filepath.Join(home, ".config", "gremlins"), home)
-		if diff := cmp.Diff(want, defaultConfigPaths()); diff != "" {
-			t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
-		}
-	})
+	want := wantConfigPaths("", filepath.Join(home, ".config", "gremlins"), home)
+	if diff := cmp.Diff(want, defaultConfigPaths()); diff != "" {
+		t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
+	}
 }
 
 // wantConfigPaths returns the expected search order: the current directory,
