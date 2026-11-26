@@ -4,18 +4,25 @@ title: Invert loop
 
 # Invert loop control
 
-_Invert loop control_ will perform inversions on control operations, which means a `continue` will become a `break`.
+`INVERT_LOOPCTRL` changes a loop control statement. A `continue` becomes a `break`, and a `break` becomes a `continue`.
 
 ## Mutation table
 
 [//]: # (@formatter:off)
 
-|   Orig   | Mutation |
+| Original | Mutated  |
 |:--------:|:--------:|
 | continue |  break   |
 |  break   | continue |
 
 [//]: # (@formatter:on)
+
+## Conditions
+
+- Gremlins mutates a `break` only where a `continue` with the same label is valid.
+- Without a label, the `break` must be in a `for` loop of the same function.
+  For example, Gremlins mutates a `break` in a `switch` in a loop, but not a `break` in a `switch` outside a loop.
+- With a label, the label must name a `for` loop.
 
 ## Examples
 

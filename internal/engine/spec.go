@@ -50,9 +50,12 @@ type spec interface {
 	mutate(n *NodeToken) (func(), error)
 }
 
-// tokenSpec is a spec that replaces the operator token from a table.
+// tokenSpec is a spec that replaces the operator token from a table. A
+// non-nil accepts limits the operators of the table that the spec selects,
+// for example to the operators whose mutants can build.
 type tokenSpec struct {
 	replacements map[token.Token]token.Token
+	accepts      func(n *NodeToken) bool
 	mt           mutator.Type
 }
 
@@ -67,15 +70,15 @@ func (s tokenSpec) tokens() []token.Token {
 func (s tokenSpec) eligible(n *NodeToken) bool {
 	_, ok := s.replacements[n.Tok()]
 
-	return ok
+	return ok && (s.accepts == nil || s.accepts(n))
 }
 
 func (s tokenSpec) mutate(n *NodeToken) (func(), error) {
 	orig := n.Tok()
-	mutated, ok := s.replacements[orig]
-	if !ok {
+	if !s.eligible(n) {
 		return nil, noMutation(s.mt, orig)
 	}
+	mutated := s.replacements[orig]
 	n.SetTok(mutated)
 
 	return func() { n.SetTok(orig) }, nil

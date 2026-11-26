@@ -137,7 +137,7 @@ func writeSource(t *testing.T, name, src string) string {
 func operatorsOf(t *testing.T, pf *parsedFile, tok token.Token) []*NodeToken {
 	t.Helper()
 	var nodes []*NodeToken
-	inspectTokens(pf.file, func(n *NodeToken) bool {
+	inspectTokens(pf.file, nil, func(n *NodeToken) bool {
 		if n.Tok() == tok {
 			nodes = append(nodes, n)
 		}

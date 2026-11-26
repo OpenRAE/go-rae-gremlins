@@ -40,6 +40,7 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/exclusion"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 	"github.com/OpenRAE/go-rae-gremlins/internal/report"
+	"github.com/OpenRAE/go-rae-gremlins/internal/typeinfo"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
@@ -63,6 +64,9 @@ type CodeData struct {
 	Cov       coverage.Profile
 	Diff      diff.Diff
 	Exclusion exclusion.Rules
+	// Facts are the operand facts of the module. The specs use them to
+	// select only the operators whose mutants can build.
+	Facts typeinfo.Facts
 }
 
 // Option for the Engine initialization.
@@ -197,7 +201,8 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	if err != nil {
 		return err
 	}
-	dirs, err := bindDirectives(set, file, src)
+	facts := mu.fileFacts(set, file, fileName)
+	dirs, err := bindDirectives(set, file, src, facts)
 	if err != nil {
 		return err
 	}
@@ -216,7 +221,7 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	// running mutant changes the shared AST, so the discovery must not read
 	// the AST after that.
 	var mutants []*mutant
-	inspectTokens(file, func(n *NodeToken) bool {
+	inspectTokens(file, facts, func(n *NodeToken) bool {
 		if ctx.Err() != nil {
 			return false
 		}
@@ -236,6 +241,25 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	}
 
 	return nil
+}
+
+// fileFacts returns the operand facts of the parsed file by position.
+// fileName is slash-separated and relative to the calling directory, and the
+// facts use the name relative to the module root.
+func (mu *Engine) fileFacts(set *token.FileSet, file *ast.File, fileName string) operatorFacts {
+	byOffset := mu.codeData.Facts.File(path.Join(filepath.ToSlash(mu.module.CallingDir), fileName))
+	if len(byOffset) == 0 {
+		return nil
+	}
+	tf := set.File(file.Pos())
+	facts := make(operatorFacts, len(byOffset))
+	for offset, f := range byOffset {
+		if offset >= 0 && offset <= tf.Size() {
+			facts[tf.Pos(offset)] = f
+		}
+	}
+
+	return facts
 }
 
 // parseFile reads and parses a Go file of the module file system. It

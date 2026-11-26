@@ -4,7 +4,7 @@ title: Increment decrement
 
 # Increment decrement <small>:material-sign-direction: default</small>
 
-_Increment decrement_ will invert the sign of the increment or decrement.
+`INCREMENT_DECREMENT` changes an increment statement to a decrement statement, and a decrement statement to an increment statement.
 
 ## Mutation table
 
@@ -16,6 +16,7 @@ _Increment decrement_ will invert the sign of the increment or decrement.
 ## Examples
 
 === "Original"
+
     ```go
     for i := 0; i < 10; i++ {
       // Do something

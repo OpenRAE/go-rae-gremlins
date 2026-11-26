@@ -18,13 +18,17 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/configuration"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
@@ -506,4 +510,97 @@ func TestFeatureUnleashRegistersMemoryBudgetFlag(t *testing.T) {
 	if f.DefValue != "" {
 		t.Errorf("memory-budget default = %q, want empty", f.DefValue)
 	}
+}
+
+// TestRegressionUnleashCreatesOnlyMutantsThatBuild checks, from the type load
+// to the report, that the run creates no mutant that cannot build and no
+// second mutant with the same change. See
+// docs/adr/0011-mutant-eligibility-type-information.md.
+func TestRegressionUnleashCreatesOnlyMutantsThatBuild(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs the go command on a temporary module")
+	}
+	dir := t.TempDir()
+	files := map[string]string{
+		"go.mod": "module example.com/built\n\ngo 1.25\n",
+		"built.go": "package built\n\nconst n uint = 2\n\n" +
+			"func Ops(a, b int, s, t string, x int64, p bool) (int, string, int64, *int) {\n" +
+			"\ta = -a + b\n" + // 6: unary - and binary +
+			"\ts = s + t\n" + // 7: string +
+			"\ts += t\n" + // 8: string +=
+			"\tx <<= n\n" + // 9: typed constant count
+			"\tx >>= n\n" + // 10: typed constant count
+			"\tq := &a\n" + // 11: unary &
+			"\tswitch {\n\tcase p:\n\t\tbreak\n\t}\n" + // 14: break outside a loop
+			"\treturn a, s, x, q\n}\n",
+		"built_test.go": "package built\n\nimport \"testing\"\n\n" +
+			"func TestOps(t *testing.T) {\n\t_, _, _, _ = Ops(1, 2, \"a\", \"b\", 1, true)\n}\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	configuration.Reset()
+	t.Cleanup(configuration.Reset)
+	if err := configuration.Init([]string{t.TempDir()}); err != nil {
+		t.Fatalf("configuration.Init error = %v, want nil", err)
+	}
+	outDir := t.TempDir()
+	configuration.Set(configuration.UnleashDryRunKey, true)
+	configuration.Set(configuration.UnleashOutputKey, filepath.Join(outDir, "report.json"))
+	for _, mt := range []mutator.Type{
+		mutator.ArithmeticBase, mutator.InvertNegatives, mutator.InvertAssignments,
+		mutator.RemoveSelfAssignments, mutator.InvertBitwise, mutator.InvertLoopCtrl,
+	} {
+		configuration.Set(configuration.MutantTypeEnabledKey(mt), true)
+	}
+
+	if err := runUnleash(context.Background())(nil, []string{dir}); err != nil {
+		t.Fatalf("runUnleash(%q) error = %v, want nil", dir, err)
+	}
+
+	want := []string{"6 ARITHMETIC_BASE", "6 INVERT_NEGATIVES", "8 REMOVE_SELF_ASSIGNMENTS"}
+	if diff := cmp.Diff(want, reportMutants(t, outDir)); diff != "" {
+		t.Errorf("report mutants mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// reportMutants returns the line and type of each mutant of the JSON report
+// report.json in dir, sorted.
+func reportMutants(t *testing.T, dir string) []string {
+	t.Helper()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := root.Close(); err != nil {
+			t.Errorf("closing the report directory: %v", err)
+		}
+	})
+	data, err := root.ReadFile("report.json")
+	if err != nil {
+		t.Fatalf("reading the report: %v", err)
+	}
+	var got struct {
+		Files []struct {
+			Mutations []struct {
+				Type string `json:"type"`
+				Line int    `json:"line"`
+			} `json:"mutations"`
+		} `json:"files"`
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("decoding the report: %v", err)
+	}
+	var lines []string
+	for _, f := range got.Files {
+		for _, m := range f.Mutations {
+			lines = append(lines, fmt.Sprintf("%d %s", m.Line, m.Type))
+		}
+	}
+	slices.Sort(lines)
+
+	return lines
 }

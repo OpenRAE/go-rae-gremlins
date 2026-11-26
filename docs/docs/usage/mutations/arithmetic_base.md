@@ -4,7 +4,7 @@ title: Arithmetic base
 
 # Arithmetic base <small>:material-sign-direction: default</small>
 
-_Arithmetic base_ will perform inversions on basic arithmetic operations.
+`ARITHMETIC_BASE` changes a basic arithmetic operator to a different one.
 
 ## Mutation table
 
@@ -15,6 +15,12 @@ _Arithmetic base_ will perform inversions on basic arithmetic operations.
 |     *      |     /     |
 |     /      |     *     |
 |     %      |     *     |
+
+## Conditions
+
+- The table applies to binary operators, for example `a + b`, and to the unary `+`, for example `+a`.
+- Gremlins does not mutate the unary `-`, for example `-a`. [INVERT_NEGATIVES](invert_negatives.md) makes that change.
+- Gremlins does not mutate a `+` whose `-` form does not type-check. For example, Go has no `-` operator for strings.
 
 ## Examples
 

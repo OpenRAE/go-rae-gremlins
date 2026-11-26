@@ -105,8 +105,10 @@ func NewExecutorDealer(
 		!integrationMode,
 	)
 
-	if testCPU != 0 && integrationMode {
-		testCPU /= testCPU
+	// Integration mode runs the complete test suite for each mutant, so it
+	// halves the CPUs of each test run, as the worker pool halves the workers.
+	if integrationMode && testCPU > 1 {
+		testCPU /= 2
 	}
 
 	memory, err := newMemoryPlan(baseline.Peak, process.AvailableMemory)

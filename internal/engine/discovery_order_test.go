@@ -18,6 +18,7 @@ package engine_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/engine"
 	"github.com/OpenRAE/go-rae-gremlins/internal/gomodule"
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/typeinfo"
 )
 
 // operatorsSource has one statement for each operator that a mutation type
@@ -75,6 +77,37 @@ func f(a, b int, p, q bool) int {
 		}
 		continue // CONTINUE
 	}
+	c = +c // unary ADD
+	c = ^c // unary XOR
+	_ = &c // unary AND
+	switch {
+	case p:
+		break // BREAK outside a loop
+	}
+L:
+	for {
+		switch {
+		case p:
+			break L // BREAK with the label of a loop
+		}
+		select {
+		default:
+			break // BREAK in a select in a loop
+		}
+	}
+M:
+	switch {
+	case q:
+		break M // BREAK with the label of a switch
+	}
+	for range 3 {
+		func() {
+			switch {
+			case p:
+				break // BREAK in a function literal in a loop
+			}
+		}()
+	}
 }
 `
 
@@ -84,8 +117,8 @@ func f(a, b int, p, q bool) int {
 func TestFeatureRunDiscoversEachOperatorInOrder(t *testing.T) {
 	want := []string{
 		"4:9 ARITHMETIC_BASE",
-		"5:8 INVERT_NEGATIVES", "5:8 ARITHMETIC_BASE",
-		"6:6 INVERT_NEGATIVES", "6:6 ARITHMETIC_BASE",
+		"5:8 ARITHMETIC_BASE",
+		"6:6 INVERT_NEGATIVES",
 		"7:8 ARITHMETIC_BASE",
 		"8:8 ARITHMETIC_BASE",
 		"9:8 ARITHMETIC_BASE",
@@ -119,6 +152,9 @@ func TestFeatureRunDiscoversEachOperatorInOrder(t *testing.T) {
 		"37:6 INVERT_LOGICAL",
 		"40:4 INVERT_LOOPCTRL",
 		"42:3 INVERT_LOOPCTRL",
+		"44:6 ARITHMETIC_BASE",
+		"55:4 INVERT_LOOPCTRL",
+		"59:4 INVERT_LOOPCTRL",
 	}
 	enabled := make(map[string]any, len(mutator.Types))
 	for _, mt := range mutator.Types {
@@ -139,5 +175,73 @@ func TestFeatureRunDiscoversEachOperatorInOrder(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("Run() discovered mutants mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// factsFile is the name of the file of factsSource.
+const factsFile = "facts.go"
+
+// factsSource has the operators whose eligibility depends on operand facts.
+const factsSource = `package main
+
+func g(s, t string, a int, u uint) {
+	s = s + t
+	s += t
+	a <<= u
+}
+`
+
+// TestFeatureRunAppliesOperandFacts checks that the discovery gives the
+// facts of typeinfo to the specs, by the module-relative file name. Without
+// facts, the specs keep their earlier selection.
+func TestFeatureRunAppliesOperandFacts(t *testing.T) {
+	facts := map[int]typeinfo.Fact{
+		strings.Index(factsSource, "+ t"):   typeinfo.InvalidSubtraction,
+		strings.Index(factsSource, "+= t"):  typeinfo.InvalidSubtraction,
+		strings.Index(factsSource, "<<= u"): typeinfo.UnassignableShiftCount,
+	}
+	withoutFacts := []string{
+		"4:8 ARITHMETIC_BASE",
+		"5:4 INVERT_ASSIGNMENTS", "5:4 REMOVE_SELF_ASSIGNMENTS",
+		"6:4 REMOVE_SELF_ASSIGNMENTS", "6:4 INVERT_BWASSIGN",
+	}
+	withFacts := []string{
+		"5:4 REMOVE_SELF_ASSIGNMENTS",
+		"6:4 INVERT_BWASSIGN",
+	}
+	testCases := map[string]struct {
+		facts      typeinfo.Facts
+		callingDir string
+		want       []string
+	}{
+		"no facts":                       {callingDir: ".", want: withoutFacts},
+		"facts of the file":              {callingDir: ".", facts: typeinfo.Facts{factsFile: facts}, want: withFacts},
+		"facts in a calling directory":   {callingDir: "sub", facts: typeinfo.Facts{"sub/" + factsFile: facts}, want: withFacts},
+		"facts of a file of another dir": {callingDir: "sub", facts: typeinfo.Facts{factsFile: facts}, want: withoutFacts},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			enabled := make(map[string]any, len(mutator.Types))
+			for _, mt := range mutator.Types {
+				enabled[configuration.MutantTypeEnabledKey(mt)] = true
+			}
+			viperSet(enabled)
+			defer viperReset()
+			mod := gomodule.GoModule{Name: expectedModule, Root: ".", CallingDir: tc.callingDir}
+			mapFS := fstest.MapFS{factsFile: {Data: []byte(factsSource)}}
+			dealer := newJobDealerStub(t)
+			codeData := engine.CodeData{Cov: coverage.Profile{}, Facts: tc.facts}
+
+			mut := engine.New(mod, codeData, dealer, engine.WithDirFs(mapFS))
+			_ = runEngine(t, mut)
+
+			got := make([]string, 0, len(dealer.gotMutants))
+			for _, m := range dealer.gotMutants {
+				got = append(got, fmt.Sprintf("%d:%d %s", m.Position().Line, m.Position().Column, m.Type()))
+			}
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("Run() discovered mutants mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

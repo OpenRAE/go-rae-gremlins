@@ -91,6 +91,7 @@ linters:
             - golang.org/x/mod/module$
             - golang.org/x/sys/windows$
             - golang.org/x/tools/cover$
+            - golang.org/x/tools/go/packages$
     errcheck:
       check-type-assertions: true
       check-blank: true

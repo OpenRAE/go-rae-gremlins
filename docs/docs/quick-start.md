@@ -1,48 +1,143 @@
 # Quick start
 
-To execute a mutation test run, from the root of a Go module execute:
+In this tutorial, you make a small Go module and run Gremlins on it.
+Gremlins finds a mutant that the tests do not detect. You then add a test that detects it.
 
-```sh
-$ gremlins unleash #(1)
-```
+## Prerequisites
 
-1. If `unleash` is too long to type for you, you can use `run` or `r` which will do the same.
+- Go 1.25 or later.
+- Gremlins. See [Install](install.md).
+- A shell on Linux, macOS, or Windows. The commands use POSIX shell syntax.
 
-Gremlins only tests mutations of parts of the code already covered by test cases. If a mutant is not covered, why bother
-testing? You already know it will not be caught. In any case, Gremlins will report which mutations are not covered.
+The module has no dependencies. Gremlins runs `go test` in the module, so use a new, empty directory.
 
-Go coverage profiles do not record the expressions of `switch` and `select` clauses. Gremlins finds these expressions
-from the clause bodies that the tests ran:
+## Make the module
 
-- For each case body that ran, Gremlins finds the entry case. It moves back while the previous case body ran and ends
-  with `fallthrough`.
-- The first expression of the entry case is covered. All expressions of the cases before it are covered.
-- All case expressions are covered when the `default` body ran and the previous case body did not fall through to it.
-- The channel and value expressions of a `select` statement are covered when one of its clause bodies ran.
+1. Make a directory for the module and go into it:
 
-Go coverage profiles cannot show some code. Gremlins skips the mutations in this code:
+    ```shell
+    mkdir quickstart
+    cd quickstart
+    ```
 
-- Package-level constant and type declarations, and the signatures of functions, methods, and function literals. The
-  compiler evaluates them, so the profile has no blocks for them.
-- Files that the file name or the build constraints exclude from the host build with the configured tags. For example,
-  a `_windows.go` file on Linux.
+2. Make the `go.mod` file:
 
-Go coverage profiles also have no blocks for the initializers of package-level variables. Go runs these initializers
-when it initializes the package, before any other code of the package:
+    ```shell
+    go mod init example.com/quickstart
+    ```
 
-- An initializer is covered when the tests ran other code of the same package.
-- Gremlins skips the mutations of an initializer when the tests ran no code of the package.
-- The body of a function literal in an initializer has its own blocks in the profile.
+3. Make the file `discount.go` with this code:
 
-Gremlins will report each mutation as:
+    ```go
+    package quickstart
 
-- `RUNNABLE`: In _dry-run_ mode, a mutation that can be tested.
-- `NOT COVERED`: A mutation not covered by tests; it will not be tested.
-- `SKIPPED`: A mutation outside the diff, or a mutation that coverage cannot show; it will not be tested.
-- `KILLED`: The mutation has been caught by the test suite.
-- `LIVED`: The mutation has not been caught by the test suite.
-- `TIMED OUT`: The tests timed out while testing the mutation: the mutation actually made the tests fail, but not
-  explicitly.
-- `NOT VIABLE`: The mutation makes the build fail.
-- `MEMORY ERROR`: The test run used more memory than its limit, so Gremlins stopped it.
-- `EQUIVALENT`: A reviewed annotation marks the mutation as equivalent; it will not be tested.
+    // Discount returns the price after a discount of 10 percent.
+    // Only a price of 100 or more gets the discount.
+    func Discount(price int) int {
+    	if price >= 100 {
+    		return price - price/10
+    	}
+
+    	return price
+    }
+    ```
+
+4. Make the file `discount_test.go` with this code:
+
+    ```go
+    package quickstart
+
+    import "testing"
+
+    func TestDiscount(t *testing.T) {
+    	tests := []struct {
+    		price int
+    		want  int
+    	}{
+    		{price: 50, want: 50},
+    		{price: 200, want: 180},
+    	}
+    	for _, tt := range tests {
+    		if got := Discount(tt.price); got != tt.want {
+    			t.Errorf("Discount(%d) = %d, want %d", tt.price, got, tt.want)
+    		}
+    	}
+    }
+    ```
+
+5. Run the tests:
+
+    ```shell
+    go test ./...
+    ```
+
+    The tests pass. Gremlins needs tests that pass before it starts.
+
+## Find the mutants
+
+1. Run Gremlins in dry-run mode:
+
+    ```shell
+    gremlins unleash --dry-run
+    ```
+
+    Gremlins runs the tests once to get the coverage. It does not run the tests of each mutant.
+    The output shows four `RUNNABLE` mutants. The order of the lines can change:
+
+    ```text
+        RUNNABLE CONDITIONALS_BOUNDARY at discount.go:6:11
+        RUNNABLE CONDITIONALS_NEGATION at discount.go:6:11
+        RUNNABLE ARITHMETIC_BASE at discount.go:7:16
+        RUNNABLE ARITHMETIC_BASE at discount.go:7:23
+    ```
+
+    Each line gives the status, the mutation type, the file, the line, and the column of the operator.
+    For example, `CONDITIONALS_BOUNDARY` changes `>=` on line 6 to `>`.
+
+## Run the mutation test
+
+1. Run Gremlins:
+
+    ```shell
+    gremlins unleash
+    ```
+
+    Gremlins applies each mutant to a copy of the module and runs the tests.
+    The output shows three `KILLED` mutants and one `LIVED` mutant:
+
+    ```text
+           LIVED CONDITIONALS_BOUNDARY at discount.go:6:11
+    ```
+
+    The summary shows `Test efficacy: 75.00%`.
+
+A `KILLED` mutant makes a test fail. A `LIVED` mutant does not.
+The `LIVED` mutant changes `price >= 100` to `price > 100`.
+No test uses a price of exactly 100, so the tests cannot see the change.
+
+## Detect the mutant
+
+1. In `discount_test.go`, add a test case for the boundary value:
+
+    ```go
+    		{price: 50, want: 50},
+    		{price: 100, want: 90},
+    		{price: 200, want: 180},
+    ```
+
+2. Run Gremlins again:
+
+    ```shell
+    gremlins unleash
+    ```
+
+    All four mutants are `KILLED`. The summary shows `Test efficacy: 100.00%`.
+
+You made a mutant live, found it, and added the test that kills it.
+
+## Next steps
+
+- To set a minimum efficacy for a continuous integration run, see [`--threshold-efficacy`](usage/commands/unleash/index.md#threshold-efficacy).
+- For the meaning of each status, see [Mutant statuses](usage/commands/unleash/index.md#mutant-statuses).
+- To learn which mutants Gremlins tests, see [Coverage](usage/coverage.md).
+- For each mutation type, see [Mutations](usage/mutations/index.md).

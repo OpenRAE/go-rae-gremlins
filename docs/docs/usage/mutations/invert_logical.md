@@ -4,20 +4,19 @@ title: Invert logical
 
 # Invert logical operators
 
-_Invert logical operators_ will perform inversions on logical operators.
+`INVERT_LOGICAL` changes a logical operator.
 For a logical NOT, the mutation adds a second `!` in front of the operand.
-The mutant then has the value of the operand.
+The mutant then has the value of the operand. Go evaluates the operand one time.
 
 ## Mutation table
 
 [//]: # (@formatter:off)
 
-| Orig | Mutation |
-|:----:|:--------:|
-| &&   | \|\|     |
-| \|\| | &&       |
-| !    | !!       |
-
+| Original | Mutated |
+|:--------:|:-------:|
+| &&       | \|\|    |
+| \|\|     | &&      |
+| !        | !!      |
 
 [//]: # (@formatter:on)
 

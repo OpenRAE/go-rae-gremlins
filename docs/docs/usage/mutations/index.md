@@ -2,26 +2,33 @@
 title: Mutations
 ---
 
-# About Mutations
+# About mutations
 
-Mutations are the core of Gremlins' activity. Each mutation belongs to a group that defines its _flavour_. These
-groups are called _mutation types_. Gremlins supports various _mutation types_, each comprising one or more mutations.
+A mutation is a small change to one operator of the source code. For example, `>=` becomes `>`.
+A mutant is one mutation at one position in the code.
+Each mutation belongs to a mutation type. The type name is the name that the report shows.
 
-When Gremlins scans the source code under test, it looks for mutations and for each found mutation creates a _mutant_.
-A _mutant_ is the "gremlin" that actually changes the source code.
+Gremlins does not create a mutant when it can find before the test that the changed code cannot build.
+It also creates only one mutant for each change. Each type page gives its conditions.
 
-Each _mutant type_ can be enabled or disabled, and only a subset of mutations is enabled by default.
+Some mutants can still fail to build. For example, a change to a constant expression can divide by zero. These mutants get the `NOT VIABLE` status.
+Gremlins does not mutate test files.
 
-| MutationType                                           | Default |
-|--------------------------------------------------------|:-------:|
-| [ARITHMETIC BASE](arithmetic_base.md)                  |   YES   |
-| [CONDITIONALS BOUNDARY](conditionals_boundary.md)      |   YES   |
-| [CONDITIONALS NEGATION](conditionals_negation.md)      |   YES   |
-| [INCREMENT DECREMENT](increment_decrement.md)          |   YES   |
-| [INVERT NEGATIVES ](invert_negatives.md)               |   YES   |
-| [INVERT LOGICAL ](invert_logical.md)                   |  FALSE  |
-| [INVERT LOOP CTRL ](invert_loop.md)                    |  FALSE  |
-| [INVERT ASSIGNMENTS ](invert_assignments.md)           |  FALSE  |
-| [INVERT BITWISE ](invert_bitwise.md)                   |  FALSE  |
-| [INVERT BWASSIGN ](invert_bitwise_assignments.md)      |  FALSE  |
-| [REMOVE_SELF_ASSIGNMENTS ](remove_self_assignments.md) |  FALSE  |
+You can enable or disable each mutation type with its flag or its configuration key.
+The configuration key is `mutants.<flag name>.enabled`. For example, `mutants.arithmetic-base.enabled`.
+
+| Mutation type | Flag | Default |
+|---|---|:---:|
+| [ARITHMETIC_BASE](arithmetic_base.md) | `--arithmetic-base` | Enabled |
+| [CONDITIONALS_BOUNDARY](conditionals_boundary.md) | `--conditionals-boundary` | Enabled |
+| [CONDITIONALS_NEGATION](conditionals_negation.md) | `--conditionals-negation` | Enabled |
+| [INCREMENT_DECREMENT](increment_decrement.md) | `--increment-decrement` | Enabled |
+| [INVERT_NEGATIVES](invert_negatives.md) | `--invert-negatives` | Enabled |
+| [INVERT_LOGICAL](invert_logical.md) | `--invert-logical` | Disabled |
+| [INVERT_LOOPCTRL](invert_loop.md) | `--invert-loopctrl` | Disabled |
+| [INVERT_ASSIGNMENTS](invert_assignments.md) | `--invert-assignments` | Disabled |
+| [INVERT_BITWISE](invert_bitwise.md) | `--invert-bitwise` | Disabled |
+| [INVERT_BWASSIGN](invert_bitwise_assignments.md) | `--invert-bwassign` | Disabled |
+| [REMOVE_SELF_ASSIGNMENTS](remove_self_assignments.md) | `--remove-self-assignments` | Disabled |
+
+One operator can have mutants of more than one type. For example, `<` has a `CONDITIONALS_BOUNDARY` and a `CONDITIONALS_NEGATION` mutant.

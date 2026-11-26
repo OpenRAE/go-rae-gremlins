@@ -4,8 +4,8 @@ title: GitHub Actions
 
 # GitHub Actions
 
-go-rae-gremlins has no GitHub Action of its own. Install the fork with `go install` in a workflow step, then run
-`gremlins unleash`.
+go-rae-gremlins has no GitHub Action of its own.
+In a workflow, install Gremlins with `go install` and then run `gremlins unleash`.
 
 ## Example usage
 
@@ -39,3 +39,17 @@ Replace `<version>` with a version from the [release page](https://github.com/Op
 Gremlins needs Go 1.25 or later. If your `go.mod` selects an earlier Go version, set `go-version` to 1.25 or later.
 
 To set flags, add them to the `gremlins unleash` command. For example, `gremlins unleash --tags="tag1,tag2"`.
+A threshold that is not met makes the step fail. See [exit codes](../commands/index.md#exit-codes).
+
+## Test only the changes of a pull request
+
+The [`--diff`](../commands/unleash/index.md#diff) flag needs the Git history of the base branch.
+GitHub sets `GITHUB_BASE_REF` only for `pull_request` events, so use this step only in a workflow for those events.
+
+1. In the `actions/checkout` step, set `fetch-depth: 0`.
+2. Run Gremlins with the base branch of the pull request:
+
+    ```yaml
+          - name: Run Gremlins
+            run: gremlins unleash --diff "origin/$GITHUB_BASE_REF"
+    ```

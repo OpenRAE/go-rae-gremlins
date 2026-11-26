@@ -20,6 +20,7 @@ import (
 	"go/token"
 
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
+	"github.com/OpenRAE/go-rae-gremlins/internal/typeinfo"
 )
 
 // builtins is the registry of the built-in mutation types.
@@ -30,10 +31,10 @@ var builtins = mustRegistry(builtinSpecs()...)
 // INVERT_NEGATIVES mutant before an ARITHMETIC_BASE mutant.
 func builtinSpecs() []spec {
 	return []spec{
-		tokenSpec{mt: mutator.InvertNegatives, replacements: map[token.Token]token.Token{
+		tokenSpec{mt: mutator.InvertNegatives, accepts: (*NodeToken).unary, replacements: map[token.Token]token.Token{
 			token.SUB: token.ADD,
 		}},
-		tokenSpec{mt: mutator.ArithmeticBase, replacements: map[token.Token]token.Token{
+		tokenSpec{mt: mutator.ArithmeticBase, accepts: arithmeticOperands, replacements: map[token.Token]token.Token{
 			token.ADD: token.SUB,
 			token.MUL: token.QUO,
 			token.QUO: token.MUL,
@@ -58,14 +59,14 @@ func builtinSpecs() []spec {
 			token.DEC: token.INC,
 			token.INC: token.DEC,
 		}},
-		tokenSpec{mt: mutator.InvertAssignments, replacements: map[token.Token]token.Token{
+		tokenSpec{mt: mutator.InvertAssignments, accepts: validSubtraction, replacements: map[token.Token]token.Token{
 			token.ADD_ASSIGN: token.SUB_ASSIGN,
 			token.MUL_ASSIGN: token.QUO_ASSIGN,
 			token.QUO_ASSIGN: token.MUL_ASSIGN,
 			token.REM_ASSIGN: token.MUL_ASSIGN,
 			token.SUB_ASSIGN: token.ADD_ASSIGN,
 		}},
-		tokenSpec{mt: mutator.RemoveSelfAssignments, replacements: map[token.Token]token.Token{
+		tokenSpec{mt: mutator.RemoveSelfAssignments, accepts: assignableShiftCount, replacements: map[token.Token]token.Token{
 			token.ADD_ASSIGN:     token.ASSIGN,
 			token.AND_ASSIGN:     token.ASSIGN,
 			token.AND_NOT_ASSIGN: token.ASSIGN,
@@ -78,7 +79,7 @@ func builtinSpecs() []spec {
 			token.SUB_ASSIGN:     token.ASSIGN,
 			token.XOR_ASSIGN:     token.ASSIGN,
 		}},
-		tokenSpec{mt: mutator.InvertBitwise, replacements: map[token.Token]token.Token{
+		tokenSpec{mt: mutator.InvertBitwise, accepts: binary, replacements: map[token.Token]token.Token{
 			token.AND:     token.OR,
 			token.OR:      token.AND,
 			token.XOR:     token.AND,
@@ -98,9 +99,49 @@ func builtinSpecs() []spec {
 			token.LAND: token.LOR,
 			token.LOR:  token.LAND,
 		}}},
-		tokenSpec{mt: mutator.InvertLoopCtrl, replacements: map[token.Token]token.Token{
+		tokenSpec{mt: mutator.InvertLoopCtrl, accepts: validLoopControl, replacements: map[token.Token]token.Token{
 			token.BREAK:    token.CONTINUE,
 			token.CONTINUE: token.BREAK,
 		}},
 	}
+}
+
+// The accepts checks below select only the operators whose mutants can build
+// and that no other type edits the same way. See
+// docs/adr/0011-mutant-eligibility-type-information.md.
+
+// arithmeticOperands accepts binary operators and unary +. INVERT_NEGATIVES
+// owns unary -. A + whose - form does not type-check, for example with
+// strings, is not accepted.
+func arithmeticOperands(n *NodeToken) bool {
+	if n.unary() {
+		return n.Tok() != token.SUB
+	}
+
+	return validSubtraction(n)
+}
+
+// validSubtraction accepts a + or += whose - form type-checks. For example,
+// strings have no - operator.
+func validSubtraction(n *NodeToken) bool {
+	return !n.facts.Has(typeinfo.InvalidSubtraction)
+}
+
+// assignableShiftCount accepts an assignment operator unless it is a shift
+// whose count cannot be assigned to the left operand. x = n then does not
+// build.
+func assignableShiftCount(n *NodeToken) bool {
+	return !n.facts.Has(typeinfo.UnassignableShiftCount)
+}
+
+// binary accepts the operator of a binary expression or a statement. The
+// unary & takes an address, and | has no unary form.
+func binary(n *NodeToken) bool {
+	return !n.unary()
+}
+
+// validLoopControl accepts continue, and a break where a continue with the
+// same label is valid.
+func validLoopControl(n *NodeToken) bool {
+	return n.Tok() != token.BREAK || n.continuable
 }

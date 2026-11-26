@@ -54,17 +54,8 @@ and put it somewhere in the `PATH`, or run
 gremlins unleash
 ```
 
-Gremlins will report each mutation as:
-
-- `RUNNABLE`: In _dry-run_ mode, a mutation that can be tested.
-- `NOT COVERED`: A mutation not covered by tests; it will not be tested.
-- `KILLED`: The mutation has been caught by the test suite.
-- `LIVED`: The mutation has not been caught by the test suite.
-- `TIMED OUT`: The tests timed out while testing the mutation: the mutation actually made the tests fail, but not
-  explicitly.
-- `NOT VIABLE`: The mutation makes the build fail.
-- `MEMORY ERROR`: The test run used more memory than its limit, so Gremlins stopped it.
-- `EQUIVALENT`: A reviewed annotation marks the mutation as equivalent; it will not be tested.
+For the meaning of each mutant status, see [Mutant statuses](docs/docs/usage/commands/unleash/index.md#mutant-statuses).
+For a guided first run, see the [quick start](docs/docs/quick-start.md).
 
 ## What inspired Gremlins
 

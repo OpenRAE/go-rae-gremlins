@@ -19,15 +19,26 @@ package engine
 import (
 	"go/ast"
 	"go/token"
+
+	"github.com/OpenRAE/go-rae-gremlins/internal/typeinfo"
 )
 
 // NodeToken is the reference to the actualToken that will be mutated during
-// the mutation testing.
+// the mutation testing, with the context that the specs need to select it.
 type NodeToken struct {
 	tok     *token.Token
 	operand *ast.Expr
 	TokPos  token.Pos
+	// facts are the operand facts of the operator from its types.
+	facts typeinfo.Fact
+	// continuable reports whether a continue statement with the label of
+	// a break statement is valid at the break.
+	continuable bool
 }
+
+// operatorFacts holds the operand facts of the operators of a parsed file by
+// position.
+type operatorFacts map[token.Pos]typeinfo.Fact
 
 // NewTokenNode checks if the ast.Node implementation is supported by
 // Gremlins and gets its Tok/Op and relative position.
@@ -76,14 +87,15 @@ func (n *NodeToken) SetTok(t token.Token) {
 }
 
 // inspectTokens calls fn for each node of root that NewTokenNode supports, in
-// depth-first order. It does not go into the type constraints of type
-// parameters and interfaces. An operator in a constraint, for example the |
-// of a type union, is a type term and not an operation. fn returns false to
-// stop the walk. inspectTokens returns false if fn stopped the walk.
-func inspectTokens(root ast.Node, fn func(*NodeToken) bool) bool {
+// depth-first order, with its operand facts from facts and its loop context.
+// It does not go into the type constraints of type parameters and
+// interfaces. An operator in a constraint, for example the | of a type union,
+// is a type term and not an operation. fn returns false to stop the walk.
+// inspectTokens returns false if fn stopped the walk.
+func inspectTokens(root ast.Node, facts operatorFacts, fn func(*NodeToken) bool) bool {
 	constraints := make(map[ast.Expr]struct{})
 	stopped := false
-	ast.Inspect(root, func(n ast.Node) bool {
+	ast.PreorderStack(root, nil, func(n ast.Node, stack []ast.Node) bool {
 		if stopped {
 			return false
 		}
@@ -97,12 +109,55 @@ func inspectTokens(root ast.Node, fn func(*NodeToken) bool) bool {
 		if !ok {
 			return true
 		}
+		t.facts = facts[t.TokPos]
+		if b, isBranch := n.(*ast.BranchStmt); isBranch && b.Tok == token.BREAK {
+			t.continuable = continueValid(b, stack)
+		}
 		stopped = !fn(t)
 
 		return !stopped
 	})
 
 	return !stopped
+}
+
+// continueValid reports whether a continue statement with the label of the
+// break statement b is valid where b is. stack holds the ancestors of b.
+// Without a label, continue needs a loop around it in the same function.
+// With a label, the label must name a loop around it.
+func continueValid(b *ast.BranchStmt, stack []ast.Node) bool {
+	for i := len(stack) - 1; i >= 0; i-- {
+		switch n := stack[i].(type) {
+		case *ast.FuncLit, *ast.FuncDecl:
+			return false
+		case *ast.ForStmt, *ast.RangeStmt:
+			if b.Label == nil {
+				return true
+			}
+		case *ast.LabeledStmt:
+			if b.Label != nil && n.Label.Name == b.Label.Name {
+				return isLoop(n.Stmt)
+			}
+		}
+	}
+
+	return false
+}
+
+// isLoop reports whether s is a for statement or a for range statement.
+func isLoop(s ast.Stmt) bool {
+	switch s.(type) {
+	case *ast.ForStmt, *ast.RangeStmt:
+		return true
+	default:
+		return false
+	}
+}
+
+// unary reports whether the operator of n is the operator of a unary
+// expression.
+func (n *NodeToken) unary() bool {
+	return n.operand != nil
 }
 
 // addConstraints adds to constraints the type constraint expressions that are

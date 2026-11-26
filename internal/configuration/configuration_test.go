@@ -223,40 +223,17 @@ func writeConfigFile(t *testing.T, dir, content string, perm os.FileMode) string
 }
 
 func TestConfigPaths(t *testing.T) {
-	home, err := homedir.Dir()
-	if err != nil {
-		t.Fatal(err)
-	}
+	home := testHome(t)
 
 	t.Run("it lookups in default locations", func(t *testing.T) {
 		t.Chdir("testdata/config1")
-
-		var want []string
-
-		// First global
-		if runtime.GOOS != windowsOs {
-			want = append(want, "/etc/gremlins")
-		}
-
-		// Then $XDG_CONFIG_HOME and $HOME
-		want = append(want,
-			filepath.Join(home, ".config", "gremlins", "gremlins"),
-			filepath.Join(home, ".gremlins"),
-		)
-
-		// Then module root
 		moduleRoot, err := os.Getwd()
 		if err != nil {
 			t.Fatal(err)
 		}
-		want = append(want, moduleRoot)
 
-		// Last current folder
-		want = append(want, ".")
-
-		got := defaultConfigPaths()
-
-		if diff := cmp.Diff(want, got); diff != "" {
+		want := wantConfigPaths(moduleRoot, filepath.Join(home, ".config", "gremlins"), home)
+		if diff := cmp.Diff(want, defaultConfigPaths()); diff != "" {
 			t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
 		}
 	})
@@ -264,63 +241,143 @@ func TestConfigPaths(t *testing.T) {
 	t.Run("no module root if not in go module", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 
-		var want []string
-
-		// First global
-		if runtime.GOOS != windowsOs {
-			want = append(want, "/etc/gremlins")
-		}
-
-		// Then $XDG_CONFIG_HOME and $HOME
-		want = append(want,
-			filepath.Join(home, ".config", "gremlins", "gremlins"),
-			filepath.Join(home, ".gremlins"),
-		)
-
-		// Last current folder
-		want = append(want, ".")
-
-		got := defaultConfigPaths()
-
-		if diff := cmp.Diff(want, got); diff != "" {
+		want := wantConfigPaths("", filepath.Join(home, ".config", "gremlins"), home)
+		if diff := cmp.Diff(want, defaultConfigPaths()); diff != "" {
 			t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
 		}
 	})
 
 	t.Run("when XDG_CONFIG_HOME is set, it lookups in that locations", func(t *testing.T) {
-		t.Chdir("testdata/config1")
-
-		customPath := filepath.Join("my", "custom", "path")
+		t.Chdir(t.TempDir())
+		customPath := t.TempDir()
 		t.Setenv("XDG_CONFIG_HOME", customPath)
 
-		var want []string
-
-		// First global
-		if runtime.GOOS != windowsOs {
-			want = append(want, "/etc/gremlins")
-		}
-
-		// Then $XDG_CONFIG_HOME and $HOME
-		want = append(want,
-			filepath.Join(customPath, "gremlins", "gremlins"),
-			filepath.Join(home, ".gremlins"))
-
-		// Then Go module root
-		moduleRoot, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		want = append(want, moduleRoot)
-
-		// Last the current directory
-		want = append(want, ".")
-
-		got := defaultConfigPaths()
-
-		if diff := cmp.Diff(want, got); diff != "" {
+		want := wantConfigPaths("", filepath.Join(customPath, "gremlins"), home)
+		if diff := cmp.Diff(want, defaultConfigPaths()); diff != "" {
 			t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
 		}
 	})
+}
+
+// TestFeatureConfigPathsIgnoresARelativeXDGConfigHome checks that a relative
+// XDG_CONFIG_HOME gives the default ~/.config, as the XDG Base Directory
+// Specification requires.
+func TestFeatureConfigPathsIgnoresARelativeXDGConfigHome(t *testing.T) {
+	home := testHome(t)
+	t.Chdir(t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join("my", "custom", "path"))
+
+	want := wantConfigPaths("", filepath.Join(home, ".config", "gremlins"), home)
+	if diff := cmp.Diff(want, defaultConfigPaths()); diff != "" {
+		t.Errorf("defaultConfigPaths() mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// wantConfigPaths returns the expected search order: the current directory,
+// the module root if there is one, the global directory except on Windows,
+// the XDG directory, and the home directory.
+func wantConfigPaths(moduleRoot, xdg, home string) []string {
+	want := []string{"."}
+	if moduleRoot != "" {
+		want = append(want, moduleRoot)
+	}
+	if runtime.GOOS != windowsOs {
+		want = append(want, "/etc/gremlins")
+	}
+
+	return append(want, xdg, home)
+}
+
+// testHome sets a new temporary home directory without XDG_CONFIG_HOME for
+// the test and returns it.
+func testHome(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", "")
+	homedir.DisableCache = true
+	t.Cleanup(func() { homedir.DisableCache = false })
+
+	return home
+}
+
+// Names of the configuration file locations in the selection tests.
+const (
+	locCWD    = "cwd"
+	locModule = "module"
+	locXDG    = "xdg"
+	locHome   = "home"
+)
+
+// selectionCase is a configuration selection test case: the locations that
+// have a configuration file, and the location of the file that Init reads.
+type selectionCase struct {
+	name  string
+	files []string
+	want  string
+}
+
+// TestRegressionInitSelectsTheConfigurationFileOfHighestPrecedence checks
+// that Init reads the file of the first location in the documented order,
+// and reads the documented user locations.
+func TestRegressionInitSelectsTheConfigurationFileOfHighestPrecedence(t *testing.T) {
+	testConfigSelection(t, []selectionCase{
+		{name: "current directory over module root", files: []string{locCWD, locModule}, want: locCWD},
+		{name: "XDG over home", files: []string{locXDG, locHome}, want: locXDG},
+		{name: "home file", files: []string{locHome}, want: locHome},
+	})
+}
+
+// TestFeatureInitPrefersTheProjectFileOverTheUserFile checks that a file of
+// the project has precedence over a user file.
+func TestFeatureInitPrefersTheProjectFileOverTheUserFile(t *testing.T) {
+	testConfigSelection(t, []selectionCase{
+		{name: "current directory over XDG", files: []string{locCWD, locXDG}, want: locCWD},
+		{name: "module root over XDG", files: []string{locModule, locXDG}, want: locModule},
+	})
+}
+
+// testConfigSelection writes the files of each case and checks the file that
+// Init reads.
+func testConfigSelection(t *testing.T, testCases []selectionCase) {
+	t.Helper()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			homeDir := testHome(t)
+			moduleDir := t.TempDir()
+			cwdDir := filepath.Join(moduleDir, "pkg")
+			dirs := map[string]string{
+				locCWD: cwdDir, locModule: moduleDir, locXDG: filepath.Join(homeDir, ".config", "gremlins"), locHome: homeDir,
+			}
+			writeTestFile(t, filepath.Join(moduleDir, "go.mod"), "module example.com/m\n")
+			for _, f := range tc.files {
+				writeTestFile(t, filepath.Join(dirs[f], ".gremlins.yaml"), "unleash:\n  tags: "+f+"\n")
+			}
+			if err := os.MkdirAll(cwdDir, 0o750); err != nil {
+				t.Fatal(err)
+			}
+			t.Chdir(cwdDir)
+			Reset()
+			t.Cleanup(Reset)
+
+			if err := Init(nil); err != nil {
+				t.Fatalf("Init(nil) error = %v, want nil", err)
+			}
+			if got := Get[string](UnleashTagsKey); got != tc.want {
+				t.Errorf("%s = %q, want %q", UnleashTagsKey, got, tc.want)
+			}
+		})
+	}
+}
+
+func writeTestFile(t *testing.T, name, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(name), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(name, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestGeneratesMutantTypeEnabledKey(t *testing.T) {

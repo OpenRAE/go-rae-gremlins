@@ -34,10 +34,13 @@ The column counts bytes from the start of the line. A tab is one column.
 
 ### Put the annotation on the line or above it
 
-A directive after code selects a mutant on the same line:
+A directive after code selects a mutant on the same line.
+In this example, the first `<` is at column 11, because the tab is column 1:
 
 ```go
-return a < b && c < d //gremlins:equivalent CONDITIONALS_BOUNDARY@11 a never equals b here
+func inRange(a, b, c, d int) bool {
+	return a < b && c < d //gremlins:equivalent CONDITIONALS_BOUNDARY@11 a never equals b here
+}
 ```
 
 A directive alone on its line selects a mutant on the next line:
@@ -70,9 +73,14 @@ These directives stop the run with exit code 1:
 The error gives the file, line, and column of the directive.
 When you edit the code, a directive can become stale. Review it again, and update or remove it.
 
+Gremlins does not create some mutants that cannot build, or a second mutant with the same change.
+A directive for such a mutant selects no mutant. For example, `ARITHMETIC_BASE` does not mutate a unary `-`.
+See the conditions of each [mutation type](mutations/index.md).
+
 Gremlins checks a directive against all the mutation types, also the disabled types.
 So a type that you disable for a run does not make its directives stale.
-Gremlins does not check the files that it does not scan for mutants, for example test files and the files that `--exclude-files` excludes.
+Gremlins does not check the files that it does not scan for mutants.
+For example, it does not check test files and the files that `--exclude-files` excludes.
 
 ## Results
 
@@ -82,7 +90,8 @@ To print only the equivalent mutants, use the `e` letter of [`--output-statuses`
 
 The JSON report adds these fields:
 
-- `equivalent_reason`: the reason of the annotation. Each annotated mutant has it, also a skipped one. Other mutants do not have it.
+- `equivalent_reason`: the reason of the annotation. Each annotated mutant has it, also a skipped one.
+  Other mutants do not have it.
 - `mutants_equivalent`: the number of `EQUIVALENT` mutants.
 
 `mutants_total` does not change. It is the sum of the killed, lived, and not viable mutants.

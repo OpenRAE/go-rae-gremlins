@@ -147,15 +147,19 @@ make clean
 1. `cmd/unleash.go` → `run()` initializes components
 2. Coverage analysis determines testable code. Without `GOCACHE`, all `go`
    commands of a run use one temporary build cache in the run work directory
-3. `Engine.Run()` walks file tree, parses Go AST
-4. For each operator, the registry gives the eligible mutation types
-   in registration order
-5. Create mutators with status (`Runnable`, `NotCovered`, `Skipped`,
+3. `internal/typeinfo` loads the package types once and gives operand
+   facts, for example a `+` without a valid `-` form. See
+   [ADR 0011](docs/adr/0011-mutant-eligibility-type-information.md)
+4. `Engine.Run()` walks file tree, parses Go AST
+5. For each operator, the registry gives the eligible mutation types
+   in registration order. A spec selects only operators whose mutants
+   can build
+6. Create mutators with status (`Runnable`, `NotCovered`, `Skipped`,
    `Equivalent`). A `//gremlins:equivalent` directive selects an
    `Equivalent` mutant (see `internal/engine/equivalent.go`). A
    `//gremlins:ignore` directive removes mutants of a line, a block,
    or a file before they are created (see `internal/engine/ignore.go`)
-6. Worker pool processes runnable mutants:
+7. Worker pool processes runnable mutants:
    - Copy code to temp workdir
    - Apply mutation via `Mutator.Apply()`
    - Run tests
@@ -163,7 +167,7 @@ make clean
      `TimedOut`, `MemoryError` (memory limit passed), `NotViable`
      (build failed)
    - Rollback mutation
-7. Report results with efficacy/coverage metrics
+8. Report results with efficacy/coverage metrics
 
 **Adding New Mutation Type:**
 
@@ -223,6 +227,7 @@ internal/
   mutator/             - Mutation definitions and interface
   process/             - Command runs that stop the process group
   report/              - Result formatting and output
+  typeinfo/            - Operand type facts for mutant eligibility
 tools/
   architecture/        - Architecture model and design checker (make architecture)
   lintcontext/         - Declaration identities for the lint baseline (make lint)

@@ -127,38 +127,40 @@ func arePathsNotSet(cPaths []string) bool {
 	return len(cPaths) == 0 || len(cPaths) == 1 && cPaths[0] == ""
 }
 
+// defaultConfigPaths returns the directories that Init searches for the
+// configuration file, in order of precedence. Viper reads only the first file
+// that it finds, so a project file has precedence over a global or user file.
 func defaultConfigPaths() []string {
-	result := make([]string, 0, 4)
-
-	// First global config
-	if runtime.GOOS != windowsOs {
-		result = append(result, "/etc/gremlins")
-	}
-
-	// Then $XDG_CONFIG_HOME
-	xchLocation, _ := homedir.Expand("~/.config")
-	if x := os.Getenv(xdgConfigHomeKey); x != "" {
-		xchLocation = x
-	}
-	xchLocation = filepath.Join(xchLocation, "gremlins", "gremlins")
-	result = append(result, xchLocation)
-
-	// Then $HOME
-	homeLocation, err := homedir.Expand("~/.gremlins")
-	if err != nil {
-		return result
-	}
-	result = append(result, homeLocation)
-
-	// Then the Go module root
+	result := []string{"."}
 	if root := findModuleRoot(); root != "" {
 		result = append(result, root)
 	}
-
-	// Finally the current directory
-	result = append(result, ".")
+	if runtime.GOOS != windowsOs {
+		result = append(result, "/etc/gremlins")
+	}
+	if xch := xdgConfigHome(); xch != "" {
+		result = append(result, filepath.Join(xch, "gremlins"))
+	}
+	if home, err := homedir.Dir(); err == nil {
+		result = append(result, home)
+	}
 
 	return result
+}
+
+// xdgConfigHome returns the base directory of user configuration files. The
+// XDG Base Directory Specification ignores a relative XDG_CONFIG_HOME and
+// gives ~/.config as the default.
+func xdgConfigHome() string {
+	if x := os.Getenv(xdgConfigHomeKey); filepath.IsAbs(x) {
+		return x
+	}
+	x, err := homedir.Expand("~/.config")
+	if err != nil {
+		return ""
+	}
+
+	return x
 }
 
 func findModuleRoot() string {
