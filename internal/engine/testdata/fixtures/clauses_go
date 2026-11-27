@@ -47,3 +47,13 @@ func Send(ch chan int, n int) bool {
 		return false
 	}
 }
+
+func Empty(n int) int {
+	r := 0
+	switch {
+	case n > 5:
+	case n > 0:
+		r = 1
+	}
+	return r
+}

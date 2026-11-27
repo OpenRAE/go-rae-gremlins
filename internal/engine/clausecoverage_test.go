@@ -45,6 +45,9 @@ type clauseBlocks struct {
 	sendHeader     coverage.Block
 	sendBody       coverage.Block
 	sendDefault    coverage.Block
+	emptyHeader    coverage.Block
+	emptyFirst     coverage.Block
+	emptySecond    coverage.Block
 }
 
 // go126Blocks are the clauses_go blocks that go test -coverprofile reports on
@@ -64,6 +67,9 @@ var go126Blocks = clauseBlocks{
 	sendHeader:     coverage.Block{StartLine: 42, StartCol: 36, EndLine: 43, EndCol: 9},
 	sendBody:       coverage.Block{StartLine: 44, StartCol: 19, EndLine: 45, EndCol: 14},
 	sendDefault:    coverage.Block{StartLine: 46, StartCol: 10, EndLine: 47, EndCol: 15},
+	emptyHeader:    coverage.Block{StartLine: 51, StartCol: 23, EndLine: 53, EndCol: 9},
+	emptyFirst:     coverage.Block{StartLine: 54, StartCol: 13, EndLine: 54, EndCol: 13},
+	emptySecond:    coverage.Block{StartLine: 55, StartCol: 13, EndLine: 56, EndCol: 8},
 }
 
 // go127Blocks are the clauses_go blocks that go test -coverprofile reports on
@@ -84,6 +90,9 @@ var go127Blocks = clauseBlocks{
 	sendHeader:     coverage.Block{StartLine: 43, StartCol: 2, EndLine: 43, EndCol: 9},
 	sendBody:       coverage.Block{StartLine: 45, StartCol: 3, EndLine: 45, EndCol: 14},
 	sendDefault:    coverage.Block{StartLine: 47, StartCol: 3, EndLine: 47, EndCol: 15},
+	emptyHeader:    coverage.Block{StartLine: 52, StartCol: 2, EndLine: 53, EndCol: 9},
+	emptyFirst:     coverage.Block{StartLine: 54, StartCol: 13, EndLine: 54, EndCol: 13},
+	emptySecond:    coverage.Block{StartLine: 56, StartCol: 3, EndLine: 56, EndCol: 8},
 }
 
 var clauseLayouts = map[string]clauseBlocks{
@@ -189,6 +198,14 @@ func TestFeatureClauseExpressionCoverage(t *testing.T) {
 			blocks: func(b clauseBlocks) []coverage.Block { return []coverage.Block{b.sendHeader} },
 			mutants: []clauseMutant{
 				{line: 44, col: 15, mt: mutator.ArithmeticBase, want: mutator.NotCovered},
+			},
+		},
+		{
+			name:   "a matched empty case body proves its expression",
+			blocks: func(b clauseBlocks) []coverage.Block { return []coverage.Block{b.emptyHeader, b.emptyFirst} },
+			mutants: []clauseMutant{
+				{line: 54, col: 9, mt: mutator.ConditionalsBoundary, want: mutator.Runnable},
+				{line: 55, col: 9, mt: mutator.ConditionalsBoundary, want: mutator.NotCovered},
 			},
 		},
 	}
