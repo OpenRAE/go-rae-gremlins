@@ -48,6 +48,9 @@ type clauseBlocks struct {
 	emptyHeader    coverage.Block
 	emptyFirst     coverage.Block
 	emptySecond    coverage.Block
+	recvHeader     coverage.Block
+	recvBody       coverage.Block
+	recvDefault    coverage.Block
 }
 
 // go126Blocks are the clauses_go blocks that go test -coverprofile reports on
@@ -70,6 +73,9 @@ var go126Blocks = clauseBlocks{
 	emptyHeader:    coverage.Block{StartLine: 51, StartCol: 23, EndLine: 53, EndCol: 9},
 	emptyFirst:     coverage.Block{StartLine: 54, StartCol: 13, EndLine: 54, EndCol: 13},
 	emptySecond:    coverage.Block{StartLine: 55, StartCol: 13, EndLine: 56, EndCol: 8},
+	recvHeader:     coverage.Block{StartLine: 61, StartCol: 38, EndLine: 63, EndCol: 9},
+	recvBody:       coverage.Block{StartLine: 64, StartCol: 23, EndLine: 65, EndCol: 8},
+	recvDefault:    coverage.Block{StartLine: 66, StartCol: 10, EndLine: 67, EndCol: 8},
 }
 
 // go127Blocks are the clauses_go blocks that go test -coverprofile reports on
@@ -93,6 +99,9 @@ var go127Blocks = clauseBlocks{
 	emptyHeader:    coverage.Block{StartLine: 52, StartCol: 2, EndLine: 53, EndCol: 9},
 	emptyFirst:     coverage.Block{StartLine: 54, StartCol: 13, EndLine: 54, EndCol: 13},
 	emptySecond:    coverage.Block{StartLine: 56, StartCol: 3, EndLine: 56, EndCol: 8},
+	recvHeader:     coverage.Block{StartLine: 62, StartCol: 2, EndLine: 63, EndCol: 9},
+	recvBody:       coverage.Block{StartLine: 65, StartCol: 3, EndLine: 65, EndCol: 8},
+	recvDefault:    coverage.Block{StartLine: 67, StartCol: 3, EndLine: 67, EndCol: 8},
 }
 
 var clauseLayouts = map[string]clauseBlocks{
@@ -206,6 +215,20 @@ func TestFeatureClauseExpressionCoverage(t *testing.T) {
 			mutants: []clauseMutant{
 				{line: 54, col: 9, mt: mutator.ConditionalsBoundary, want: mutator.Runnable},
 				{line: 55, col: 9, mt: mutator.ConditionalsBoundary, want: mutator.NotCovered},
+			},
+		},
+		{
+			name:   "a select default body proves the receive channel expression",
+			blocks: func(b clauseBlocks) []coverage.Block { return []coverage.Block{b.recvHeader, b.recvDefault} },
+			mutants: []clauseMutant{
+				{line: 64, col: 19, mt: mutator.ArithmeticBase, want: mutator.Runnable},
+			},
+		},
+		{
+			name:   "a selected receive body proves the receive channel expression",
+			blocks: func(b clauseBlocks) []coverage.Block { return []coverage.Block{b.recvHeader, b.recvBody} },
+			mutants: []clauseMutant{
+				{line: 64, col: 19, mt: mutator.ArithmeticBase, want: mutator.Runnable},
 			},
 		},
 	}

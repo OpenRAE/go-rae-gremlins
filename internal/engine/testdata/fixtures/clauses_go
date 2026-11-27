@@ -57,3 +57,14 @@ func Empty(n int) int {
 	}
 	return r
 }
+
+func Recv(chs []chan int, i int) int {
+	r := 0
+	select {
+	case v := <-chs[i+1]:
+		r = v
+	default:
+		r = 2
+	}
+	return r
+}
