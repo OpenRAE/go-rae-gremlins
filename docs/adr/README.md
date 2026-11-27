@@ -1,7 +1,7 @@
 # Architecture decision records
 
 This directory holds the architecture decision records (ADRs) of go-rae-gremlins.
-This index lists the ADRs of both ADR directories and their status on 2026-11-24.
+This index lists the ADRs of both ADR directories and their status on 2026-11-27.
 Each ADR keeps its original status line and rationale.
 A current-context note in an ADR records later changes to its facts.
 
@@ -20,7 +20,7 @@ A current-context note in an ADR records later changes to its facts.
 | [0009](0009-ignore-mutant-directives.md) | Ignore mutants with a source directive | Accepted. The change for #9 merged. |
 | [0009](0009-temporary-build-cache.md) | Use a temporary Go build cache for each run | Accepted. The pull request for #8 merged. |
 | [0010](0010-maintainer-integrations-in-the-canonical-repository.md) | Run maintainer integrations only in the canonical repository | Accepted. The change for #231 merged. |
-| [0011](0011-mutant-eligibility-type-information.md) | Create only mutants that can build | Accepted when the pull request for #222 merges. |
+| [0011](0011-mutant-eligibility-type-information.md) | Create only mutants that can build | Accepted. [PR #234](https://github.com/OpenRAE/go-rae-gremlins/pull/234) delivered the change for #222. |
 
 Two ADRs use the number 0009.
 Identify each of them by its title and file name.

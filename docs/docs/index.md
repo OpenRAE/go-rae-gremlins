@@ -1,39 +1,32 @@
-![Gremlins mascotte](assets/images/gremlins_mascotte.png){ align=right }
+![Gremlins mascot](assets/images/gremlins_mascotte.png){ align=right }
 
 # Welcome to Gremlins
 
-Gremlins is a mutation testing tool for Go. It has been made to work well on _smallish_ Go modules, for example
-_microservices_, on which it helps validate the test suite, aids the TDD process and can be used as a CI quality gate.
+Gremlins is a mutation testing tool for Go.
+This documentation is for the OpenRAE fork.
+Gremlins works best on small and medium Go modules.
+A run on a large module can take hours.
 
-As of now, Gremlins doesn't work very well on very big Go modules, mainly because a run can take hours to complete.
+![Example Gremlins report](assets/images/gremlins-term.webp)
 
-![](assets/images/gremlins-term.webp)
-
-[//]: # (@formatter:off)
-!!! warning
-    Gremlins is still in its 0.x.x release, which, as per SemVer, doesn't guarantee backward compatibility. What this
-    means for Gremlins is that configuration flags and/or configuration files can change among minor releases. This may
-    be important if you use Gremlins in automated builds, for example in _continuous integration_ pipelines.
-
-    Also, while in 0.x.x releases, only the current minor release will be maintained; if we are in v0.2.0, no patch
-    releases will be provided for the v0.1.0 line.
-    Once Gremlins will reach it's 1.x.x release, it will start to be backward compatible, and we'll decide how many
-    releases to maintain at the same time (ex. up to two minors before, as Go itself does).
-
-[//]: # (@formatter:on)
+- [Run your first mutation test](quick-start.md).
+- [Install Gremlins](install.md), [set up continuous integration](usage/ci/github-action.md), or [run in a container](usage/ci/docker.md).
+- Find the [command reference](usage/commands/index.md), [configuration keys](usage/configuration.md), and [mutation types](usage/mutations/index.md).
 
 ## What is Mutation Testing
 
-Code coverage is unreliable as a measure of test quality. It is too easy to have tests that exercise a piece of code but
-don't test anything at all. Mutation testing works by mutating the code exercised by the tests and verifying if the
-mutation is caught by the test suite. Imagine gremlins going into your code and messing around: will your test suit
-catch their damage?
+Mutation testing checks whether tests detect changes to the code that they run.
+See [coverage and mutation testing](usage/coverage.md) for how Gremlins selects the mutants to test.
 
 ## Features
 
-- Discovers mutant candidates and tests them
-- Only tests mutants covered by tests
-- Can test mutants only in PR changes
-- Supports five mutant types
-- Yaml-based configuration
-- Can run as quality gate on CI
+Gremlins can limit mutants to changed lines in a [Git diff](usage/commands/unleash/index.md#diff).
+It can also check thresholds for [efficacy](usage/commands/unleash/index.md#threshold-efficacy) and [mutant coverage](usage/commands/unleash/index.md#threshold-mutant-coverage) in continuous integration.
+
+## Releases and contributions
+
+During 0.x development, flags and configuration can change between minor releases.
+For automated builds, use a specific [release](https://github.com/OpenRAE/go-rae-gremlins/releases).
+
+See the [contributor guide](https://github.com/OpenRAE/go-rae-gremlins/blob/dev/docs/CONTRIBUTING.md) for work on the fork.
+For security problems, follow the [private reporting procedure](https://github.com/OpenRAE/go-rae-gremlins/blob/dev/SECURITY.md).
