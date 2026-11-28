@@ -1,17 +1,20 @@
 ## Summary
 
-<!-- Describe the resulting behavior. -->
+<!-- Describe the result of the change. -->
 
 ## Related Issues
 
-<!-- Link an issue, for example: Refs #123. Write None if there is no linked issue. -->
+<!-- Link the issue. For example, use Closes #123 when the PR delivers the issue. -->
+<!-- If there is no issue, write None. -->
 
 ## ADR Impact
 
-<!-- Cite affected ADRs or write: No ADR required. -->
+<!-- Link the affected ADRs or write No ADR required. -->
 
 ## Test Plan
 
-<!-- List the checks run and their results. -->
+<!-- Give the checks and their results. For documentation, include the source revision and paths. -->
+<!-- Record the differences you corrected, the tool versions, and the limits of the checks. -->
 
-- [ ] New Go tests use `TestRegression...` for fixes or `TestFeature...` for features; regression cases pass the base-code proof check
+- [ ] If this PR adds Go tests, their names use `TestRegression...` for fixes or `TestFeature...` for features.
+- [ ] If this PR adds regression tests, each case passes the base-code proof check.

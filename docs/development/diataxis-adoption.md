@@ -34,32 +34,79 @@ Keep machine-read agent filenames and GitHub template paths stable.
 
 ## Complete scope and ownership
 
-The source inventory is `git ls-files '*.md' '*.rst' '*.mdx'` at revision `8a37862b6d73d229de4930ba90460d0894b70401`.
-It contains 75 Markdown paths and no tracked reStructuredText or MDX paths.
-The following groups cover that inventory.
-Implementation issues refresh it to include pages added after this revision, including this design and its preflight.
+The source inventory for #224 is `git ls-files '*.md' '*.rst' '*.mdx'` at
+`c47239bff4e85c0c8b317bccaff73af5df7a3163`.
+It includes 88 Markdown paths and no reStructuredText or MDX paths.
+The [first inventory](https://github.com/OpenRAE/go-rae-gremlins/blob/5f0a929/docs/development/diataxis-adoption.md#complete-scope-and-ownership)
+records the 75 paths at the design revision.
 
-| Scope | Treatment | Implementation owner |
-| --- | --- | --- |
-| `docs/CONTRIBUTING.md`, `CLAUDE.md`, `AGENTS.md`, `.gc/plan-rules.md` | Reuse the delivered skill and checks. Separate task guidance from exact rules and architecture explanations. | Delivered tools; contributor pages. |
-| `docs/docs/quick-start.md`, `install.md`, `usage/ci/*.md` | Tutorial and task guides. State prerequisites and expected outcomes. | User pages. |
-| `docs/docs/usage/commands/**/*.md`, `usage/configuration.md`, `usage/mutations/*.md`, `usage/equivalent-mutants.md`, `usage/ignore-mutants.md` | Reference owns exact syntax and behavior. Separate task steps and conceptual explanations where needed. | User pages. |
-| `docs/MAINTAINER_SETUP.md`, active `docs/development/*.md` | Task guides for setup, release, checks, and recovery. Reference for standards. Explanation for architecture and design. | Contributor pages. |
-| `docs/adr/*.md`, `architecture/adrs/*.md` | Reference indexes link to explanation records. Preserve decisions, status, history, and rationale. | Contributor pages. |
-| `docs/development/*-preflight.md`, review and assessment records, `upstream-release.md` | Retain evidence and source revisions. Explain historical scope and link to current guidance. | Contributor pages. |
-| `README.md`, `docs/docs/index.md`, `SECURITY.md`, `.github/**/*.md` | Route readers to the correct form. Keep security reporting and template metadata accurate. | Entry points and final navigation. |
-| `CHANGELOG.md`, `CODE_OF_CONDUCT.md` | Preserve generated history and adopted policy text. Explain their status through links from maintained entry pages. | Entry points and final navigation. |
+### User pages
 
-All maintained prose must serve its selected reader need and conform to ASD-STE100 Simplified Technical English.
-Do not rewrite quotations, historical evidence, adopted policy, copyright, or legal terms to obtain a checker pass.
-Classify these records and add current explanatory context where needed.
-Their preservation does not establish STE conformance of their original text.
+| Paths under `docs/docs` | Form and canonical destination |
+| --- | --- |
+| `index.md` | [Entry point](../docs/index.md) for the four forms. |
+| `quick-start.md` | [Tutorial](../docs/quick-start.md) for the first mutation test. |
+| `install.md`, `usage/ci/*.md` | Installation and CI how-to guides in the MkDocs navigation. |
+| `usage/commands/unleash/workers.md`, `usage/equivalent-mutants.md`, `usage/ignore-mutants.md` | How-to guides for workers and source directives. Keep the conditions and syntax with each task. |
+| `usage/commands/index.md`, `usage/commands/unleash/index.md`, `usage/configuration.md`, `usage/mutations/*.md` | Command, configuration, and mutation reference in the MkDocs navigation. |
+| `usage/coverage.md` | [Explanation](../docs/usage/coverage.md) of how coverage affects the mutation test. |
 
-The JSON schema remains exact configuration reference, owned by configuration code.
-Check its links and factual agreement during the user-page work.
-Include maintained source comments, CLI help, schema descriptions, and examples in the owning section review.
-Preserve public help behavior, machine tokens, byte-exact fixtures, binary assets, and license notices.
-Do not change a protected runtime contract for an editorial rewrite.
+### Repository guidance
+
+| Paths | Form and canonical destination |
+| --- | --- |
+| `README.md` | [Entry point](../../README.md) for users and contributors. |
+| `SECURITY.md` | [How-to guide](../../SECURITY.md) for private vulnerability reports. |
+| `.github/ISSUE_TEMPLATE/*.md`, `.github/PULL_REQUEST_TEMPLATE.md` | Forms for GitHub tasks. Keep their paths and template metadata. |
+| `AGENTS.md`, `CLAUDE.md`, `.gc/plan-rules.md` | Agent instructions and architecture reference. Keep the entry paths and binding rules. |
+| `docs/CONTRIBUTING.md`, `docs/MAINTAINER_SETUP.md` | [Contributor tasks](../CONTRIBUTING.md) and [maintainer setup](../MAINTAINER_SETUP.md). |
+| `docs/adr/README.md` | [Reference index](../adr/README.md) for both ADR directories. |
+| `docs/adr/0*.md`, `architecture/adrs/*.md` | Decision explanations. Keep the original decisions and their reasons. Use the index for current status. |
+| `checks.md`, `coding-standards.md`, `test-standard.md` | Reference for [checks](checks.md), [coding rules](coding-standards.md), and [test rules](test-standard.md). |
+| `release.md`, `phase-e.md`, `memory-budget.md` | How-to guides for [release](release.md), [delivery finalization](phase-e.md), and [memory limits](memory-budget.md). |
+| `architecture.md`, `lint-design.md`, `mutation-registry.md`, `phase-e-design.md`, `diataxis-adoption.md` | Explanations of [architecture checks](architecture.md), [lint](lint-design.md), the [mutation registry](mutation-registry.md), [delivery finalization](phase-e-design.md), and this documentation design. |
+| `maintenance-plan.md` | [Maintenance process](maintenance-plan.md) with its initial plans and issue links. |
+| `*-preflight.md`, `documentation-review.md`, `process-review.md`, `test-assessment.md`, `upstream-release.md` | Source records. See [historical records](#historical-records). |
+
+The unqualified filenames in the last five rows are under `docs/development`.
+
+### Historical records
+
+Use these records to find the evidence for a decision at its source revision.
+For current instructions, follow the [contributor guide](../CONTRIBUTING.md) and the [user pages](../docs/index.md).
+
+- Documentation reviews: [documentation](documentation-review.md), [adoption](diataxis-preflight.md),
+  [destinations](documentation-destinations-preflight.md), [contributor pages](contributor-documentation-preflight.md),
+  and [user pages](user-docs-preflight.md).
+- Execution reviews: [adaptive timeout](adaptive-timeout-preflight.md), [build cache](build-cache-preflight.md),
+  [compiler flags](compiler-flags-preflight.md), [module declarations](module-declaration-preflight.md),
+  [nested module diff](nested-module-diff-preflight.md), and [memory budget](memory-budget-preflight.md).
+- Mutation reviews: [equivalent mutants](equivalent-mutants-preflight.md), [ignore directives](ignore-directive-preflight.md),
+  [logical negation](invert-logical-not-preflight.md), [mutation registry](mutation-registry-preflight.md),
+  and [Descartes extreme mutation](descartes-extreme-mutation-preflight.md).
+- Verification reviews: [configuration schema](configuration-schema-preflight.md), [field alignment](fieldalignment-preflight.md),
+  [lint](lint-preflight.md), [process tests](process-tests-preflight.md), [test standard](test-standard-preflight.md),
+  and [test assessment](test-assessment.md).
+- Maintainer reviews: [process](process-review.md), [optional tooling](optional-maintainer-tooling-preflight.md),
+  [release](release-preflight.md), [transport regression](transport-regression-preflight.md), and
+  [upstream release](upstream-release.md). The [finalization design](phase-e-design.md#pre-merge-transport-verification)
+  gives the context for the JSON and TAP evidence under `docs/development/evidence`.
+
+### Other documentation surfaces
+
+| Surface | Form or treatment |
+| --- | --- |
+| CLI help and flag descriptions in `cmd/` and `cmd/internal/flags/` | Runtime reference. The command pages give the exact syntax and conditions. Keep help behavior and tokens. |
+| Help and usage text in `Makefile`, `scripts/`, `tools/`, and `.github/scripts/` | Maintainer reference at the command source. Link to the supported procedures in the contributor and maintainer guides. |
+| Go package, declaration, and implementation comments under `cmd/`, `internal/`, and `tools/` | Developer reference and explanation at the code. Use the architecture and coding guides for project-wide rules. Keep license headers and compiler directives. |
+| Comments and descriptions in workflows, build files, and repository configuration | Reference at the file that defines the setting. Use the checks and setup guides for procedures. Preserve machine-read values. |
+| `docs/docs/schema/configuration.json` | Configuration reference for tools. Keep descriptions with the schema and verify them against `internal/configuration/` and `cmd/`. |
+| Examples in the tutorial, how-to guides, reference, and contributor pages | Keep each example with its task or contract. For configuration examples, use the [configuration reference](../docs/usage/configuration.md#reference) and schema. The repository configuration and workflow files give working examples of their own settings. |
+| `CHANGELOG.md`, `CODE_OF_CONDUCT.md`, `LICENSE` | Generated release history, adopted policy, and legal text. The [repository entry point](../../README.md) gives the context for each. |
+| Quotations, copyright, asset files, and test inputs and outputs | Keep the original records. The pages that show them give context. Keep test fixtures byte-exact. |
+
+The inventory assigns a reader purpose or record treatment to each surface.
+The original wording of protected records has no STE conformance claim.
 
 ## Existing tools and review
 

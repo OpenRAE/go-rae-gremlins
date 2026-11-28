@@ -30,18 +30,21 @@ extra:
 
 nav:
   - Home: index.md
-  - Install: install.md
-  - Quick start: quick-start.md
-  - Usage:
+  - Tutorial:
+      - First mutation test: quick-start.md
+  - How-to guides:
+      - Install: install.md
+      - Tune workers: usage/commands/unleash/workers.md
+      - Annotate equivalent mutants: usage/equivalent-mutants.md
+      - Ignore mutants: usage/ignore-mutants.md
+      - Continuous integration:
+          - GitHub Actions: usage/ci/github-action.md
+          - Docker: usage/ci/docker.md
+  - Reference:
       - Commands:
           - usage/commands/index.md
-          - Unleash:
-            - usage/commands/unleash/index.md
-            - usage/commands/unleash/workers.md
-      - usage/configuration.md
-      - usage/coverage.md
-      - usage/equivalent-mutants.md
-      - usage/ignore-mutants.md
+          - usage/commands/unleash/index.md
+      - Configuration: usage/configuration.md
       - Mutations:
           - usage/mutations/index.md
           - usage/mutations/arithmetic_base.md
@@ -58,10 +61,13 @@ nav:
           - usage/mutations/extreme_void.md
           - usage/mutations/extreme_zero.md
           - usage/mutations/extreme_constant.md
-      - Continuous integration:
-          - usage/ci/github-action.md
-          - usage/ci/docker.md
-  - Contributing: https://github.com/OpenRAE/go-rae-gremlins/blob/dev/docs/CONTRIBUTING.md
+  - Explanation:
+      - Coverage: usage/coverage.md
+  - Repository guides:
+      - Contributing: https://github.com/OpenRAE/go-rae-gremlins/blob/dev/docs/CONTRIBUTING.md
+      - Maintainer setup: https://github.com/OpenRAE/go-rae-gremlins/blob/dev/docs/MAINTAINER_SETUP.md
+      - Architecture decisions: https://github.com/OpenRAE/go-rae-gremlins/blob/dev/docs/adr/README.md
+      - Security reporting: https://github.com/OpenRAE/go-rae-gremlins/blob/dev/SECURITY.md
 
 plugins:
   - search
