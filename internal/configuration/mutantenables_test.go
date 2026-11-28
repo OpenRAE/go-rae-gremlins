@@ -23,7 +23,9 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/mutator"
 )
 
-func TestMutantDefaultStatus(t *testing.T) {
+// TestFeatureMutantDefaultStatus checks the default state of each mutation
+// type.
+func TestFeatureMutantDefaultStatus(t *testing.T) {
 	t.Parallel()
 	type testCase struct {
 		mutantType mutator.Type

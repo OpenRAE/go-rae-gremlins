@@ -168,12 +168,12 @@ func runSiblings(t *testing.T, sys fstest.MapFS) []string {
 	return got
 }
 
-// TestRegressionPackageNamesOfSiblingFiles checks the package-level names
+// TestFeaturePackageNamesOfSiblingFiles checks the package-level names
 // that the extreme specs read from the other files of the directory. Names of
 // another package do not count. A sibling that cannot be read or parsed does
 // not stop the run; its names are not known, so no predeclared identifier
 // counts. A sibling that is not a regular file is not read.
-func TestRegressionPackageNamesOfSiblingFiles(t *testing.T) {
+func TestFeaturePackageNamesOfSiblingFiles(t *testing.T) {
 	both := []string{"EXTREME_CONSTANT", "EXTREME_ZERO"}
 	testCases := map[string]struct {
 		sys  fstest.MapFS
@@ -206,11 +206,11 @@ func TestRegressionPackageNamesOfSiblingFiles(t *testing.T) {
 	}
 }
 
-// TestRegressionDiffSelectionUsesPhysicalLines checks that the diff
+// TestFeatureFunctionDiffSelectionUsesPhysicalLines checks that the diff
 // selection of a function and of an operator uses the physical lines of the
 // file. A //line directive in the function changes only the reported
 // position of the operator.
-func TestRegressionDiffSelectionUsesPhysicalLines(t *testing.T) {
+func TestFeatureFunctionDiffSelectionUsesPhysicalLines(t *testing.T) {
 	const src = "package p\n\nfunc f(a int) int {\n//line other.go:100\n\treturn a * 2\n}\n"
 	viperSet(map[string]any{configuration.UnleashDryRunKey: true})
 	defer viperReset()

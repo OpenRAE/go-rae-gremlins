@@ -148,21 +148,6 @@ func TestTypeString(t *testing.T) {
 			expected:   "REMOVE_SELF_ASSIGNMENTS",
 			mutantType: mutator.RemoveSelfAssignments,
 		},
-		{
-			name:       "EXTREME_VOID",
-			expected:   "EXTREME_VOID",
-			mutantType: mutator.ExtremeVoid,
-		},
-		{
-			name:       "EXTREME_ZERO",
-			expected:   "EXTREME_ZERO",
-			mutantType: mutator.ExtremeZero,
-		},
-		{
-			name:       "EXTREME_CONSTANT",
-			expected:   "EXTREME_CONSTANT",
-			mutantType: mutator.ExtremeConstant,
-		},
 	}
 	for _, tc := range testCases {
 		tc := tc
@@ -196,6 +181,23 @@ func TestFeatureTypeIsDescartes(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("mutator.Types does not contain the Descartes type %s", mt)
+		}
+	}
+}
+
+// TestFeatureExtremeTypeStrings checks the names of the extreme types. The
+// names are the report, directive, and configuration contract of ADR 0012.
+func TestFeatureExtremeTypeStrings(t *testing.T) {
+	t.Parallel()
+
+	want := map[mutator.Type]string{
+		mutator.ExtremeVoid:     "EXTREME_VOID",
+		mutator.ExtremeZero:     "EXTREME_ZERO",
+		mutator.ExtremeConstant: "EXTREME_CONSTANT",
+	}
+	for mt, name := range want {
+		if got := mt.String(); got != name {
+			t.Errorf("Type(%d).String() = %q, want %q", int(mt), got, name)
 		}
 	}
 }

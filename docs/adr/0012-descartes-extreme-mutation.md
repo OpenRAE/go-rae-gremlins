@@ -97,4 +97,4 @@ When false, the per-type settings apply.
 | Shared AST | An added statement stays after `Apply`. | The spec restores the original statement list. `Apply` calls the restore function before it releases the file lock. | Spec restoration tests. |
 | Result integrity | A wrong result kind makes a mutant that does not compile. | The scope rule rejects shadowed predeclared names. Unknown types are not eligible. | Classification tests and a type check of the mutated files. |
 | Source tree | A mutation writes outside the worker copy. | The existing mutant writes only the physical file through an `os.Root`. | Existing confinement tests. |
-| Files outside the module | A symbolic link in the package directory makes the name scan read another file and print it in a parser error. | The scan opens only regular files and reports no parser error. | `TestRegressionPackageNamesOfSiblingFiles`. |
+| Files outside the module | A symbolic link in the package directory makes the name scan read another file and print it in a parser error. | The scan opens only regular files and reports no parser error. | `TestFeaturePackageNamesOfSiblingFiles`. |

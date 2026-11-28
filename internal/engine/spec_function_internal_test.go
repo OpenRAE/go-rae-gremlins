@@ -314,11 +314,11 @@ var true = 2 > 1
 	}
 }
 
-// TestRegressionExtremeSpecImportShadowing checks that an import name of the
+// TestFeatureExtremeSpecImportShadowing checks that an import name of the
 // file hides a predeclared identifier: EXTREME_ZERO cannot return false when
 // the file imports a package as false. The EXTREME_CONSTANT mutant of the
 // same function type-checks.
-func TestRegressionExtremeSpecImportShadowing(t *testing.T) {
+func TestFeatureExtremeSpecImportShadowing(t *testing.T) {
 	t.Parallel()
 
 	const src = `package p
@@ -355,11 +355,11 @@ func ok() bool {
 	}
 }
 
-// TestRegressionUnknownPackageNamesHidePredeclaredIdentifiers checks that a
+// TestFeatureUnknownPackageNamesHidePredeclaredIdentifiers checks that a
 // nil set of package names, which means that the names are not known, lets
 // no predeclared identifier count. Only EXTREME_VOID, which uses no name,
 // stays eligible.
-func TestRegressionUnknownPackageNamesHidePredeclaredIdentifiers(t *testing.T) {
+func TestFeatureUnknownPackageNamesHidePredeclaredIdentifiers(t *testing.T) {
 	t.Parallel()
 
 	_, file, _ := parseExtreme(t)

@@ -74,11 +74,6 @@ func TestUnleash(t *testing.T) {
 			defValue: "",
 		},
 		{
-			name:     "descartes",
-			flagType: boolType,
-			defValue: falseValue,
-		},
-		{
 			name:      "diff",
 			shorthand: "D",
 			flagType:  stringType,
@@ -89,21 +84,6 @@ func TestUnleash(t *testing.T) {
 			shorthand: "d",
 			flagType:  boolType,
 			defValue:  falseValue,
-		},
-		{
-			name:     "extreme-constant",
-			flagType: boolType,
-			defValue: falseValue,
-		},
-		{
-			name:     "extreme-void",
-			flagType: boolType,
-			defValue: falseValue,
-		},
-		{
-			name:     "extreme-zero",
-			flagType: boolType,
-			defValue: falseValue,
 		},
 		{
 			name:     "increment-decrement",
@@ -623,4 +603,28 @@ func reportMutants(t *testing.T, dir string) []string {
 	slices.Sort(lines)
 
 	return lines
+}
+
+// TestFeatureUnleashDescartesFlags checks the flags of ADR 0012: the
+// --descartes group flag and the flags of the three extreme types. All are
+// boolean flags that are false by default.
+func TestFeatureUnleashDescartesFlags(t *testing.T) {
+	c, err := newUnleashCmd(context.Background())
+	if err != nil {
+		t.Fatalf("newUnleashCmd() error = %v, want nil", err)
+	}
+	for _, name := range []string{"descartes", "extreme-void", "extreme-zero", "extreme-constant"} {
+		t.Run(name, func(t *testing.T) {
+			f := c.cmd.Flags().Lookup(name)
+			if f == nil {
+				t.Fatalf("flags.Lookup(%q) = nil, want a registered flag", name)
+			}
+			if f.Value.Type() != boolType {
+				t.Errorf("flag %q type = %q, want %q", name, f.Value.Type(), boolType)
+			}
+			if f.DefValue != falseValue {
+				t.Errorf("flag %q default = %q, want %q", name, f.DefValue, falseValue)
+			}
+		})
+	}
 }

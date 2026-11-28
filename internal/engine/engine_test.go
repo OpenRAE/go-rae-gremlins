@@ -545,7 +545,9 @@ func checkMutation(t *testing.T, tc mutationsTest) {
 	t.Errorf("Run() mutants = %v, want a %v mutant with status %v and a position", got, tc.mutantType, tc.mutStatus)
 }
 
-func TestMutantSkipDisabled(t *testing.T) {
+// TestFeatureMutantSkipDisabled checks that the discovery creates no mutant
+// of a disabled mutation type, for each type of mutator.Types.
+func TestFeatureMutantSkipDisabled(t *testing.T) {
 	t.Parallel()
 	for _, mt := range mutator.Types {
 		mt := mt

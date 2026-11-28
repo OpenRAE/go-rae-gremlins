@@ -468,11 +468,11 @@ func TestFeatureMutantApplyReportsRestorationFailure(t *testing.T) {
 	}
 }
 
-// TestRegressionExtremeSnippetShowsTheAddedReturn checks that the snippets of
+// TestFeatureExtremeSnippetShowsTheAddedReturn checks that the snippets of
 // an extreme mutant of a function with a long signature show the body. The
 // mutant is at the func keyword, which is more than three lines before the
 // added return statement.
-func TestRegressionExtremeSnippetShowsTheAddedReturn(t *testing.T) {
+func TestFeatureExtremeSnippetShowsTheAddedReturn(t *testing.T) {
 	t.Parallel()
 
 	const src = "package main\n\nfunc f(\n\ta int,\n\tb int,\n\tc int,\n\td int,\n) {\n\tprintln(a, b, c, d)\n}\n"
