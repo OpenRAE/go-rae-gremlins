@@ -113,7 +113,7 @@ All later changes use the executable pre-code command.
 [go-archcheck](https://github.com/OpenRAE/go-archcheck) checks the module against the model in `architecture/model.yaml`.
 The [go-archcheck model documentation](https://github.com/OpenRAE/go-archcheck/blob/dev/docs/model.md) defines the model format and the checks.
 The model gives each package of the module one layer and one component.
-The `Makefile` pins the go-archcheck version in `ARCHCHECK_VERSION`.
+The `Makefile` pins the go-archcheck version in `ARCHCHECK_VERSION` and the Go toolchain that runs it in `ARCHCHECK_GO`.
 
 `make archcheck` does these checks:
 

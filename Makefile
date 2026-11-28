@@ -121,7 +121,9 @@ architecture-design:
 # structural model change needs a new design record. An empty ARCHCHECK_BASE, or a base with no
 # model, skips that comparison. See docs/development/architecture.md.
 ARCHCHECK_VERSION=v0.0.0-20261128001710-5746a1ce4bef
-ARCHCHECK=${GO_CMD} run github.com/OpenRAE/go-archcheck/cmd/archcheck@${ARCHCHECK_VERSION}
+# go-archcheck requires a newer Go than go.mod. CI sets GOTOOLCHAIN=local, so name the toolchain.
+ARCHCHECK_GO=go1.27.4
+ARCHCHECK=GOTOOLCHAIN=${ARCHCHECK_GO} ${GO_CMD} run github.com/OpenRAE/go-archcheck/cmd/archcheck@${ARCHCHECK_VERSION}
 ARCHCHECK_BASE ?= origin/dev
 .PHONY: archcheck archcheck-reserve
 archcheck:
