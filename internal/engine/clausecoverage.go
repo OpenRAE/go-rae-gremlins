@@ -44,14 +44,14 @@ import (
 // before any other code of the package. Thus an executed block in a file of
 // the package proves that the initializers ran.
 type fileCoverage struct {
-	set         *token.FileSet
-	profile     coverage.Profile
-	evaluated   []exprSpan
-	compiled    []exprSpan
-	varDecls    []exprSpan
-	funcBodies  []exprSpan
-	built       bool
-	pkgRan      bool
+	set        *token.FileSet
+	profile    coverage.Profile
+	evaluated  []exprSpan
+	compiled   []exprSpan
+	varDecls   []exprSpan
+	funcBodies []exprSpan
+	built      bool
+	pkgRan     bool
 }
 
 // exprSpan is the source range [start, end) of an expression.
