@@ -1,0 +1,304 @@
+# The go-rae-archcheck architecture model of go-rae-gremlins. See docs/development/architecture.md.
+version: 1
+module: github.com/OpenRAE/go-rae-gremlins
+
+system:
+  id: gremlins
+  name: Gremlins
+  description: A mutation testing tool for Go. It changes the source code of a module and runs its tests on each change.
+
+people:
+  - id: developer
+    name: Developer
+    description: Runs Gremlins on a Go module, on a workstation or in CI.
+
+external_systems:
+  - id: go-command
+    name: Go command
+    description: Lists, builds and tests the packages of the module under test.
+  - id: git
+    name: Git
+    description: Gives the diff of the module under test for the diff mode.
+
+relationships:
+  - from: developer
+    to: gremlins-cli
+    description: Runs
+    technology: Command line
+  - from: gremlins-cli
+    to: go-command
+    description: Gets coverage, type information and test results from
+    technology: go test, go list
+  - from: gremlins-cli
+    to: git
+    description: Gets the changed lines from
+    technology: git diff
+  - from: developer
+    to: repository-tools
+    description: Runs the repository checks with
+    technology: Make
+
+containers:
+  - id: gremlins-cli
+    name: gremlins
+    technology: Go
+    description: The gremlins command.
+  - id: repository-tools
+    name: Repository tools
+    technology: Go
+    description: The architecture check and the lint context tool of this repository.
+
+layers:
+  - id: cli
+    directory: cmd
+    description: The cobra commands, the shared flag binding and the binary entry point.
+    uses: [configuration, coverage, diff, engine, exclusion, execution, gomodule, log, mutator, report, typeinfo]
+    external:
+      - path: github.com/spf13/cobra
+        reason: The command and flag framework of the CLI.
+      - path: github.com/spf13/pflag
+        reason: The flag set type of cobra.
+      - path: github.com/spf13/viper
+        reason: Binds the flags to the configuration keys.
+      - path: github.com/MakeNowJust/heredoc
+        reason: Formats the long help text of the commands.
+      - path: github.com/fatih/color
+        reason: Gives the color-aware console writers to the logger.
+  - id: engine
+    directory: internal/engine
+    description: Finds the mutants, copies the module to work directories and runs the mutants on a worker pool.
+    uses: [configuration, coverage, diff, exclusion, gomodule, log, mutator, process, report, typeinfo]
+    external: []
+  - id: coverage
+    directory: internal/coverage
+    description: Runs go test with a coverage profile and gives the covered positions.
+    uses: [configuration, gomodule, log, process]
+    external:
+      - path: golang.org/x/tools/cover
+        reason: Parses the coverage profile of go test.
+  - id: diff
+    directory: internal/diff
+    description: Runs git diff and gives the changed lines.
+    uses: [configuration, log]
+    external:
+      - path: github.com/bluekeyes/go-gitdiff/gitdiff
+        reason: Parses the output of git diff.
+  - id: typeinfo
+    directory: internal/typeinfo
+    description: Loads the type information of the packages under test.
+    uses: [log]
+    external:
+      - path: golang.org/x/tools/go/packages
+        reason: The standard loader of Go packages with their types.
+  - id: report
+    directory: internal/report
+    description: Writes the console report and the JSON output file.
+    uses: [configuration, execution, log, mutator]
+    external:
+      - path: github.com/aymanbagabas/go-udiff
+        reason: Makes the unified diff of each mutant.
+      - path: github.com/fatih/color
+        reason: Colors the console report.
+      - path: github.com/hako/durafmt
+        reason: Formats the elapsed time.
+  - id: exclusion
+    directory: internal/exclusion
+    description: Applies the file exclusion rules.
+    uses: [configuration]
+    external: []
+  - id: gomodule
+    directory: internal/gomodule
+    description: Finds the Go module and its path.
+    uses: []
+    external:
+      - path: golang.org/x/mod/modfile
+        reason: Reads the module path from the go.mod file.
+      - path: golang.org/x/mod/module
+        reason: Validates module paths.
+  - id: log
+    directory: internal/log
+    description: All console and error output of the tool.
+    uses: [configuration]
+    external:
+      - path: github.com/fatih/color
+        reason: Colors the console output.
+  - id: configuration
+    directory: internal/configuration
+    description: The settings from the flags, the configuration file and the environment.
+    uses: [mutator]
+    external:
+      - path: github.com/spf13/viper
+        reason: Reads the configuration file, the environment and the flags.
+      - path: github.com/mitchellh/go-homedir
+        reason: Finds the home directory for the user configuration file.
+  - id: process
+    directory: internal/process
+    description: Command runs that stop the process group.
+    uses: []
+    external:
+      - path: golang.org/x/sys/windows
+        reason: The job objects and process calls of Windows.
+  - id: execution
+    directory: internal/execution
+    description: The process exit codes.
+    uses: []
+    external: []
+  - id: mutator
+    directory: internal/mutator
+    description: The mutation types, the mutant status values and the mutant interface.
+    uses: []
+    external: []
+  - id: architecture-tool
+    directory: tools/architecture
+    description: The architecture model and design check of the repository.
+    uses: [log]
+    external: []
+  - id: lintcontext
+    directory: tools/lintcontext
+    description: Gives the declaration identities for the lint baseline.
+    uses: []
+    external: []
+
+components:
+  - id: entry-point
+    containers: [gremlins-cli]
+    description: The binary entry point. It cancels the run context on a signal and sets the exit code.
+    packages: [github.com/OpenRAE/go-rae-gremlins/cmd/gremlins]
+    depends_on: [commands, execution, log]
+    modules: [github.com/fatih/color]
+  - id: commands
+    containers: [gremlins-cli]
+    description: The cobra commands of the CLI.
+    packages: [github.com/OpenRAE/go-rae-gremlins/cmd]
+    depends_on:
+      - flags
+      - configuration
+      - coverage
+      - diff
+      - engine
+      - workdir
+      - exclusion
+      - gomodule
+      - log
+      - mutator
+      - report
+      - typeinfo
+    modules: [github.com/MakeNowJust/heredoc, github.com/spf13/cobra, github.com/spf13/pflag]
+  - id: flags
+    containers: [gremlins-cli]
+    description: The shared flag binding of the commands.
+    packages: [github.com/OpenRAE/go-rae-gremlins/cmd/internal/flags]
+    depends_on: []
+    modules: [github.com/spf13/cobra, github.com/spf13/pflag, github.com/spf13/viper]
+  - id: engine
+    containers: [gremlins-cli]
+    description: Walks the source files, finds the mutants and runs them.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/engine]
+    depends_on:
+      - configuration
+      - coverage
+      - diff
+      - workdir
+      - workerpool
+      - exclusion
+      - gomodule
+      - log
+      - mutator
+      - process
+      - report
+      - typeinfo
+  - id: workdir
+    containers: [gremlins-cli]
+    description: The temporary module copy that each mutant runs in.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/engine/workdir]
+    depends_on: [log]
+  - id: workerpool
+    containers: [gremlins-cli]
+    description: The worker pool that runs the mutants.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/engine/workerpool]
+    depends_on: [configuration, mutator]
+  - id: coverage
+    containers: [gremlins-cli]
+    description: Gets the covered positions from go test.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/coverage]
+    depends_on: [configuration, gomodule, log, process]
+    modules: [golang.org/x/tools]
+  - id: diff
+    containers: [gremlins-cli]
+    description: Gets the changed lines from git diff.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/diff]
+    depends_on: [configuration, log]
+    modules: [github.com/bluekeyes/go-gitdiff]
+  - id: typeinfo
+    containers: [gremlins-cli]
+    description: Loads the type information of the packages under test.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/typeinfo]
+    depends_on: [log]
+    modules: [golang.org/x/tools]
+  - id: report
+    containers: [gremlins-cli]
+    description: Writes the console report and the JSON output file.
+    packages:
+      - github.com/OpenRAE/go-rae-gremlins/internal/report
+      - github.com/OpenRAE/go-rae-gremlins/internal/report/internal
+    depends_on: [configuration, execution, log, mutator]
+    modules: [github.com/aymanbagabas/go-udiff, github.com/fatih/color, github.com/hako/durafmt]
+  - id: exclusion
+    containers: [gremlins-cli]
+    description: Applies the file exclusion rules.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/exclusion]
+    depends_on: [configuration]
+  - id: gomodule
+    containers: [gremlins-cli]
+    description: Finds the Go module and its path.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/gomodule]
+    depends_on: []
+    modules: [golang.org/x/mod]
+  - id: log
+    containers: [gremlins-cli, repository-tools]
+    description: All console and error output.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/log]
+    depends_on: [configuration]
+    modules: [github.com/fatih/color]
+  - id: configuration
+    containers: [gremlins-cli]
+    description: The settings from the flags, the configuration file and the environment.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/configuration]
+    depends_on: [mutator]
+    modules: [github.com/spf13/viper, github.com/mitchellh/go-homedir]
+  - id: process
+    containers: [gremlins-cli]
+    description: Command runs that stop the process group.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/process]
+    depends_on: []
+    modules: [golang.org/x/sys]
+  - id: execution
+    containers: [gremlins-cli]
+    description: The process exit codes.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/execution]
+    depends_on: []
+  - id: mutator
+    containers: [gremlins-cli]
+    description: The mutation types and the mutant status values.
+    packages: [github.com/OpenRAE/go-rae-gremlins/internal/mutator]
+    depends_on: []
+  - id: architecture-tool
+    containers: [repository-tools]
+    description: The architecture model and design check of the repository.
+    packages: [github.com/OpenRAE/go-rae-gremlins/tools/architecture]
+    depends_on: [log]
+  - id: lintcontext
+    containers: [repository-tools]
+    description: Gives the declaration identities for the lint baseline.
+    packages: [github.com/OpenRAE/go-rae-gremlins/tools/lintcontext]
+    depends_on: []
+
+test_modules:
+  - github.com/google/go-cmp
+  - github.com/hectane/go-acl
+  - github.com/spf13/pflag
+  - github.com/spf13/viper
+
+test_support: []
+
+rules: []

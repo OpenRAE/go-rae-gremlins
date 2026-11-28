@@ -5,6 +5,8 @@ The checker compiles its rules in memory. It creates no generated files.
 The checker is development tooling. The Gremlins binary does not import it.
 ADR 0004 records the decision and its limits.
 
+CI also checks the module with [go-archcheck](#go-archcheck-model-and-design-records).
+
 The separate [delivery finalization boundary](phase-e-design.md) models the post-merge workflow,
 its pinned utility installation, and GitHub evidence access. It does not broaden the static checker's permissions.
 The [transport verification boundary](phase-e-design.md#pre-merge-transport-verification) models the CI jobs that test transport changes with the private release.
@@ -105,6 +107,31 @@ Historical context: the checker could not run before it existed.
 For #76, the maintainer reviewed the initial model and design manually before implementation.
 That same design then ran as the bootstrap verification.
 All later changes use the executable pre-code command.
+
+## go-archcheck model and design records
+
+[go-archcheck](https://github.com/OpenRAE/go-archcheck) checks the module against the model in `architecture/model.yaml`.
+The [go-archcheck model documentation](https://github.com/OpenRAE/go-archcheck/blob/dev/docs/model.md) defines the model format and the checks.
+The model gives each package of the module one layer and one component.
+The `Makefile` pins the go-archcheck version in `ARCHCHECK_VERSION` and the Go toolchain that runs it in `ARCHCHECK_GO`.
+
+`make archcheck` does these checks:
+
+1. It checks the model, and the code of the module against the model.
+2. It checks each design record in `architecture/designs` against its reservation tag `design/NNNN` in `origin`.
+3. With `ARCHCHECK_BASE`, it compares the model with the model of that commit. A structural change of the model needs a new design record.
+
+The default `ARCHCHECK_BASE` is `origin/dev`. An empty `ARCHCHECK_BASE`, or a base commit with no model, skips the comparison.
+The Architecture job of CI runs `make archcheck` with the same comparison commit as `tools/architecture`.
+
+To change the structure of the model, do these steps:
+
+1. Reserve a design number for the issue: `GH_TOKEN="$(gh auth token)" make archcheck-reserve ISSUE=<issue>`. The command prints the number.
+2. Add the record `architecture/designs/NNNN-<slug>.md` with that number. Its front matter states `design`, `issue`, and `title`.
+3. Change the model in the same pull request, and run `make archcheck`.
+
+The reservation tag message is `issue: N`, and it must name the issue of the record.
+A change to only the names, descriptions, technologies, reasons, or fix messages of the model is not structural.
 
 ## Security and failure behavior
 

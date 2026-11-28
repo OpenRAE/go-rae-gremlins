@@ -34,6 +34,16 @@ jobs:
             COMPARISON=''
           fi
           go run ./tools/architecture -base "$COMPARISON"
+      # go-archcheck checks the code against architecture/model.yaml and each design record against
+      # its design/NNNN reservation tag. A structural model change needs a new design record.
+      - name: Check the archcheck model, design records, and reservations
+        env:
+          COMPARISON: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before || 'origin/dev' }}
+        run: |
+          if [ "$COMPARISON" = 0000000000000000000000000000000000000000 ]; then
+            COMPARISON=''
+          fi
+          make archcheck ARCHCHECK_BASE="$COMPARISON"
 
   lint:
     name: Lint

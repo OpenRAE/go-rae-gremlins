@@ -88,6 +88,10 @@ When you fix a violation, remove its stale baseline entry.
 Do not regenerate or enlarge the architecture baseline.
 Architecture policy changes need maintainer review.
 
+CI also runs `make archcheck`, which checks the code against `architecture/model.yaml` with go-archcheck.
+A structural change of that model needs a new design record with a reserved number.
+See [go-archcheck model and design records](development/architecture.md#go-archcheck-model-and-design-records).
+
 Follow the [Go coding standard](development/coding-standards.md).
 Provision the pinned linter and Go with mise, and run `go mod download` before analysis.
 For a local lint check, run `make lint LINT_BASE=origin/dev` or give another fetched target commit.

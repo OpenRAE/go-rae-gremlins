@@ -1,6 +1,8 @@
 dist/
 # Pinned tools that scripts/doc-tools.sh installs.
 /.tools/
+# Inputs of make archcheck.
+/.cache/
 /docs/site/
 out
 .idea
