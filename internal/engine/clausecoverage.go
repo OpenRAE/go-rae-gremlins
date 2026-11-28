@@ -180,11 +180,21 @@ func within(spans []exprSpan, pos token.Pos) bool {
 	return slices.ContainsFunc(spans, func(s exprSpan) bool { return pos >= s.start && pos < s.end })
 }
 
-// bodyRan tells if the body of the clause with the given colon ran.
-// The coverage block of a clause body starts immediately after the colon,
-// also when the body is empty.
-func (c fileCoverage) bodyRan(colon token.Pos) bool {
-	return c.profile.IsCovered(c.set.Position(colon + 1))
+// bodyRan tells if the body of the clause with the given colon and statements
+// ran.
+//
+// The coverage block of a non-empty clause body starts at its first statement
+// on Go 1.27 and later. On Go 1.26 and earlier it starts immediately after the
+// colon and reaches the end of the body. The first statement is in the block
+// for both. The coverage block of an empty clause body starts immediately after
+// the colon on both.
+func (c fileCoverage) bodyRan(colon token.Pos, body []ast.Stmt) bool {
+	pos := colon + 1
+	if len(body) > 0 {
+		pos = body[0].Pos()
+	}
+
+	return c.profile.IsCovered(c.set.Position(pos))
 }
 
 // evaluatedCaseExprs returns the case expressions of an expression switch
@@ -224,7 +234,7 @@ func (c fileCoverage) caseEvidence(clauses []*ast.CaseClause) (int, []bool) {
 	full := 0
 	first := make([]bool, len(clauses))
 	for j, cc := range clauses {
-		if !c.bodyRan(cc.Colon) {
+		if !c.bodyRan(cc.Colon, cc.Body) {
 			continue
 		}
 		entry := c.entryClause(clauses, j)
@@ -251,7 +261,7 @@ func (c fileCoverage) entryClause(clauses []*ast.CaseClause, j int) int {
 
 // fellThrough tells if the body of the clause ran and ends with fallthrough.
 func (c fileCoverage) fellThrough(cc *ast.CaseClause) bool {
-	if len(cc.Body) == 0 || !c.bodyRan(cc.Colon) {
+	if len(cc.Body) == 0 || !c.bodyRan(cc.Colon, cc.Body) {
 		return false
 	}
 	br, ok := cc.Body[len(cc.Body)-1].(*ast.BranchStmt)
@@ -269,7 +279,7 @@ func (c fileCoverage) fellThrough(cc *ast.CaseClause) bool {
 // selected clause.
 func (c fileCoverage) evaluatedCommExprs(body *ast.BlockStmt) []exprSpan {
 	clauses := clausesOf[*ast.CommClause](body)
-	ran := slices.ContainsFunc(clauses, func(cc *ast.CommClause) bool { return c.bodyRan(cc.Colon) })
+	ran := slices.ContainsFunc(clauses, func(cc *ast.CommClause) bool { return c.bodyRan(cc.Colon, cc.Body) })
 	if !ran {
 		return nil
 	}
@@ -287,7 +297,7 @@ func (c fileCoverage) commSpans(cc *ast.CommClause) []exprSpan {
 	case *ast.SendStmt, *ast.ExprStmt:
 		return []exprSpan{{start: s.Pos(), end: s.End()}}
 	case *ast.AssignStmt:
-		return c.receiveSpans(s, cc.Colon)
+		return c.receiveSpans(s, cc.Colon, cc.Body)
 	default:
 		// The default clause has no communication.
 		return nil
@@ -295,9 +305,9 @@ func (c fileCoverage) commSpans(cc *ast.CommClause) []exprSpan {
 }
 
 // receiveSpans returns the evaluated expressions of a receive assignment.
-func (c fileCoverage) receiveSpans(s *ast.AssignStmt, colon token.Pos) []exprSpan {
+func (c fileCoverage) receiveSpans(s *ast.AssignStmt, colon token.Pos, body []ast.Stmt) []exprSpan {
 	spans := spansOf(s.Rhs)
-	if c.bodyRan(colon) {
+	if c.bodyRan(colon, body) {
 		spans = append(spans, spansOf(s.Lhs)...)
 	}
 

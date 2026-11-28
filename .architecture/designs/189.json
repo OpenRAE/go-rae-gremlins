@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "issue": 189,
+  "summary": "Recognize tested switch and select case expressions as covered on Go 1.27. The coverage block of a non-empty clause body starts at its first statement on Go 1.27 and later, and immediately after the colon on Go 1.26 and earlier. An empty clause body keeps the block immediately after the colon on both. bodyRan in internal/engine/clausecoverage.go now reads the first statement position when the clause body has statements, and the colon position otherwise. The first statement position lies inside the body block for both Go versions, so bodyRan reports the same result on both. The callers caseEvidence, fellThrough, evaluatedCommExprs, and receiveSpans pass the clause body statements to bodyRan. The clause coverage feature test runs its full table against both the Go 1.26 and the Go 1.27 block layouts. No internal dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/process",
+        "internal/report",
+        "internal/typeinfo"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator",
+        "internal/typeinfo"
+      ]
+    }
+  ],
+  "contracts": [],
+  "contract_changes": {},
+  "policies": [],
+  "trust_boundaries": "The change reads an existing coverage profile and the parsed AST of a target file, both already inside the process. It starts no subprocess, download, or file write, and adds no credential, destination, or provider. Development checks stay local or in existing CI. The delivery_finalization and merge_queue_policy entries restate the unchanged modeled boundaries.",
+  "conflicts": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  }
+}
