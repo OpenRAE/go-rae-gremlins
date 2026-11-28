@@ -116,6 +116,36 @@ architecture:
 architecture-design:
 	bash scripts/check-design.sh
 
+# go-archcheck checks the module code against architecture/model.yaml. Each design record in
+# architecture/designs needs its design/NNNN reservation tag in origin. With ARCHCHECK_BASE, a
+# structural model change needs a new design record. An empty ARCHCHECK_BASE, or a base with no
+# model, skips that comparison. See docs/development/architecture.md.
+ARCHCHECK_VERSION=v0.0.0-20261128001710-5746a1ce4bef
+ARCHCHECK=${GO_CMD} run github.com/OpenRAE/go-archcheck/cmd/archcheck@${ARCHCHECK_VERSION}
+ARCHCHECK_BASE ?= origin/dev
+.PHONY: archcheck archcheck-reserve
+archcheck:
+	mkdir -p .cache
+	git fetch --quiet --prune origin '+refs/tags/design/*:refs/tags/design/*'
+	git for-each-ref --format='%(refname)%09%(objecttype)%09%(contents:subject)' refs/tags/design/ > .cache/reservations.txt
+	@base='${ARCHCHECK_BASE}'; \
+	if [ -n "$$base" ]; then git rev-parse --quiet --verify "$$base^{commit}" > /dev/null || { echo "unknown ARCHCHECK_BASE $$base" >&2; exit 1; }; fi; \
+	if [ -n "$$base" ] && git cat-file -e "$$base:architecture/model.yaml" 2>/dev/null; then \
+		git show "$$base:architecture/model.yaml" > .cache/base-model.yaml; \
+		git ls-tree --name-only "$$base" architecture/designs/ > .cache/base-designs.txt; \
+		echo "archcheck: compare with $$base"; \
+		${ARCHCHECK} -reservations .cache/reservations.txt -base-model .cache/base-model.yaml -base-designs .cache/base-designs.txt; \
+	else \
+		echo "archcheck: no base model to compare"; \
+		${ARCHCHECK} -reservations .cache/reservations.txt; \
+	fi
+
+# Reserve the next design number for issue ISSUE. GH_TOKEN needs write access to the contents
+# of the repository, for example GH_TOKEN="$(gh auth token)".
+archcheck-reserve:
+	@if [ -z "${ISSUE}" ]; then echo "set ISSUE to the issue number" >&2; exit 2; fi
+	${ARCHCHECK} reserve -repo OpenRAE/go-rae-gremlins -issue "${ISSUE}"
+
 # Prove that the cgroup-v2 memory budget stops a runaway allocator. Linux only.
 .PHONY: memcheck
 memcheck:

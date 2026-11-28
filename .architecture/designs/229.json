@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "issue": 229,
+  "summary": "Adopt the go-archcheck checks. architecture/model.yaml models each package of the module as a go-archcheck layer and component. Design record 0001 states the initial model, with its reservation tag design/0001 for issue 229. make archcheck runs go-archcheck at a pinned version with the reservation tags of origin and, with a comparison commit, the base model and design records. make archcheck-reserve reserves the next design number. The Architecture CI job runs make archcheck with the same comparison commit as tools/architecture. The existing model, checker, and baseline do not change. No Go package, CLI flag, configuration key, JSON report, or exit code changes.",
+  "changes": [],
+  "contracts": [],
+  "contract_changes": {},
+  "policies": [
+    "ci",
+    "build",
+    "contributing",
+    "guidance"
+  ],
+  "trust_boundaries": "Existing modeled trust boundaries remain. make archcheck runs go-archcheck through go run at a pinned module version, as make vuln runs govulncheck. The go command downloads the module and, when needed, the Go toolchain that the module requires. The check fetches the design/NNNN tags from origin with read access. go-archcheck loads the packages of the module with the go command; it runs no test and no repository code, and it sends no source. make archcheck-reserve is a developer command, not a CI step: it creates a tag through the GitHub API with the GH_TOKEN of the developer.",
+  "conflicts": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  }
+}

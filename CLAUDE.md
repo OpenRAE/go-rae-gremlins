@@ -254,3 +254,9 @@ Record the model digest, affected rules, and result in the issue plan.
 Resolve conflicts before implementation. Repeat after model or design changes.
 See [the architecture model and design check](docs/development/architecture.md).
 CI runs the same architecture check as `make architecture`. It rejects baseline growth and missing design coverage.
+
+CI also runs `make archcheck`, which checks the code against `architecture/model.yaml` with go-archcheck.
+A new package or import must agree with that model.
+For a structural model change, reserve a design number with `make archcheck-reserve ISSUE=<issue>`.
+Then add the record `architecture/designs/NNNN-<slug>.md` in the same change.
+See [go-archcheck model and design records](docs/development/architecture.md#go-archcheck-model-and-design-records).
