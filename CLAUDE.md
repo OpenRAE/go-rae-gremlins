@@ -109,7 +109,10 @@ make clean
 - Types: `ArithmeticBase`, `ConditionalsBoundary`,
   `ConditionalsNegation`, `IncrementDecrement`, `InvertAssignments`,
   `InvertBitwise`, `InvertBitwiseAssignments`, `InvertLogical`,
-  `InvertLoopCtrl`, `InvertNegatives`, `RemoveSelfAssignments`
+  `InvertLoopCtrl`, `InvertNegatives`, `RemoveSelfAssignments`,
+  `ExtremeVoid`, `ExtremeZero`, `ExtremeConstant`
+- `Type.IsDescartes` gives the Descartes group of the extreme types
+  (ADR 0012). `--descartes` runs only that group
 - Status values: `NotCovered`, `Runnable`, `Skipped`, `Lived`,
   `Killed`, `NotViable`, `TimedOut`, `MemoryError`, `Equivalent`
 - Each mutator implements: `Apply()` (mutate code), `Rollback()`
@@ -190,7 +193,8 @@ CLI, configuration, and report contracts.
 
 - **Spec-based mutations**: Each spec edits the shared Go AST at an
   original operator position and restores the AST before `Apply`
-  returns. Worker writes use the physical file name, not `//line`
+  returns. An extreme spec edits a function body; its position is the
+  `func` keyword. Worker writes use the physical file name, not `//line`
   positions
 - **Workdir isolation**: Each mutation runs in a temporary copy of the
   module, so mutants do not interfere. The copy is not a sandbox: the

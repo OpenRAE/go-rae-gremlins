@@ -56,6 +56,7 @@ const (
 	paramBuildTags          = "tags"
 	paramCoverPackages      = "coverpkg"
 	paramDryRun             = "dry-run"
+	paramDescartes          = "descartes"
 	paramOutputStatuses     = "output-statuses"
 	paramOutputDiffStatuses = "output-diff-statuses"
 	paramOutput             = "output"
@@ -306,6 +307,10 @@ func unleashFlags() []*flags.Flag {
 		{
 			Name: paramDryRun, CfgKey: configuration.UnleashDryRunKey, Shorthand: "d", DefaultV: false,
 			Usage: "find mutants but do not run their tests (the coverage run still runs the tests)",
+		},
+		{
+			Name: paramDescartes, CfgKey: configuration.UnleashDescartesKey, DefaultV: false,
+			Usage: "run only the Descartes extreme mutation types, whatever the mutant type flags are",
 		},
 		{
 			Name: paramOutputStatuses, CfgKey: configuration.UnleashOutputStatusesKey, Shorthand: "S", DefaultV: "",

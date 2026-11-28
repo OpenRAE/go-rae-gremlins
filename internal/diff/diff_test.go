@@ -30,6 +30,9 @@ const (
 	testFile1 = "test1"
 )
 
+// exampleFile is the file name of the diff tests.
+const exampleFile = "example.go"
+
 func TestRegressionDiffSeparatedAdditions(t *testing.T) {
 	patch := "diff --git a/example.go b/example.go\n--- a/example.go\n+++ b/example.go\n@@ -1,5 +1,7 @@\n first\n+added\n context\n-old\n+replacement\n last\n+added again\n end\n"
 	files, _, err := gitdiff.Parse(bytes.NewBufferString(patch))
@@ -39,14 +42,14 @@ func TestRegressionDiffSeparatedAdditions(t *testing.T) {
 	got := newDiff(files)
 	for line := 1; line <= 8; line++ {
 		want := line == 2 || line == 4 || line == 6
-		if changed := got.IsChanged(token.Position{Filename: "example.go", Line: line}); changed != want {
+		if changed := got.IsChanged(token.Position{Filename: exampleFile, Line: line}); changed != want {
 			t.Errorf("line %d changed = %v, want %v", line, changed, want)
 		}
 	}
 }
 
 func TestRegressionDiffEmptySelection(t *testing.T) {
-	if newDiff(nil).IsChanged(token.Position{Filename: "example.go", Line: 1}) {
+	if newDiff(nil).IsChanged(token.Position{Filename: exampleFile, Line: 1}) {
 		t.Fatal("an enabled diff with no additions must not select the whole repository")
 	}
 }
@@ -226,5 +229,42 @@ func TestFeature_newChanges_separateEditsInOneFragment(t *testing.T) {
 	}
 	if !reflect.DeepEqual(changes, expect) {
 		t.Fatalf("newChanges() for a hunk with two separate edits = %v, want %v", changes, expect)
+	}
+}
+
+// TestFeatureDiffIsRangeChanged checks that a range of lines is changed when
+// a changed region overlaps one or more of its lines. ADR 0012 selects a
+// function mutant this way.
+func TestFeatureDiffIsRangeChanged(t *testing.T) {
+	t.Parallel()
+
+	d := Diff{exampleFile: {{StartLine: 10, EndLine: 12}}}
+	testCases := []struct {
+		name       string
+		file       string
+		start, end int
+		want       bool
+	}{
+		{name: "range before the change", file: exampleFile, start: 1, end: 9, want: false},
+		{name: "range ends on the first changed line", file: exampleFile, start: 5, end: 10, want: true},
+		{name: "range inside the change", file: exampleFile, start: 11, end: 11, want: true},
+		{name: "range contains the change", file: exampleFile, start: 1, end: 20, want: true},
+		{name: "range starts on the last changed line", file: exampleFile, start: 12, end: 30, want: true},
+		{name: "range after the change", file: exampleFile, start: 13, end: 30, want: false},
+		{name: "other file", file: "other.go", start: 1, end: 30, want: false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			start := token.Position{Filename: tc.file, Line: tc.start}
+			end := token.Position{Filename: tc.file, Line: tc.end}
+			if got := d.IsRangeChanged(start, end); got != tc.want {
+				t.Errorf("IsRangeChanged(%d, %d) in %s = %t, want %t", tc.start, tc.end, tc.file, got, tc.want)
+			}
+		})
+	}
+
+	if !Diff(nil).IsRangeChanged(token.Position{Filename: exampleFile, Line: 1}, token.Position{Filename: exampleFile, Line: 2}) {
+		t.Error("nil Diff IsRangeChanged = false, want true: diff selection is disabled")
 	}
 }

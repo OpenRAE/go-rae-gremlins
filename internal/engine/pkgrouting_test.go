@@ -55,7 +55,8 @@ func TestFeatureRoot(t *testing.T) {
 
 func positive(n int) bool { return n > 0 }
 
-func main() { _ = positive(1) }
+// A test cannot run main, so main has an empty body and no extreme mutant.
+func main() {}
 `,
 	"cmd/app/main_test.go": `package main
 

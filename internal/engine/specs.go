@@ -103,6 +103,9 @@ func builtinSpecs() []spec {
 			token.BREAK:    token.CONTINUE,
 			token.CONTINUE: token.BREAK,
 		}},
+		extremeSpec{mt: mutator.ExtremeVoid, values: voidValues},
+		extremeSpec{mt: mutator.ExtremeZero, values: zeroValues},
+		extremeSpec{mt: mutator.ExtremeConstant, values: constantValues},
 	}
 }
 

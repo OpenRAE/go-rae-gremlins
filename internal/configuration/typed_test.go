@@ -234,6 +234,11 @@ func TestFeatureValidateRejectsInvalidValues(t *testing.T) {
 			wantKey: []string{UnleashExcludeFiles},
 		},
 		{
+			name:    "descartes from environment",
+			env:     map[string]string{"GREMLINS_UNLEASH_DESCARTES": badBool},
+			wantKey: []string{UnleashDescartesKey},
+		},
+		{
 			name:    "mutant enabled from file",
 			config:  "mutants:\n  arithmetic-base:\n    enabled: sometimes\n",
 			wantKey: []string{MutantTypeEnabledKey(mutator.ArithmeticBase)},

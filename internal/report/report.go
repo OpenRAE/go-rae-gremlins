@@ -154,6 +154,12 @@ func reportMutatorType(m mutator.Mutator, rep *reportStatus) {
 		rep.mutatorStatistics.InvertNegatives++
 	case mutator.RemoveSelfAssignments:
 		rep.mutatorStatistics.RemoveSelfAssignments++
+	case mutator.ExtremeVoid:
+		rep.mutatorStatistics.ExtremeVoid++
+	case mutator.ExtremeZero:
+		rep.mutatorStatistics.ExtremeZero++
+	case mutator.ExtremeConstant:
+		rep.mutatorStatistics.ExtremeConstant++
 	}
 }
 

@@ -19,6 +19,12 @@
           "type": "boolean",
           "default": false
         },
+        "descartes": {
+          "title": "Descartes mode",
+          "description": "Runs only the Descartes extreme mutation types: extreme-void, extreme-zero, and extreme-constant. The other mutation types do not run, and the enabled keys of the mutants do not apply",
+          "type": "boolean",
+          "default": false
+        },
         "integration": {
           "title": "Integration mode",
           "description": "Runs the complete test suite for each mutant, not only the tests of the mutant's package",
@@ -297,6 +303,39 @@
         },
         "remove-self-assignments": {
           "title": "The remove-self-assignments Schema",
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "The enabled Schema",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "extreme-void": {
+          "title": "The extreme-void Schema",
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "The enabled Schema",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "extreme-zero": {
+          "title": "The extreme-zero Schema",
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "The enabled Schema",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "extreme-constant": {
+          "title": "The extreme-constant Schema",
           "type": "object",
           "properties": {
             "enabled": {

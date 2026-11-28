@@ -30,5 +30,18 @@ The configuration key is `mutants.<flag name>.enabled`. For example, `mutants.ar
 | [INVERT_BITWISE](invert_bitwise.md) | `--invert-bitwise` | Disabled |
 | [INVERT_BWASSIGN](invert_bitwise_assignments.md) | `--invert-bwassign` | Disabled |
 | [REMOVE_SELF_ASSIGNMENTS](remove_self_assignments.md) | `--remove-self-assignments` | Disabled |
+| [EXTREME_VOID](extreme_void.md) | `--extreme-void` | Disabled |
+| [EXTREME_ZERO](extreme_zero.md) | `--extreme-zero` | Disabled |
+| [EXTREME_CONSTANT](extreme_constant.md) | `--extreme-constant` | Disabled |
 
 One operator can have mutants of more than one type. For example, `<` has a `CONDITIONALS_BOUNDARY` and a `CONDITIONALS_NEGATION` mutant.
+
+## Descartes extreme mutations
+
+The extreme types remove the behavior of a full function, as the Descartes method of
+[Niedermayr, Juergens, and Wagner](https://arxiv.org/abs/1611.07163) does.
+A function with no results loses its statements. A function with results returns constants.
+An extreme mutant that lives shows a function whose behavior no test checks.
+
+The [`--descartes`](../commands/unleash/index.md#descartes) flag runs only the extreme types.
+[ADR 0012](https://github.com/OpenRAE/go-rae-gremlins/blob/dev/docs/adr/0012-descartes-extreme-mutation.md) records the design.

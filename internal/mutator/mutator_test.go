@@ -148,6 +148,21 @@ func TestTypeString(t *testing.T) {
 			expected:   "REMOVE_SELF_ASSIGNMENTS",
 			mutantType: mutator.RemoveSelfAssignments,
 		},
+		{
+			name:       "EXTREME_VOID",
+			expected:   "EXTREME_VOID",
+			mutantType: mutator.ExtremeVoid,
+		},
+		{
+			name:       "EXTREME_ZERO",
+			expected:   "EXTREME_ZERO",
+			mutantType: mutator.ExtremeZero,
+		},
+		{
+			name:       "EXTREME_CONSTANT",
+			expected:   "EXTREME_CONSTANT",
+			mutantType: mutator.ExtremeConstant,
+		},
 	}
 	for _, tc := range testCases {
 		tc := tc
@@ -156,5 +171,31 @@ func TestTypeString(t *testing.T) {
 				t.Errorf("Type.String() = %q, want %q", got, tc.expected)
 			}
 		})
+	}
+}
+
+// TestFeatureTypeIsDescartes checks the Descartes group of ADR 0012: the three
+// extreme types and no other type of mutator.Types.
+func TestFeatureTypeIsDescartes(t *testing.T) {
+	t.Parallel()
+
+	want := map[mutator.Type]bool{
+		mutator.ExtremeVoid:     true,
+		mutator.ExtremeZero:     true,
+		mutator.ExtremeConstant: true,
+	}
+	for _, mt := range mutator.Types {
+		if got := mt.IsDescartes(); got != want[mt] {
+			t.Errorf("%s.IsDescartes() = %t, want %t", mt, got, want[mt])
+		}
+	}
+	for mt := range want {
+		found := false
+		for _, listed := range mutator.Types {
+			found = found || listed == mt
+		}
+		if !found {
+			t.Errorf("mutator.Types does not contain the Descartes type %s", mt)
+		}
 	}
 }

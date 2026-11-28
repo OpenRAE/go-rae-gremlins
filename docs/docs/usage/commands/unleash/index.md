@@ -147,6 +147,19 @@ gremlins unleash -E "_(gen|wrap)\.go$" -E "^(generate|wrap)/" -E "internal/super
 
 An expression that does not compile stops the run with an error.
 
+### Descartes
+
+:material-flag: `--descartes` · :material-sign-direction: Default: `false`
+
+Runs only the Descartes extreme mutation types:
+[EXTREME_VOID](../../mutations/extreme_void.md), [EXTREME_ZERO](../../mutations/extreme_zero.md),
+and [EXTREME_CONSTANT](../../mutations/extreme_constant.md).
+The other mutation types do not run. The mutation type flags and keys do not apply.
+
+```shell
+gremlins unleash --descartes
+```
+
 ### Diff
 
 :material-flag: `--diff`/`-D` · :material-sign-direction: Default: empty
@@ -266,6 +279,36 @@ Output:
 
 ```shell
 gremlins unleash --output-diff-statuses lk
+```
+
+### Extreme constant
+
+:material-flag: `--extreme-constant` · :material-sign-direction: Default: `false`
+
+Enables or disables the [EXTREME_CONSTANT](../../mutations/extreme_constant.md) mutation type.
+
+```shell
+gremlins unleash --extreme-constant
+```
+
+### Extreme void
+
+:material-flag: `--extreme-void` · :material-sign-direction: Default: `false`
+
+Enables or disables the [EXTREME_VOID](../../mutations/extreme_void.md) mutation type.
+
+```shell
+gremlins unleash --extreme-void
+```
+
+### Extreme zero
+
+:material-flag: `--extreme-zero` · :material-sign-direction: Default: `false`
+
+Enables or disables the [EXTREME_ZERO](../../mutations/extreme_zero.md) mutation type.
+
+```shell
+gremlins unleash --extreme-zero
 ```
 
 ### Increment decrement

@@ -95,6 +95,9 @@ const (
 	InvertLoopCtrl
 	InvertNegatives
 	RemoveSelfAssignments
+	ExtremeVoid
+	ExtremeZero
+	ExtremeConstant
 )
 
 // Types allows to iterate over Type.
@@ -110,6 +113,9 @@ var Types = []Type{
 	InvertLoopCtrl,
 	InvertNegatives,
 	RemoveSelfAssignments,
+	ExtremeVoid,
+	ExtremeZero,
+	ExtremeConstant,
 }
 
 func (mt Type) String() string {
@@ -136,9 +142,30 @@ func (mt Type) String() string {
 		return "INVERT_BWASSIGN"
 	case RemoveSelfAssignments:
 		return "REMOVE_SELF_ASSIGNMENTS"
+	case ExtremeVoid:
+		return "EXTREME_VOID"
+	case ExtremeZero:
+		return "EXTREME_ZERO"
+	case ExtremeConstant:
+		return "EXTREME_CONSTANT"
 
 	default:
 		panic("this should not happen")
+	}
+}
+
+// IsDescartes reports whether mt is a Descartes extreme mutation type. An
+// extreme mutation removes the behavior of a full function. The unleash
+// descartes setting runs only these types.
+func (mt Type) IsDescartes() bool {
+	switch mt {
+	case ExtremeVoid, ExtremeZero, ExtremeConstant:
+		return true
+	case ArithmeticBase, ConditionalsBoundary, ConditionalsNegation, IncrementDecrement, InvertAssignments,
+		InvertBitwise, InvertBitwiseAssignments, InvertLogical, InvertLoopCtrl, InvertNegatives, RemoveSelfAssignments:
+		return false
+	default:
+		return false
 	}
 }
 

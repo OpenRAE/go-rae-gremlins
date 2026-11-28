@@ -39,6 +39,7 @@ import (
 const (
 	GremlinsSilentKey             = "silent"
 	UnleashDryRunKey              = "unleash.dry-run"
+	UnleashDescartesKey           = "unleash.descartes"
 	UnleashOutputStatusesKey      = "unleash.output-statuses"
 	UnleashOutputKey              = "unleash.output"
 	UnleashTagsKey                = "unleash.tags"
@@ -117,6 +118,18 @@ func MutantTypeEnabledKey(mt mutator.Type) string {
 	m = strings.ToLower(m)
 
 	return fmt.Sprintf("mutants.%s.enabled", m)
+}
+
+// IsMutantTypeEnabled reports whether a run tests the mutants of type mt.
+// When the unleash.descartes key is true, the run tests the Descartes types
+// and no other type, and the per-type keys do not apply. Otherwise, the
+// per-type key of mt applies.
+func IsMutantTypeEnabled(mt mutator.Type) bool {
+	if Get[bool](UnleashDescartesKey) {
+		return mt.IsDescartes()
+	}
+
+	return Get[bool](MutantTypeEnabledKey(mt))
 }
 
 func isSpecificFile(cPaths []string) bool {
@@ -263,6 +276,7 @@ func typedKeys() map[string]func(any) error {
 	checks := map[string]func(any) error{
 		GremlinsSilentKey:             checkBool,
 		UnleashDryRunKey:              checkBool,
+		UnleashDescartesKey:           checkBool,
 		UnleashOutputStatusesKey:      checkString,
 		UnleashOutputKey:              checkString,
 		UnleashTagsKey:                checkString,

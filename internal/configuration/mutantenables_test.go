@@ -74,6 +74,18 @@ func TestMutantDefaultStatus(t *testing.T) {
 			mutantType: mutator.RemoveSelfAssignments,
 			expected:   false,
 		},
+		{
+			mutantType: mutator.ExtremeVoid,
+			expected:   false,
+		},
+		{
+			mutantType: mutator.ExtremeZero,
+			expected:   false,
+		},
+		{
+			mutantType: mutator.ExtremeConstant,
+			expected:   false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -116,4 +128,41 @@ func enabled(b bool) string {
 	}
 
 	return "disabled"
+}
+
+// TestFeatureIsMutantTypeEnabledSelectsTheDescartesGroup checks the effective
+// enablement of ADR 0012. With unleash.descartes, the run tests the Descartes
+// types and no other type, whatever the per-type values are. Without it, the
+// per-type values apply.
+func TestFeatureIsMutantTypeEnabledSelectsTheDescartesGroup(t *testing.T) {
+	descartes := map[mutator.Type]bool{
+		mutator.ExtremeVoid: true, mutator.ExtremeZero: true, mutator.ExtremeConstant: true,
+	}
+	testCases := []struct {
+		want    func(mt mutator.Type) bool
+		name    string
+		group   bool
+		perType bool
+	}{
+		{name: "group off, all types on", perType: true, want: func(mutator.Type) bool { return true }},
+		{name: "group off, all types off", perType: false, want: func(mutator.Type) bool { return false }},
+		{name: "group on, all types on", group: true, perType: true, want: func(mt mutator.Type) bool { return descartes[mt] }},
+		{name: "group on, all types off", group: true, perType: false, want: func(mt mutator.Type) bool { return descartes[mt] }},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			configuration.Reset()
+			t.Cleanup(configuration.Reset)
+			configuration.Set(configuration.UnleashDescartesKey, tc.group)
+			for _, mt := range mutator.Types {
+				configuration.Set(configuration.MutantTypeEnabledKey(mt), tc.perType)
+			}
+
+			for _, mt := range mutator.Types {
+				if got, want := configuration.IsMutantTypeEnabled(mt), tc.want(mt); got != want {
+					t.Errorf("IsMutantTypeEnabled(%s) = %t, want %t", mt, got, want)
+				}
+			}
+		})
+	}
 }

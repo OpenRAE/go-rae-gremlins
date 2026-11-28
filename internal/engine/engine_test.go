@@ -904,6 +904,7 @@ func TestRegressionSkipMutantsThatCoverageCannotObserve(t *testing.T) {
 	// observable maps each line with mutants to whether coverage can observe it.
 	observable := map[mutantLine]bool{
 		{constFile, 3}:    false,
+		{constFile, 5}:    true,
 		{constFile, 6}:    true,
 		{constFile, 8}:    true,
 		{hostFile, 3}:     true,
@@ -1102,8 +1103,9 @@ func TestRegressionSkipTypeConstraintOperators(t *testing.T) {
 	}
 }
 
-// lifecycleFS is a module file with eight mutants: each comparison has a
-// conditionals-boundary and a conditionals-negation mutant.
+// lifecycleFS is a module file with ten mutants: each comparison has a
+// conditionals-boundary and a conditionals-negation mutant, and the function
+// has an extreme-zero and an extreme-constant mutant.
 var lifecycleFS = fstest.MapFS{
 	"lifecycle.go": {Data: []byte("package lifecycle\n\n" +
 		"func f(a, b int) (bool, bool, bool, bool) { return a > b, a < b, a >= b, a <= b }\n")},
@@ -1124,7 +1126,7 @@ func TestFeatureEngineRunReleasesWorkersOnCompletion(t *testing.T) {
 			t.Fatalf("Run() error = %v, want nil", err)
 		}
 
-		if got, want := len(res.Mutants), 8; got != want {
+		if got, want := len(res.Mutants), 10; got != want {
 			t.Errorf("Run reported %d mutants, want %d", got, want)
 		}
 	})

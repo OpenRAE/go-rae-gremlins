@@ -74,6 +74,11 @@ func TestUnleash(t *testing.T) {
 			defValue: "",
 		},
 		{
+			name:     "descartes",
+			flagType: boolType,
+			defValue: falseValue,
+		},
+		{
 			name:      "diff",
 			shorthand: "D",
 			flagType:  stringType,
@@ -84,6 +89,21 @@ func TestUnleash(t *testing.T) {
 			shorthand: "d",
 			flagType:  boolType,
 			defValue:  falseValue,
+		},
+		{
+			name:     "extreme-constant",
+			flagType: boolType,
+			defValue: falseValue,
+		},
+		{
+			name:     "extreme-void",
+			flagType: boolType,
+			defValue: falseValue,
+		},
+		{
+			name:     "extreme-zero",
+			flagType: boolType,
+			defValue: falseValue,
 		},
 		{
 			name:     "increment-decrement",
