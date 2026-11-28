@@ -25,11 +25,11 @@ import (
 // tests evaluated and that the coverage profile has no block for.
 //
 // The Go cover tool ends the coverage block of a statement at the body of its
-// first function literal, and each function literal body gets its own blocks.
-// Thus the statement code after that body and outside the bodies is in no
+// first function literal. Thus the statement code after that body is in no
 // block. Go evaluates this code with the statement, and the cover tool counts
 // a statement as one unit. Thus the code is evaluated when the block of the
-// statement start ran.
+// statement start ran. Each function literal body has its own blocks, so
+// isCovered does not use the returned spans for a function literal body.
 func (c fileCoverage) evaluatedFuncLitTails(list []ast.Stmt) []exprSpan {
 	var spans []exprSpan
 	for _, s := range list {
@@ -40,7 +40,7 @@ func (c fileCoverage) evaluatedFuncLitTails(list []ast.Stmt) []exprSpan {
 		if cut == token.NoPos || !c.profile.IsCovered(c.set.Position(s.Pos())) {
 			continue
 		}
-		spans = append(spans, outsideFuncLits(s, cut, end)...)
+		spans = append(spans, exprSpan{start: cut, end: end})
 	}
 
 	return spans
@@ -83,26 +83,4 @@ func firstFuncLitBody(nodes ...ast.Node) token.Pos {
 	}
 
 	return token.NoPos
-}
-
-// outsideFuncLits returns the spans of [cut, end) that are outside the
-// outermost function literal bodies of s.
-func outsideFuncLits(s ast.Stmt, cut, end token.Pos) []exprSpan {
-	var spans []exprSpan
-	start := cut
-	for _, f := range outerFuncLits(s) {
-		lbrace := f.Body.Lbrace
-		if lbrace < cut || lbrace >= end {
-			continue
-		}
-		if start < lbrace {
-			spans = append(spans, exprSpan{start: start, end: lbrace})
-		}
-		start = f.Body.End()
-	}
-	if start < end {
-		spans = append(spans, exprSpan{start: start, end: end})
-	}
-
-	return spans
 }

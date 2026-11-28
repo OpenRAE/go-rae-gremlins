@@ -83,6 +83,14 @@ func TestFeatureFuncLitStatementCoverage(t *testing.T) {
 			},
 		},
 		{
+			name: "the first function literal body that did not run is not covered",
+			ran:  func(b coverage.Block) bool { return b.StartLine != 44 || b.StartCol < 30 },
+			mutants: []clauseMutant{
+				{line: 44, col: 43, mt: mutator.ArithmeticBase, want: mutator.NotCovered},
+				{line: 44, col: 79, mt: mutator.ArithmeticBase, want: mutator.Runnable},
+			},
+		},
+		{
 			name: "a statement that did not run proves no code after a function literal",
 			ran:  func(b coverage.Block) bool { return b.StartLine < 12 || b.StartLine > 16 },
 			mutants: []clauseMutant{

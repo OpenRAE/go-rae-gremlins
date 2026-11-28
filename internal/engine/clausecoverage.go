@@ -49,7 +49,7 @@ type fileCoverage struct {
 	evaluated   []exprSpan
 	compiled    []exprSpan
 	varDecls    []exprSpan
-	varFuncBody []exprSpan
+	funcBodies  []exprSpan
 	built       bool
 	pkgRan      bool
 }
@@ -80,8 +80,10 @@ func newFileCoverage(set *token.FileSet, file *ast.File, profile coverage.Profil
 			c.evaluated = append(c.evaluated, c.evaluatedFuncLitTails(n.Body)...)
 		case *ast.CommClause:
 			c.evaluated = append(c.evaluated, c.evaluatedFuncLitTails(n.Body)...)
+		case *ast.FuncLit:
+			c.funcBodies = append(c.funcBodies, spanOf(n.Body))
 		default:
-			// Other nodes have no statement list.
+			// Other nodes have no statement list or function literal body.
 		}
 
 		return true
@@ -98,7 +100,7 @@ func (c fileCoverage) isCovered(pos token.Pos) bool {
 		return true
 	}
 
-	return within(c.evaluated, pos)
+	return within(c.evaluated, pos) && !within(c.funcBodies, pos)
 }
 
 // isObservable tells if a test run can cover pos. The tests of the host build
@@ -142,7 +144,6 @@ func addGenDecl(c *fileCoverage, d *ast.GenDecl) {
 	c.varDecls = append(c.varDecls, spanOf(d))
 	for _, f := range outerFuncLits(d) {
 		c.compiled = append(c.compiled, signatureSpan(f.Pos(), f.End(), f.Body))
-		c.varFuncBody = append(c.varFuncBody, spanOf(f.Body))
 	}
 }
 
@@ -150,7 +151,7 @@ func addGenDecl(c *fileCoverage, d *ast.GenDecl) {
 // and not in the body of a function literal of it. A function literal body
 // has its own coverage blocks.
 func (c fileCoverage) inVarInitializer(pos token.Pos) bool {
-	return within(c.varDecls, pos) && !within(c.varFuncBody, pos)
+	return within(c.varDecls, pos) && !within(c.funcBodies, pos)
 }
 
 // signatureSpan returns the span of a function signature from start to the
