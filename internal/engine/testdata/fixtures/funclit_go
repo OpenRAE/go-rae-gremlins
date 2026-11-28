@@ -1,0 +1,59 @@
+package main
+
+func call(f func() int) int { return f() }
+
+func pick(first bool, f, g func() int) int {
+	if first {
+		return f()
+	}
+	return g()
+}
+
+func If(n int) bool {
+	if v := call(func() int { return n }); v > 3 {
+		return true
+	}
+	return false
+}
+
+func For(n int) int {
+	s := 0
+	for i := call(func() int { return 0 }); i < n; i++ {
+		s++
+	}
+	return s
+}
+
+func Range(n int) int {
+	s := 0
+	for range call(func() int { return n }) + 1 {
+		s++
+	}
+	return s
+}
+
+func Switch(n int) bool {
+	switch call(func() int { return n }) % 2 {
+	case 0:
+		return true
+	}
+	return false
+}
+
+func Simple(n int) int {
+	return pick(n > 0, func() int { return n + 1 }, func() int { return n - 1 }) * 2
+}
+
+func Labeled(n int) int {
+	s := 0
+loop:
+	for i := call(func() int { return n }); i > 0; i-- {
+		s++
+		if s > 5 {
+			break loop
+		}
+	}
+	return s
+}
+
+func main() {}

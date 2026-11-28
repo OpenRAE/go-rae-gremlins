@@ -28,9 +28,10 @@ import (
 // fileCoverage tells if the tests executed a token position of one parsed file.
 //
 // A Go coverage profile has a block for each switch and select clause body,
-// but no block for the clause expressions. fileCoverage adds the clause
-// expressions that the tests evaluated. It derives them from the clause
-// bodies that ran and from the Go evaluation order of the statements.
+// but no block for the clause expressions. It also has no block for the code
+// of a statement after its first function literal body. fileCoverage adds the
+// code of both kinds that the tests evaluated. It derives this code from the
+// blocks that ran and from the Go evaluation order of the statements.
 //
 // fileCoverage also tells if the coverage profile can show a token position.
 // The profile has no block for a file that the host build excludes. It also
@@ -45,7 +46,7 @@ import (
 type fileCoverage struct {
 	set         *token.FileSet
 	profile     coverage.Profile
-	clauseExprs []exprSpan
+	evaluated   []exprSpan
 	compiled    []exprSpan
 	varDecls    []exprSpan
 	varFuncBody []exprSpan
@@ -70,11 +71,17 @@ func newFileCoverage(set *token.FileSet, file *ast.File, profile coverage.Profil
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch n := node.(type) {
 		case *ast.SwitchStmt:
-			c.clauseExprs = append(c.clauseExprs, c.evaluatedCaseExprs(n.Body)...)
+			c.evaluated = append(c.evaluated, c.evaluatedCaseExprs(n.Body)...)
 		case *ast.SelectStmt:
-			c.clauseExprs = append(c.clauseExprs, c.evaluatedCommExprs(n.Body)...)
+			c.evaluated = append(c.evaluated, c.evaluatedCommExprs(n.Body)...)
+		case *ast.BlockStmt:
+			c.evaluated = append(c.evaluated, c.evaluatedFuncLitTails(n.List)...)
+		case *ast.CaseClause:
+			c.evaluated = append(c.evaluated, c.evaluatedFuncLitTails(n.Body)...)
+		case *ast.CommClause:
+			c.evaluated = append(c.evaluated, c.evaluatedFuncLitTails(n.Body)...)
 		default:
-			// Other nodes have no clause expressions.
+			// Other nodes have no statement list.
 		}
 
 		return true
@@ -91,7 +98,7 @@ func (c fileCoverage) isCovered(pos token.Pos) bool {
 		return true
 	}
 
-	return within(c.clauseExprs, pos)
+	return within(c.evaluated, pos)
 }
 
 // isObservable tells if a test run can cover pos. The tests of the host build

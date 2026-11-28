@@ -327,7 +327,9 @@ func (m *mutantExecutor) runTests(ctx context.Context, rootDir, pkg string) (mut
 
 // getTestArgs returns the go test arguments for pkg with timeout. Outside
 // integration mode, -count=1 makes go test run the tests and not report a
-// cached result, so the elapsed time is a true timeout sample.
+// cached result, so the elapsed time is a true timeout sample. go test reports
+// a finding of its vet checks as a build failure. A mutant that vet flags is
+// valid Go, so -vet=off lets the tests and not vet give its status.
 func (m *mutantExecutor) getTestArgs(pkg string, timeout time.Duration) []string {
 	args := []string{"test"}
 	if m.buildTags != "" {
@@ -337,7 +339,7 @@ func (m *mutantExecutor) getTestArgs(pkg string, timeout time.Duration) []string
 	// timeout and not the test itself. The timeout on the test prevents the test.* processes
 	// from hanging forever.
 	args = append(args, "-timeout", (testTimeoutGrace + timeout).String())
-	args = append(args, "-failfast")
+	args = append(args, "-failfast", "-vet=off")
 
 	if m.testCPU != 0 {
 		args = append(args, "-cpu", fmt.Sprintf("%d", m.testCPU))

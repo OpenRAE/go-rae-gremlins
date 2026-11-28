@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "issue": 239,
+  "summary": "Test mutants that a go vet check flags, and cover statement code after a function literal. getTestArgs in internal/engine/executor.go adds -vet=off to the mutant go test command. go test reports a vet finding as [build failed], so a valid mutant that vet flags became NOT VIABLE. The coverage run keeps the default vet checks. The Go cover tool ends the block of a statement at the body of its first function literal, so the statement code after that body is in no block. newFileCoverage in internal/engine/clausecoverage.go adds that code, without the function literal bodies, as evaluated spans when the profile covers the statement start. It uses the same block boundaries as the cover tool for if, for, range, switch, type switch, and simple statements. A cmd/gremlins process test runs a real unleash on both cases. No internal dependency, CLI flag, configuration key, JSON report field, or exit code changes.",
+  "changes": [
+    {
+      "package": "internal/engine",
+      "imports": [
+        "internal/configuration",
+        "internal/coverage",
+        "internal/diff",
+        "internal/engine/workdir",
+        "internal/engine/workerpool",
+        "internal/exclusion",
+        "internal/gomodule",
+        "internal/log",
+        "internal/mutator",
+        "internal/process",
+        "internal/report",
+        "internal/typeinfo"
+      ],
+      "test_imports": [
+        "internal/configuration",
+        "internal/mutator",
+        "internal/typeinfo"
+      ]
+    },
+    {
+      "package": "cmd/gremlins"
+    }
+  ],
+  "contracts": [],
+  "contract_changes": {},
+  "policies": [],
+  "trust_boundaries": "The coverage change reads an existing coverage profile and the parsed AST of a target file, both already inside the process. The executor change adds one flag to the existing go test subprocess of a mutant. It adds no subprocess, download, file write, credential, destination, or provider. Development checks stay local or in existing CI. The other entries restate the unchanged modeled boundaries.",
+  "conflicts": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": [
+        "local",
+        "existing-ci"
+      ],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": [
+        "existing-ci",
+        "github-api",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": [
+        "existing-ci",
+        "github-api"
+      ],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": [
+        "existing-ci",
+        "ground-control-release",
+        "npm-registry"
+      ],
+      "network": true,
+      "execute_source": true
+    }
+  }
+}

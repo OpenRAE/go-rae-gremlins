@@ -27,6 +27,7 @@ import (
 const (
 	goTestArg       = "test"
 	failFastArg     = "-failfast"
+	vetOffArg       = "-vet=off"
 	allPackagesArg  = "./..."
 	timeoutArg      = "-timeout"
 	countArg        = "-count=1"
@@ -48,44 +49,44 @@ func TestGetTestArgs(t *testing.T) {
 		"should_not_include_tags_flag_when_build_tags_are_empty": {
 			timeout: 10 * time.Second,
 			pkg:     examplePackage,
-			want:    []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage},
+			want:    []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, vetOffArg, countArg, examplePackage},
 		},
 		"should_include_tags_flag_when_build_tags_are_set": {
 			buildTags: "tag1,tag2",
 			timeout:   10 * time.Second,
 			pkg:       examplePackage,
 			want: []string{
-				goTestArg, "-tags", "tag1,tag2", timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage,
+				goTestArg, "-tags", "tag1,tag2", timeoutArg, expectedTimeout, failFastArg, vetOffArg, countArg, examplePackage,
 			},
 		},
 		"should_compute_timeout_as_two_seconds_plus_execution_time": {
 			timeout: 30 * time.Second,
 			pkg:     examplePackage,
-			want:    []string{goTestArg, timeoutArg, "32s", failFastArg, countArg, examplePackage},
+			want:    []string{goTestArg, timeoutArg, "32s", failFastArg, vetOffArg, countArg, examplePackage},
 		},
 		"should_not_include_cpu_flag_when_test_cpu_is_zero": {
 			timeout: 10 * time.Second,
 			testCPU: 0,
 			pkg:     examplePackage,
-			want:    []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage},
+			want:    []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, vetOffArg, countArg, examplePackage},
 		},
 		"should_include_cpu_flag_when_test_cpu_is_nonzero": {
 			timeout: 10 * time.Second,
 			testCPU: 4,
 			pkg:     examplePackage,
-			want:    []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, "-cpu", "4", countArg, examplePackage},
+			want:    []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, vetOffArg, "-cpu", "4", countArg, examplePackage},
 		},
 		"should_use_package_path_when_integration_mode_is_disabled": {
 			timeout:         10 * time.Second,
 			integrationMode: false,
 			pkg:             examplePackage,
-			want:            []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, countArg, examplePackage},
+			want:            []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, vetOffArg, countArg, examplePackage},
 		},
 		"should_use_dot_dot_dot_path_when_integration_mode_is_enabled": {
 			timeout:         10 * time.Second,
 			integrationMode: true,
 			pkg:             examplePackage,
-			want:            []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, "-p", "1", allPackagesArg},
+			want:            []string{goTestArg, timeoutArg, expectedTimeout, failFastArg, vetOffArg, "-p", "1", allPackagesArg},
 		},
 		"should_include_all_flags_when_all_options_are_configured": {
 			buildTags:       "integration",
@@ -94,7 +95,7 @@ func TestGetTestArgs(t *testing.T) {
 			integrationMode: true,
 			pkg:             examplePackage,
 			want: []string{
-				goTestArg, "-tags", "integration", timeoutArg, expectedTimeout, failFastArg,
+				goTestArg, "-tags", "integration", timeoutArg, expectedTimeout, failFastArg, vetOffArg,
 				"-cpu", "2", "-p", "1", allPackagesArg,
 			},
 		},

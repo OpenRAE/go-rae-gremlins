@@ -49,6 +49,9 @@ A `TIMED OUT` mutant often stops a test, but the status does not show that a tes
 ## Go command settings
 
 Gremlins runs `go test` for the coverage step and for each mutant.
+The `go test` command of a mutant uses `-vet=off`. `go test` reports a `go vet` finding as a build failure.
+A mutant that a vet check finds is valid Go, so the tests give its status and not vet.
+
 Each `go` command gets the environment of Gremlins, so it uses the `GOFLAGS` environment variable.
 Use `GOFLAGS` to give the same build flags to all test runs.
 For example, monkey-patching libraries need tests that the compiler builds without inlining:
