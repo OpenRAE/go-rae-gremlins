@@ -1,25 +1,24 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
+about: Request a change to Gremlins
 title: '[request] '
 labels: 't/to-triage'
-assignees: k3rn31
 ---
 
-# 🚀 Feature Request
+# Feature request
 
-### Is your feature request related to a problem? Please describe
+## Problem
 
-<!-- A clear and concise description of what the problem is. Ex. I'm always frustrated when [...] -->
+<!-- Describe the task and the problem that prevents you from completing it. -->
 
-### Describe the solution you'd like
+## Proposed behavior
 
-<!-- A clear and concise description of what you want to happen. -->
+<!-- Describe what Gremlins must do. Give a result that a reviewer can check. -->
 
-### Describe alternatives you've considered
+## Alternatives
 
-<!-- A clear and concise description of any alternative solutions or features you've considered. -->
+<!-- Describe other solutions that you considered. -->
 
-### Additional context
+## Additional information
 
-<!-- Add any other context or screenshots about the feature request here. -->
+<!-- Add other information that helps explain the request. -->

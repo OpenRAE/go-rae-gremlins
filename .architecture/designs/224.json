@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "issue": 224,
+  "summary": "Complete the documentation entry points and coverage review under the Diataxis adoption design. Keep docs/docs as the MkDocs source. Use native navigation and ordinary links to the canonical site and repository guides. Preserve recognized template paths, useful fragments, private vulnerability routing, and protected records. Keep the documentation inventory in docs/development/diataxis-adoption.md. The proposed entry pages, templates, inventory, and navigation are outside the modeled policy paths. The inventory reads runtime contract owners and examples without changing their behavior or formats.",
+  "changes": [],
+  "contracts": [],
+  "policies": [],
+  "contract_changes": {},
+  "trust_boundaries": "The existing writing checks read explicit local Markdown paths and run in existing CI. Keep the checksum-verified tool installation. The strict MkDocs build uses the existing theme and extensions, reads the site source, and writes ignored local output. Inspect GitHub destinations with read-only access. Preserve private reporting and secret scanning. Do not submit reports, execute examples, send source or build output to a new destination, add credentials or services, or publish the site. The model also requires declarations for existing CI boundaries. These declarations do not authorize workflow changes or dispatches.",
+  "conflicts": [],
+  "trust_changes": {
+    "development_checks": {
+      "destinations": ["local", "existing-ci"],
+      "network": false,
+      "execute_source": false
+    },
+    "delivery_finalization": {
+      "destinations": ["existing-ci", "github-api", "ground-control-release", "npm-registry"],
+      "network": true,
+      "execute_source": false
+    },
+    "merge_queue_policy": {
+      "destinations": ["existing-ci", "github-api"],
+      "network": true,
+      "execute_source": false
+    },
+    "transport_verification": {
+      "destinations": ["existing-ci", "ground-control-release", "npm-registry"],
+      "network": true,
+      "execute_source": true
+    }
+  }
+}

@@ -1,45 +1,34 @@
 ---
 name: 'Bug report'
-about: 'Create a report to help us improve'
+about: 'Report a problem with Gremlins'
 title: '[bug] '
-labels: 'c/bug, c/to-triage'
-assignees: k3rn31
-
+labels: 'c/bug, t/to-triage'
 ---
 
-## 🐞Bug Report
+## Bug description
 
-### Bug Description
+For a vulnerability, follow the [private reporting procedure](https://github.com/OpenRAE/go-rae-gremlins/blob/dev/SECURITY.md).
 
-<!--
-A clear and concise description of what the bug is.
--->
+<!-- Describe the problem. -->
 
-### To Reproduce
+### Steps to reproduce
 
-Steps to reproduce the behavior:
+<!-- Give the commands and the inputs that cause the problem. Use numbered steps. -->
 
-1. Go to '...'
-2. Execute Gremlins on '...'
-3. Scroll down to '....'
+### Actual result
 
-### Found behaviour
+<!-- Describe what happened. Include the error message if it helps explain the problem. -->
 
-<!-- A description of the problem found -->
+### Expected result
 
-### Expected behaviour
+<!-- Describe the result you expected. -->
 
-<!-- A clear and concise description of what you expected to happen. -->
+### Versions and operating system
 
-### Screenshots
+- Output of `gremlins --version`
+- Output of `go version`
+- Operating system and version
 
-<!-- If applicable, add screenshots to help explain your problem, otherwise remove this section. -->
+### Additional information
 
-### Operating System
-
-- OS: [e.g. Linux]
-- Version [e.g. v0.1.0]
-
-### Additional Context
-
-<!-- Add any other context about the problem here, otherwise remove this section. -->
+<!-- Add other information that helps explain the problem. Remove sensitive data. -->
