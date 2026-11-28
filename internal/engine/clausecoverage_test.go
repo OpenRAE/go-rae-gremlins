@@ -28,6 +28,13 @@ import (
 
 const clausesFixture = "testdata/fixtures/clauses_go"
 
+// The names of the coverage block layouts of Go 1.26 and earlier, and of Go
+// 1.27 and later.
+const (
+	layoutGo126 = "go126"
+	layoutGo127 = "go127"
+)
+
 // clauseBlocks holds one coverage block for each clause header and body of
 // clauses_go. A profile holds only the blocks that ran.
 type clauseBlocks struct {
@@ -105,8 +112,8 @@ var go127Blocks = clauseBlocks{
 }
 
 var clauseLayouts = map[string]clauseBlocks{
-	"go126": go126Blocks,
-	"go127": go127Blocks,
+	layoutGo126: go126Blocks,
+	layoutGo127: go127Blocks,
 }
 
 // clauseMutant names a mutant position in clauses_go and its expected status.
@@ -233,7 +240,7 @@ func TestFeatureClauseExpressionCoverage(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		for _, layout := range []string{"go126", "go127"} {
+		for _, layout := range []string{layoutGo126, layoutGo127} {
 			t.Run(tc.name+"/"+layout, func(t *testing.T) {
 				t.Parallel()
 				viperSet(map[string]any{configuration.UnleashDryRunKey: true})

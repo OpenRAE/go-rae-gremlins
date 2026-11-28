@@ -23,6 +23,19 @@ Gremlins finds these expressions from the clause bodies that the tests ran:
 - All case expressions are covered when the `default` body ran and the previous case body did not fall through to it.
 - The channel and value expressions of a `select` statement are covered when one of its clause bodies ran.
 
+## Function literals in statements
+
+A Go coverage profile ends the block of a statement at the body of its first function literal. Each function literal
+body has its own blocks. Thus the profile has no block for the code of the statement after that body. For example, it
+has no block for `v > 3` in this statement:
+
+```go
+if v := call(func() int { return n }); v > 3 {
+```
+
+This code is covered when the tests ran the start of the statement. The code in a function literal body is covered only
+when its own block ran.
+
 ## Code that coverage cannot show
 
 Go coverage profiles cannot show some code. Gremlins reports the mutants in this code as `SKIPPED`:

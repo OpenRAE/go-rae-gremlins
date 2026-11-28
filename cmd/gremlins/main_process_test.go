@@ -441,3 +441,79 @@ func TestRegressionRelativeTempDirKeepsMutantStatus(t *testing.T) {
 		t.Errorf("output does not contain %q; output:\n%s", oneLivedOutput, output)
 	}
 }
+
+// TestRegressionMutantStatusComesFromTheTests runs a real unleash on mutants
+// that the tests kill but that the coverage profile or go vet hid from them
+// (issue #239).
+func TestRegressionMutantStatusComesFromTheTests(t *testing.T) {
+	testCases := []struct {
+		name       string
+		src        string
+		test       string
+		wantOutput string
+		args       []string
+	}{
+		{
+			name: "a mutant that go vet flags is tested",
+			src: `package probe
+
+func Small(n int) bool {
+	return n == 1 || n == 2
+}
+`,
+			test: `package probe
+
+import "testing"
+
+func TestSmall(t *testing.T) {
+	if !Small(1) || !Small(2) || Small(3) {
+		t.Error("Small")
+	}
+}
+`,
+			args:       []string{unleashCmd, "--invert-logical"},
+			wantOutput: "KILLED INVERT_LOGICAL at probe.go:4:16",
+		},
+		{
+			name: "code after a function literal in a statement is covered",
+			src: `package probe
+
+func call(f func() int) int { return f() }
+
+func Big(n int) bool {
+	if v := call(func() int { return n }); v > 3 {
+		return true
+	}
+	return false
+}
+`,
+			test: `package probe
+
+import "testing"
+
+func TestBig(t *testing.T) {
+	if !Big(4) || Big(3) {
+		t.Error("Big")
+	}
+}
+`,
+			args:       []string{unleashCmd},
+			wantOutput: "KILLED CONDITIONALS_BOUNDARY at probe.go:6:43",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			module := writeModule(t, map[string]string{probeModFile: probeMod, probeSrcFile: tc.src, probeTestFile: tc.test})
+
+			code, output := runMain(t, module, tc.args...)
+
+			if code != 0 {
+				t.Errorf("exit code = %d, want 0; output:\n%s", code, output)
+			}
+			if !strings.Contains(output, tc.wantOutput) {
+				t.Errorf("output does not contain %q; output:\n%s", tc.wantOutput, output)
+			}
+		})
+	}
+}
