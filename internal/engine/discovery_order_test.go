@@ -116,6 +116,7 @@ M:
 // comes from the mutation type reference, not from the discovery code.
 func TestFeatureRunDiscoversEachOperatorInOrder(t *testing.T) {
 	want := []string{
+		"3:1 EXTREME_ZERO", "3:1 EXTREME_CONSTANT",
 		"4:9 ARITHMETIC_BASE",
 		"5:8 ARITHMETIC_BASE",
 		"6:6 INVERT_NEGATIVES",
@@ -200,12 +201,15 @@ func TestFeatureRunAppliesOperandFacts(t *testing.T) {
 		strings.Index(factsSource, "+= t"):  typeinfo.InvalidSubtraction,
 		strings.Index(factsSource, "<<= u"): typeinfo.UnassignableShiftCount,
 	}
+	// The function g has no results, so it also has an EXTREME_VOID mutant.
 	withoutFacts := []string{
+		"3:1 EXTREME_VOID",
 		"4:8 ARITHMETIC_BASE",
 		"5:4 INVERT_ASSIGNMENTS", "5:4 REMOVE_SELF_ASSIGNMENTS",
 		"6:4 REMOVE_SELF_ASSIGNMENTS", "6:4 INVERT_BWASSIGN",
 	}
 	withFacts := []string{
+		"3:1 EXTREME_VOID",
 		"5:4 REMOVE_SELF_ASSIGNMENTS",
 		"6:4 INVERT_BWASSIGN",
 	}

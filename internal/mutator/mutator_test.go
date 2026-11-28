@@ -158,3 +158,46 @@ func TestTypeString(t *testing.T) {
 		})
 	}
 }
+
+// TestFeatureTypeIsDescartes checks the Descartes group of ADR 0012: the three
+// extreme types and no other type of mutator.Types.
+func TestFeatureTypeIsDescartes(t *testing.T) {
+	t.Parallel()
+
+	want := map[mutator.Type]bool{
+		mutator.ExtremeVoid:     true,
+		mutator.ExtremeZero:     true,
+		mutator.ExtremeConstant: true,
+	}
+	for _, mt := range mutator.Types {
+		if got := mt.IsDescartes(); got != want[mt] {
+			t.Errorf("%s.IsDescartes() = %t, want %t", mt, got, want[mt])
+		}
+	}
+	for mt := range want {
+		found := false
+		for _, listed := range mutator.Types {
+			found = found || listed == mt
+		}
+		if !found {
+			t.Errorf("mutator.Types does not contain the Descartes type %s", mt)
+		}
+	}
+}
+
+// TestFeatureExtremeTypeStrings checks the names of the extreme types. The
+// names are the report, directive, and configuration contract of ADR 0012.
+func TestFeatureExtremeTypeStrings(t *testing.T) {
+	t.Parallel()
+
+	want := map[mutator.Type]string{
+		mutator.ExtremeVoid:     "EXTREME_VOID",
+		mutator.ExtremeZero:     "EXTREME_ZERO",
+		mutator.ExtremeConstant: "EXTREME_CONSTANT",
+	}
+	for mt, name := range want {
+		if got := mt.String(); got != name {
+			t.Errorf("Type(%d).String() = %q, want %q", int(mt), got, name)
+		}
+	}
+}

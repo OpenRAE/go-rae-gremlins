@@ -49,11 +49,12 @@ type fileDirectives struct {
 }
 
 // bindDirectives parses and binds the //gremlins: directives of a parsed
-// file. src is the source of the file, and facts are the operand facts of
-// its operators. It returns the errors of all the invalid directives.
-func bindDirectives(set *token.FileSet, file *ast.File, src []byte, facts operatorFacts) (fileDirectives, error) {
+// file. src is the source of the file, and scope holds the operand facts of
+// its operators and the package-level names of its package. It returns the
+// errors of all the invalid directives.
+func bindDirectives(set *token.FileSet, file *ast.File, src []byte, scope fileScope) (fileDirectives, error) {
 	byName, err := parseDirectives(set, file, src)
-	eqs, eqErr := fileEquivalents(set, file, byName[equivalentDirective], facts)
+	eqs, eqErr := fileEquivalents(set, file, byName[equivalentDirective], scope)
 	igs, igErr := fileIgnores(set, file, byName[ignoreDirective])
 
 	return fileDirectives{equivalents: eqs, ignores: igs}, errors.Join(err, eqErr, igErr)

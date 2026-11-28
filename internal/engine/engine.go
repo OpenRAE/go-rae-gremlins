@@ -55,8 +55,11 @@ type Engine struct {
 	jDealer      ExecutorDealer
 	codeData     CodeData
 	mutantStream chan mutator.Mutator
-	module       gomodule.GoModule
-	logger       report.MutantLogger
+	// pkgNames holds the package-level names of each directory that the
+	// discovery read, by package name. Only the discovery goroutine uses it.
+	pkgNames map[string]map[string]pkgNames
+	module   gomodule.GoModule
+	logger   report.MutantLogger
 }
 
 // CodeData is used to check if the mutant should be executed.
@@ -116,6 +119,7 @@ func (mu *Engine) Run(ctx context.Context) (report.Results, error) {
 	defer stop()
 
 	mu.mutantStream = make(chan mutator.Mutator)
+	mu.pkgNames = make(map[string]map[string]pkgNames)
 	discoverErr := make(chan error, 1)
 	go func() {
 		defer close(mu.mutantStream)
@@ -201,8 +205,9 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	if err != nil {
 		return err
 	}
-	facts := mu.fileFacts(set, file, fileName)
-	dirs, err := bindDirectives(set, file, src, facts)
+	names := fileNames(mu.packageNames(path.Dir(fileName), file.Name.Name), file)
+	scope := fileScope{facts: mu.fileFacts(set, file, fileName), pkg: names}
+	dirs, err := bindDirectives(set, file, src, scope)
 	if err != nil {
 		return err
 	}
@@ -221,7 +226,7 @@ func (mu *Engine) runOnFile(ctx context.Context, fileName string) error {
 	// running mutant changes the shared AST, so the discovery must not read
 	// the AST after that.
 	var mutants []*mutant
-	inspectTokens(file, facts, func(n *NodeToken) bool {
+	inspectTokens(file, scope, func(n *NodeToken) bool {
 		if ctx.Err() != nil {
 			return false
 		}
@@ -287,6 +292,67 @@ func (mu *Engine) parseFile(set *token.FileSet, fileName string) ([]byte, *ast.F
 	return src, file, nil
 }
 
+// packageNames returns the package-level names that the Go files of the
+// directory dir declare in the package pkg. The go command builds the package
+// of dir and its tests from these files. The names also include the names of
+// files that the host build excludes, so a name can hide a predeclared
+// identifier that only another build shadows. That makes fewer functions
+// eligible, never a wrong mutant. packageNames returns nil, which means
+// unknown names, when a Go file of dir is not a regular file or cannot be
+// read or parsed. It does not read such a file, and it reports no error,
+// because discovery does not need the file.
+func (mu *Engine) packageNames(dir, pkg string) pkgNames {
+	if mu.pkgNames == nil {
+		mu.pkgNames = make(map[string]map[string]pkgNames)
+	}
+	byPkg, ok := mu.pkgNames[dir]
+	if !ok {
+		byPkg = mu.readPackageNames(dir)
+		mu.pkgNames[dir] = byPkg
+	}
+	if byPkg == nil {
+		return nil
+	}
+
+	return byPkg[pkg]
+}
+
+// readPackageNames returns the package-level names of the Go files of the
+// directory dir by package name. It returns nil when a Go file of dir is not
+// a regular file or cannot be read or parsed.
+func (mu *Engine) readPackageNames(dir string) map[string]pkgNames {
+	entries, err := fs.ReadDir(mu.fs, dir)
+	if err != nil {
+		return nil
+	}
+	byPkg := make(map[string]pkgNames)
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".go" || goIgnored(e.Name()) {
+			continue
+		}
+		if !e.Type().IsRegular() {
+			return nil
+		}
+		name := path.Join(dir, e.Name())
+		src, err := fs.ReadFile(mu.fs, name)
+		if err != nil {
+			return nil
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), name, src, parser.SkipObjectResolution)
+		if err != nil {
+			return nil
+		}
+		names, ok := byPkg[file.Name.Name]
+		if !ok {
+			names = pkgNames{}
+			byPkg[file.Name.Name] = names
+		}
+		addPackageNames(names, file)
+	}
+
+	return byPkg
+}
+
 // hostBuilds tells if the host build with the configured build tags includes
 // a Go file of the module file system. It applies the file name suffixes and
 // the build constraints of the file, as the go command does.
@@ -312,12 +378,11 @@ func (mu *Engine) hostBuilds(fileName string) (bool, error) {
 func (mu *Engine) findMutations(sf *sourceFile, node *NodeToken) []*mutant {
 	var mutants []*mutant
 	for mt := range builtins.eligibleTypes(node) {
-		if !configuration.Get[bool](configuration.MutantTypeEnabledKey(mt)) ||
-			sf.directives.ignores.ignored(node.TokPos, mt) {
+		if !configuration.IsMutantTypeEnabled(mt) || sf.directives.ignores.ignored(node.TokPos, mt) {
 			continue
 		}
 		tm := builtins.newMutant(sf.parsedFile, sf.pkg, node, mt)
-		status := mu.mutationStatus(sf.cov, node.TokPos)
+		status := mu.mutationStatus(sf.cov, node)
 		if reason, ok := sf.directives.equivalents[equivalentKey{pos: node.TokPos, mt: mt}]; ok {
 			tm.SetEquivalentReason(reason)
 			if status != mutator.Skipped {
@@ -345,14 +410,19 @@ func (mu *Engine) pkgName(fileName string) string {
 	return mu.module.Name + "/" + dir
 }
 
-// mutationStatus returns the status of a new mutant at tokPos. A mutant that
-// is outside the diff, or that no test run can cover, is skipped. Coverage
-// then tells if the mutant is runnable or not covered.
-func (mu *Engine) mutationStatus(cov fileCoverage, tokPos token.Pos) mutator.Status {
+// mutationStatus returns the status of a new mutant of node. A mutant whose
+// source span is outside the diff, or that no test run can cover, is skipped.
+// The diff has physical lines, so //line directives do not change the span.
+// Coverage of the coverage position of node then tells if the mutant is
+// runnable or not covered.
+func (mu *Engine) mutationStatus(cov fileCoverage, node *NodeToken) mutator.Status {
+	start, end := node.span()
+	pos := node.coverPos()
 	switch {
-	case !mu.codeData.Diff.IsChanged(cov.set.Position(tokPos)) || !cov.isObservable(tokPos):
+	case !mu.codeData.Diff.IsRangeChanged(cov.set.PositionFor(start, false), cov.set.PositionFor(end, false)) ||
+		!cov.isObservable(pos):
 		return mutator.Skipped
-	case cov.isCovered(tokPos):
+	case cov.isCovered(pos):
 		return mutator.Runnable
 	default:
 		return mutator.NotCovered

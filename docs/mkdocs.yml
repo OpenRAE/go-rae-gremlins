@@ -58,6 +58,9 @@ nav:
           - usage/mutations/invert_loop.md
           - usage/mutations/invert_negatives.md
           - usage/mutations/remove_self_assignments.md
+          - usage/mutations/extreme_void.md
+          - usage/mutations/extreme_zero.md
+          - usage/mutations/extreme_constant.md
   - Explanation:
       - Coverage: usage/coverage.md
   - Repository guides:

@@ -191,7 +191,7 @@ func (m *mutant) Apply() error {
 		return err
 	}
 	m.origFile = origFile
-	line := m.src.line(m.node.TokPos)
+	line := m.src.line(m.node.snippetPos())
 	m.origSnippet = extractSnippet(origFile, line, snippetContext)
 
 	restore, err := s.mutate(m.node)

@@ -82,7 +82,8 @@ For current instructions, follow the [contributor guide](../CONTRIBUTING.md) and
   [compiler flags](compiler-flags-preflight.md), [module declarations](module-declaration-preflight.md),
   [nested module diff](nested-module-diff-preflight.md), and [memory budget](memory-budget-preflight.md).
 - Mutation reviews: [equivalent mutants](equivalent-mutants-preflight.md), [ignore directives](ignore-directive-preflight.md),
-  [logical negation](invert-logical-not-preflight.md), and [mutation registry](mutation-registry-preflight.md).
+  [logical negation](invert-logical-not-preflight.md), [mutation registry](mutation-registry-preflight.md),
+  and [Descartes extreme mutation](descartes-extreme-mutation-preflight.md).
 - Verification reviews: [configuration schema](configuration-schema-preflight.md), [field alignment](fieldalignment-preflight.md),
   [lint](lint-preflight.md), [process tests](process-tests-preflight.md), [test standard](test-standard-preflight.md),
   and [test assessment](test-assessment.md).

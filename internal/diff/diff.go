@@ -97,14 +97,19 @@ func changesInFragment(fragment *gitdiff.TextFragment) []Change {
 // changed. A non-nil Diff with no matching range means diff-based selection
 // is enabled but found no added lines for that position, so it is unchanged.
 func (d Diff) IsChanged(pos token.Position) bool {
+	return d.IsRangeChanged(pos, pos)
+}
+
+// IsRangeChanged returns true if a changed region overlaps one or more lines
+// from the line of start to the line of end, in the file of start. A nil Diff
+// means diff-based selection is disabled, so every range is changed.
+func (d Diff) IsRangeChanged(start, end token.Position) bool {
 	if d == nil {
 		return true
 	}
 
-	fileDiff := d[FileName(pos.Filename)]
-
-	for _, change := range fileDiff {
-		if pos.Line >= change.StartLine && pos.Line <= change.EndLine {
+	for _, change := range d[FileName(start.Filename)] {
+		if start.Line <= change.EndLine && change.StartLine <= end.Line {
 			return true
 		}
 	}

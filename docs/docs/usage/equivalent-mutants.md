@@ -15,6 +15,7 @@ Put a directive comment in the Go source file:
 
 - `TYPE` is the mutation type, as Gremlins prints it. For example, `CONDITIONALS_BOUNDARY`.
 - `COLUMN` is the column of the operator, as Gremlins prints it. It is optional.
+  The operator of an [extreme mutant](mutations/index.md#descartes-extreme-mutations) is the `func` keyword of its function.
 - `REASON` is the result of your review. It must contain text.
 
 Do not put a space between `//` and `gremlins`.

@@ -21,6 +21,7 @@ A current-context note in an ADR records later changes to its facts.
 | [0009](0009-temporary-build-cache.md) | Use a temporary Go build cache for each run | Accepted. The pull request for #8 merged. |
 | [0010](0010-maintainer-integrations-in-the-canonical-repository.md) | Run maintainer integrations only in the canonical repository | Accepted. The change for #231 merged. |
 | [0011](0011-mutant-eligibility-type-information.md) | Create only mutants that can build | Accepted. [PR #234](https://github.com/OpenRAE/go-rae-gremlins/pull/234) delivered the change for #222. |
+| [0012](0012-descartes-extreme-mutation.md) | Add the Descartes extreme mutation types | Accepted when #2 merges. |
 
 Two ADRs use the number 0009.
 Identify each of them by its title and file name.

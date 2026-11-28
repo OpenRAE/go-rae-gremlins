@@ -24,6 +24,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -137,7 +138,7 @@ func writeSource(t *testing.T, name, src string) string {
 func operatorsOf(t *testing.T, pf *parsedFile, tok token.Token) []*NodeToken {
 	t.Helper()
 	var nodes []*NodeToken
-	inspectTokens(pf.file, nil, func(n *NodeToken) bool {
+	inspectTokens(pf.file, fileScope{}, func(n *NodeToken) bool {
 		if n.Tok() == tok {
 			nodes = append(nodes, n)
 		}
@@ -464,5 +465,41 @@ func TestFeatureMutantApplyReportsRestorationFailure(t *testing.T) {
 		if !errors.Is(e, fs.ErrPermission) {
 			t.Errorf("Apply() error %d = %v, want %v", i, e, fs.ErrPermission)
 		}
+	}
+}
+
+// TestFeatureExtremeSnippetShowsTheAddedReturn checks that the snippets of
+// an extreme mutant of a function with a long signature show the body. The
+// mutant is at the func keyword, which is more than three lines before the
+// added return statement.
+func TestFeatureExtremeSnippetShowsTheAddedReturn(t *testing.T) {
+	t.Parallel()
+
+	const src = "package main\n\nfunc f(\n\ta int,\n\tb int,\n\tc int,\n\td int,\n) {\n\tprintln(a, b, c, d)\n}\n"
+	workdir := writeSource(t, sourceFileName, src)
+	pf := parseSource(t, sourceFileName, src)
+	var fn *NodeToken
+	inspectTokens(pf.file, fileScope{pkg: pkgNames{}}, func(n *NodeToken) bool {
+		if n.fn != nil {
+			fn = n
+		}
+
+		return true
+	})
+	if fn == nil {
+		t.Fatal("found no function candidate")
+	}
+	mut := builtins.newMutant(pf, "example.com/test", fn, mutator.ExtremeVoid)
+	mut.SetWorkdir(workdir)
+
+	if err := mut.Apply(); err != nil {
+		t.Fatalf("Apply() error = %v, want nil", err)
+	}
+
+	if got := string(mut.MutatedSnippet()); !strings.Contains(got, "\treturn\n") {
+		t.Errorf("MutatedSnippet() = %q, want the added return statement", got)
+	}
+	if got := string(mut.OrigSnippet()); !strings.Contains(got, "println(a, b, c, d)") {
+		t.Errorf("OrigSnippet() = %q, want the first body statement", got)
 	}
 }

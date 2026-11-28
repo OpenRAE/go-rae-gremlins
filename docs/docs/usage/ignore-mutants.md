@@ -44,6 +44,9 @@ func myFunc() {
 }
 ```
 
+This includes the [extreme mutants](mutations/index.md#descartes-extreme-mutations) of the function.
+A directive inside the function body does not ignore its extreme mutants, because they are at the `func` keyword.
+
 Before a statement, it ignores the full statement. For an `if` statement, that includes all the branches:
 
 ```go

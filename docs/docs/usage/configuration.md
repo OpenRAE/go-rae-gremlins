@@ -58,6 +58,7 @@ silent: false
 unleash:
   integration: false
   dry-run: false
+  descartes: false
   tags: ""
   coverpkg: ""
   output: ""
@@ -96,6 +97,12 @@ mutants:
   invert-loopctrl:
     enabled: false
   remove-self-assignments:
+    enabled: false
+  extreme-void:
+    enabled: false
+  extreme-zero:
+    enabled: false
+  extreme-constant:
     enabled: false
 
 ```

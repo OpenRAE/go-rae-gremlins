@@ -28,7 +28,8 @@ import (
 	"github.com/OpenRAE/go-rae-gremlins/internal/typeinfo"
 )
 
-// tokenTable returns the token replacement table of s.
+// tokenTable returns the token replacement table of s. An extreme spec
+// replaces no token, so its table is empty.
 func tokenTable(t *testing.T, s spec) map[token.Token]token.Token {
 	t.Helper()
 	switch s := s.(type) {
@@ -36,6 +37,8 @@ func tokenTable(t *testing.T, s spec) map[token.Token]token.Token {
 		return s.replacements
 	case logicalSpec:
 		return s.replacements
+	case extremeSpec:
+		return nil
 	default:
 		t.Fatalf("spec of %s has unknown kind %T", s.mutationType(), s)
 

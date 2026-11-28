@@ -827,3 +827,40 @@ func TestFeatureReportCountsMemoryErrorsApartFromKilledAndLived(t *testing.T) {
 		t.Errorf("Do() output mismatch (-want +got):\n%s", diff)
 	}
 }
+
+// TestFeatureReportCountsExtremeTypes checks the JSON statistics of the
+// extreme mutation types of ADR 0012. The field names are a downstream
+// contract.
+func TestFeatureReportCountsExtremeTypes(t *testing.T) {
+	isolateConfig(t)
+	output := filepath.Join(t.TempDir(), "findings.json")
+	configuration.Set(configuration.UnleashOutputKey, output)
+	mutants := []mutator.Mutator{
+		stubMutant{status: mutator.Killed, mutantType: mutator.ExtremeVoid, position: newPosition("file1.go", 3, 1)},
+		stubMutant{status: mutator.Killed, mutantType: mutator.ExtremeZero, position: newPosition("file1.go", 7, 1)},
+		stubMutant{status: mutator.Lived, mutantType: mutator.ExtremeZero, position: newPosition("file1.go", 9, 1)},
+		stubMutant{status: mutator.Killed, mutantType: mutator.ExtremeConstant, position: newPosition("file1.go", 7, 1)},
+		stubMutant{status: mutator.Lived, mutantType: mutator.ExtremeConstant, position: newPosition("file1.go", 9, 1)},
+		stubMutant{status: mutator.NotCovered, mutantType: mutator.ExtremeConstant, position: newPosition("file1.go", 11, 1)},
+	}
+
+	if err := report.Do(report.Results{Module: "example.com/m", Mutants: mutants}); err != nil {
+		t.Fatalf("Do() error = %v, want nil", err)
+	}
+	//nolint:gosec // test code reading test output file
+	data, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatalf("os.ReadFile(report output) error = %v, want nil", err)
+	}
+	var got struct {
+		Statistics map[string]int `json:"mutator_statistics"`
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("json.Unmarshal(report output) error = %v, want nil", err)
+	}
+
+	want := map[string]int{"extreme_void": 1, "extreme_zero": 2, "extreme_constant": 3}
+	if diff := cmp.Diff(want, got.Statistics); diff != "" {
+		t.Errorf("mutator_statistics mismatch (-want +got):\n%s", diff)
+	}
+}

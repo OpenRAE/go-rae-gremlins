@@ -57,16 +57,17 @@ type annotation struct {
 }
 
 // fileEquivalents returns the mutants that the //gremlins:equivalent
-// directives dirs of a parsed file annotate. Each directive must select
+// directives dirs of a parsed file annotate. pkg holds the package-level
+// names of the package of the file. Each directive must select
 // exactly one mutant among all the mutation types of the operators of the
 // file, enabled or not. fileEquivalents returns the errors of all the invalid
 // directives, which wrap ErrEquivalentAnnotation.
-func fileEquivalents(set *token.FileSet, file *ast.File, dirs []directive, facts operatorFacts) (equivalents, error) {
+func fileEquivalents(set *token.FileSet, file *ast.File, dirs []directive, scope fileScope) (equivalents, error) {
 	anns, err := parseAnnotations(dirs)
 	if err != nil || len(anns) == 0 {
 		return nil, err
 	}
-	matchAnnotations(set, file, anns, facts)
+	matchAnnotations(set, file, anns, scope)
 
 	return bindAnnotations(set, anns)
 }
@@ -122,13 +123,14 @@ func parseAnnotation(args string, at token.Position) (*annotation, error) {
 
 // matchAnnotations records in each annotation the operators of file that
 // are on its line, at its column if it has one, and that can produce its
-// mutation type with the operand facts. It compares physical positions.
-func matchAnnotations(set *token.FileSet, file *ast.File, anns []*annotation, facts operatorFacts) {
+// mutation type with the scope of the file. The operator of a function
+// candidate is its func keyword. It compares physical positions.
+func matchAnnotations(set *token.FileSet, file *ast.File, anns []*annotation, scope fileScope) {
 	byLine := make(map[int][]*annotation, len(anns))
 	for _, a := range anns {
 		byLine[a.line] = append(byLine[a.line], a)
 	}
-	inspectTokens(file, facts, func(node *NodeToken) bool {
+	inspectTokens(file, scope, func(node *NodeToken) bool {
 		pos := set.PositionFor(node.TokPos, false)
 		for _, a := range byLine[pos.Line] {
 			if (a.column == 0 || a.column == pos.Column) && builtins.eligible(node, a.mt) {

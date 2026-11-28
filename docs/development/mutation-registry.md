@@ -1,8 +1,10 @@
 # Mutation registry
 
 This explanation describes how the engine finds and applies mutations.
+
 Issue 20 introduced this design. The [preflight](mutation-registry-preflight.md) records its boundaries and evidence obligations.
 Issue 222 added the eligibility checks and the operand facts. [ADR 0011](../adr/0011-mutant-eligibility-type-information.md) records that decision.
+Issue 2 added the function candidates of the Descartes types. [ADR 0012](../adr/0012-descartes-extreme-mutation.md) records that decision.
 
 ## Components
 
@@ -17,7 +19,9 @@ The `internal/mutator` package keeps the `Type`, `Status`, and `Mutator` contrac
 | Expression edit helpers | `spec_expression.go` | Find a `!x` negation and apply the `!!x` edit for the logical spec. |
 | Operator context | `node.go` | The operator token, its unary or binary form, its operand facts, and the loop context of a `break`. |
 | Operand facts | `internal/typeinfo` | Loads the types of the scanned packages once. Gives the `+` and `+=` operators whose `-` form does not type-check, and the shift assignments whose count cannot be assigned. |
-| Built-in specs | `specs.go` | The registration list of the 11 built-in types, in candidate order. |
+| Built-in specs | `specs.go` | The registration list of the 14 built-in types, in candidate order. |
+| Extreme spec | `spec_function.go` | A Descartes spec. It adds one `return` statement before the statements of a function body. |
+| Function candidate | `function.go` | The function declaration of a candidate, the kinds of its results, and the names that the package and the function declare. |
 | Registry | `registry.go` | Validates the registration once and indexes the specs by operator token. Gives the eligible types of an operator, in registration order. |
 | Factory | `registry.go` | Binds a type, an operator, a package, and a parsed file into a `mutator.Mutator`. |
 | Parsed file | `mutant.go` | The shared AST of one source file, its physical name, the lock for its AST edits, and the file access in a worker copy. |
@@ -40,6 +44,7 @@ classDiagram
   }
   class tokenSpec
   class logicalSpec
+  class extremeSpec
   class registry {
     eligibleTypes(NodeToken) Seq[Type]
     eligible(NodeToken, Type) bool
@@ -49,6 +54,7 @@ classDiagram
   class parsedFile
   spec <|.. tokenSpec
   spec <|.. logicalSpec
+  spec <|.. extremeSpec
   logicalSpec *-- tokenSpec
   registry o-- spec
   registry ..> mutant : creates
@@ -68,8 +74,12 @@ A spec selects an operator only when its mutant can build and no other type make
 | `INVERT_ASSIGNMENTS` | No `+=` whose `-` form does not type-check. | For example, strings have no `-=`. |
 | `REMOVE_SELF_ASSIGNMENTS` | No `<<=` or `>>=` whose count cannot be assigned to the left operand. | `x = n` needs `n` to have a type that `x` can hold. |
 | `INVERT_LOOPCTRL` | A `break` only where `continue` with the same label is valid. | `continue` needs a loop. A label must name a loop. |
+| `EXTREME_VOID` | A function without results. The body is not empty and is not only `return`. | Such a body is already the mutation. |
+| `EXTREME_ZERO` | Each result is nilable or basic, and the value names are predeclared. The body is not one `return` of the zero values. | Other types have no literal value. That body is already the mutation. |
+| `EXTREME_CONSTANT` | The `EXTREME_ZERO` checks, with one or more basic results. The body is not one `return` of the same constants. | A function with only nilable results has the same mutant as `EXTREME_ZERO`. |
 
 The syntax checks use the operator and its ancestors in the AST. They need no types.
+The extreme checks use the function declaration and the names of its package and file. They need no types.
 The type checks use the operand facts.
 
 For a `+` or `+=`, `internal/typeinfo` asks the type checker if the `-` form type-checks at the operator position.
@@ -101,6 +111,29 @@ Each position and type pair is one candidate.
 Directive matching and discovery use the same registry.
 An equivalent annotation selects an operator that its type can mutate, also when the type is disabled.
 
+## Function candidates
+
+The Descartes types of [ADR 0012](../adr/0012-descartes-extreme-mutation.md) mutate a full function.
+A function or method declaration with a body is one candidate. Its token for the registry is `func`.
+The candidate has three source locations:
+
+| Location | Use |
+| --- | --- |
+| The `func` keyword | The position of the mutant in reports, logs, and directives. |
+| The first statement of the body | The coverage position. The coverage profile has a block from that statement. |
+| The physical lines of the declaration | The diff range. A change on one of these lines selects the mutant. |
+| The opening brace of the body | The center of the snippets, so they show the added statement. |
+
+The engine gives the kind of each result from the syntax of its type: nilable, `bool`, numeric, `string`, or other.
+A predeclared identifier counts only when the package, the imports of the file, and the function do not declare the name.
+The engine reads the package-level names of the regular Go files of the directory once, by package clause.
+When a Go file of the directory is not a regular file, or cannot be read or parsed, the names are not known.
+Then no predeclared identifier counts. The scan reports no error and reads no symbolic link.
+
+An extreme spec adds the `return` statement before the original statements and keeps them.
+The restore function puts back the original statement list.
+The added statement has no position, so it does not move the original positions.
+
 ## Data flow
 
 ```mermaid
@@ -124,6 +157,7 @@ flowchart LR
   cache -- dependency export data --> types
   types -- operand facts --> parse
   src -- Go source bytes --> parse
+  src -- package-level names of the directory --> match
   parse -- original AST operators and facts --> match
   match -- ordered types --> policy
   operator -- enabled types --> policy
@@ -188,6 +222,8 @@ A `//line` directive cannot change the worker file path.
 | Shared AST | Two workers edit one AST at the same time. | One lock for each parsed file covers the edit, the print, and the restoration. | `TestFeatureMutantApplySharesTheLockOfItsFile` with the race detector. |
 | Shared AST | An edit stays after Apply, so a later mutant or the discovery sees it. | The spec returns an exact restore function. Apply calls it before it releases the lock, also on failure. Discovery of a file ends before its first dispatch. | `TestRegressionTokenMutatorApplyWriteFailureRestoresAST`, `TestFeatureMutantApplyDoubleNegation`, `TestFeatureRunDiscoversOnlyOriginalNegations`. |
 | Result integrity | A spec selects an operator whose mutant cannot build, or two types make the same edit. | Syntax checks in each spec. Type facts for the `-` form of `+` and for shift counts. A missing fact keeps the earlier behavior. | `TestFeatureSpecEligibility`, `TestFeatureLoadFindsOperandFacts`, `TestRegressionUnleashCreatesOnlyMutantsThatBuild`. |
+| Files outside the module | A symbolic link next to a source file makes the name scan read another file and print it in a parser error. | The scan opens only regular files and reports no parser error. | `TestFeaturePackageNamesOfSiblingFiles`. |
+| Result integrity | A wrong result kind gives an extreme mutant that does not compile. | Unknown types are not eligible. A predeclared name counts only when the package, the file imports, and the function do not declare it. | `TestFeatureExtremeSpecEligibility`, `TestFeatureExtremeMutantsTypeCheck`. |
 | Result integrity | A wrong registration adds, removes, or reorders candidates. | Registry validation at start. A characterization test compares the candidates with an independent list. | `TestFeatureRegistryRejectsInvalidRegistration`, `TestFeatureRunDiscoversEachOperatorInOrder`, `TestFeatureSpecMutatesEachOperator`. |
 
 Gremlins runs operator-selected code with the permissions of the operator.
